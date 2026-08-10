@@ -1033,7 +1033,7 @@ app.delete("/api/admin/mensagens/:id", autenticar, apenasAdmin, async (req, res)
 // STATUS
 // ==========================================
 app.get("/api/status", (req, res) => {
-  res.json({ mensagem: "Servidor UCM SmartHub Operacional", status: "ONLINE" });
+  res.json({ mensagem: "Servidor Operacional", status: "ONLINE" });
 });
 
 // ==========================================
