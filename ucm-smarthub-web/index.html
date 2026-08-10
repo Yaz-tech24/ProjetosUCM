@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="pt">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="UCM SmartHub — Plataforma académica da Universidade Católica de Moçambique, Extensão de Tete." />
+    <meta name="theme-color" content="#04122e" />
+
+    <title>UCM SmartHub</title>
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+
+    <!--
+      Fonte Inter — apenas 3 pesos essenciais (era 6, reduziu ~55% do tamanho da fonte)
+      display=swap: não bloqueia o render — mostra texto imediatamente com fonte de sistema
+    -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap"
+      rel="stylesheet"
+      media="print"
+      onload="this.media='all'"
+    />
+    <!-- Fallback para browsers sem JS -->
+    <noscript>
+      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet" />
+    </noscript>
+
+    <!--
+      CSS crítico inline — evita flash branco antes do React montar.
+      O browser pinta este fundo imediatamente, antes de qualquer JS.
+    -->
+    <style>
+      /* Reset mínimo e fundo imediato */
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+      html, body { height: 100%; }
+
+      body {
+        font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        background: #f0f5ff;
+        color: #0f172a;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+
+      /* Skeleton de carregamento — visível enquanto o React não monta */
+      #root:empty {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        background: linear-gradient(145deg, #020b18 0%, #04122e 35%, #071832 65%, #0d254a 100%);
+      }
+
+      #root:empty::before {
+        content: '';
+        width: 72px;
+        height: 72px;
+        border-radius: 22px;
+        background: linear-gradient(135deg, #c9a800, #ffd700, #ffe88a);
+        box-shadow: 0 0 40px rgba(255, 215, 0, 0.55);
+        animation: pulse-logo 1.4s ease-in-out infinite;
+      }
+
+      @keyframes pulse-logo {
+        0%, 100% { transform: scale(1);    opacity: 1;   }
+        50%       { transform: scale(0.88); opacity: 0.7; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
