@@ -1,22 +1,16 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import api from "../services/api";
 import { useNavigate } from "react-router-dom";
 import {
-  BookOpen, User, Lock, Mail, FileText, GraduationCap,
+  BookOpen, User, Lock, Mail, GraduationCap,
   ArrowRight, Library, MessageCircle, Sparkles, CheckCircle,
   AlertCircle, Globe, Share2, Menu, X,
 } from "lucide-react";
-import { CURSOS } from "../constants/cursos";
+import { useConfig } from "../context/ConfigContext";
 
 /* ─── Constantes de navegação / footer ─── */
 const NAV_LINKS    = ["Sobre Nós", "Projectos", "Carreiras", "Contacto"];
 const FOOTER_LINKS = ["Sobre", "Projectos", "Carreiras", "Sitemap"];
-const SOCIALS = [
-  { Icon: Mail,          href: "mailto:smarthub@ucm.ac.mz" },
-  { Icon: Globe,         href: "#" },
-  { Icon: MessageCircle, href: "#" },
-  { Icon: Share2,        href: "#" },
-];
 
 /* ─── Card flutuante no painel hero ─── */
 const FloatCard = ({ icon: Icon, label, value, delay, style }) => (
@@ -47,12 +41,6 @@ const FloatCard = ({ icon: Icon, label, value, delay, style }) => (
   </div>
 );
 
-const FEATURES = [
-  { icon: Library,       text: "Repositório de materiais aprovados" },
-  { icon: MessageCircle, text: "Chat em tempo real com a turma"     },
-  { icon: Sparkles,      text: "IA que resume PDFs automaticamente" },
-];
-
 /* ── Input reutilizável — DEVE estar fora do Login para não re-montar a cada render ── */
 const InputField = ({ icon, ...props }) => (
   <div className="relative">
@@ -74,6 +62,7 @@ const InputField = ({ icon, ...props }) => (
 ══════════════════════════════════════════════════════════════ */
 const Login = ({ onLogin }) => {
   const navigate = useNavigate();
+  const { config, cursos } = useConfig();
 
   /* form state */
   const [isRegistering,    setIsRegistering]    = useState(false);
@@ -82,23 +71,42 @@ const Login = ({ onLogin }) => {
   const [nome,             setNome]             = useState("");
   const [email,            setEmail]            = useState("");
   const [senha,            setSenha]            = useState("");
-  const [codigoEstudante,  setCodigoEstudante]  = useState("");
   const [papel,            setPapel]            = useState("estudante");
-  const [curso,            setCurso]            = useState("Informática");
+  const [curso,            setCurso]            = useState("");
+  const [stats,            setStats]            = useState(null);
 
   /* navbar mobile */
   const [mobileMenu, setMobileMenu] = useState(false);
 
-  const validarCodigo = (c) => /^708\d{6}$/.test(c);
+  /* Selecciona o primeiro curso disponível assim que a lista carrega */
+  useEffect(() => {
+    if (!curso && cursos.length > 0) setCurso(cursos[0].nome);
+  }, [cursos, curso]);
+
+  /* Números reais para o painel — nunca dados fabricados */
+  useEffect(() => {
+    api.get("/stats/publicas").then(res => setStats(res.data)).catch(() => setStats(null));
+  }, []);
+
+  const SOCIALS = [
+    { Icon: Mail,          href: config.contacto_email ? `mailto:${config.contacto_email}` : null },
+    { Icon: Globe,         href: "#" },
+    { Icon: MessageCircle, href: "#" },
+    { Icon: Share2,        href: "#" },
+  ].filter(s => s.href);
+
+  const FEATURES = [
+    { icon: Library, text: "Repositório de materiais aprovados" },
+    ...(config.chat_activado ? [{ icon: MessageCircle, text: "Chat em tempo real com a turma" }] : []),
+    ...(config.ia_activada   ? [{ icon: Sparkles, text: "IA que resume PDFs automaticamente" }] : []),
+  ];
 
   const handleRegister = async (e) => {
     e.preventDefault();
     setMensagem({ texto: "", tipo: "" });
-    if (papel === "estudante" && !validarCodigo(codigoEstudante))
-      return setMensagem({ texto: "Código UCM inválido. Deve ter 9 dígitos e começar por 708.", tipo: "erro" });
     setLoading(true);
     try {
-      await api.post("/register", { nome, email, senha, papel, curso, codigo: papel === "estudante" ? codigoEstudante : null });
+      await api.post("/register", { nome, email, senha, papel, curso });
       setMensagem({ texto: "Conta criada! Faça login para entrar.", tipo: "sucesso" });
       setIsRegistering(false);
       setSenha("");
@@ -125,7 +133,7 @@ const Login = ({ onLogin }) => {
     setIsRegistering(v => !v);
     setMensagem({ texto: "", tipo: "" });
     setPapel("estudante");
-    setCurso("Informática");
+    setCurso(cursos[0]?.nome || "");
   };
 
   return (
@@ -241,11 +249,12 @@ const Login = ({ onLogin }) => {
                 animation:"glow-logo-s 2.5s ease-in-out infinite",
               }}
             >
-              <BookOpen size={20} strokeWidth={1.7} />
+              {config.logo_url
+                ? <img src={config.logo_url} alt={config.nome_plataforma} style={{ width: "100%", height: "100%", objectFit: "contain", borderRadius: 13 }} />
+                : <BookOpen size={20} strokeWidth={1.7} />}
             </div>
             <div style={{ lineHeight:1 }}>
-              <span style={{ display:"block", fontSize:9, fontWeight:700, letterSpacing:".44em", color:"rgba(var(--color-navy-mid-rgb),.45)", textTransform:"uppercase", marginBottom:2 }}>UCM</span>
-              <span style={{ display:"block", fontSize:18, fontWeight:900, color:"var(--color-navy-deep)", letterSpacing:"-.02em" }}>SmartHub</span>
+              <span style={{ display:"block", fontSize:18, fontWeight:900, color:"var(--color-navy-deep)", letterSpacing:"-.02em" }}>{config.nome_plataforma}</span>
             </div>
           </div>
 
@@ -313,21 +322,26 @@ const Login = ({ onLogin }) => {
               <div key={c} className={`absolute w-8 h-8 ${c}`} style={{ borderColor:"rgba(var(--color-gold-rgb),.28)" }} />
             ))}
 
-            {/* float cards */}
-            <FloatCard icon={Library}       label="Materiais aprovados" value="120+" delay="0s"   style={{ top:"17%", right:"6%"  }} />
-            <FloatCard icon={MessageCircle} label="Mensagens hoje"       value="34"   delay="0.9s" style={{ top:"42%", right:"3%"  }} />
-            <FloatCard icon={Sparkles}      label="Resumos gerados"      value="890"  delay="1.6s" style={{ bottom:"21%", right:"7%" }} />
+            {/* float cards — números reais, não mostrados enquanto não há dados */}
+            {stats && (
+              <>
+                <FloatCard icon={Library}       label="Materiais aprovados" value={stats.total_materiais} delay="0s"   style={{ top:"17%", right:"6%"  }} />
+                <FloatCard icon={MessageCircle} label="Mensagens trocadas"  value={stats.total_mensagens} delay="0.9s" style={{ top:"42%", right:"3%"  }} />
+                <FloatCard icon={Sparkles}      label="Estudantes"          value={stats.total_utilizadores} delay="1.6s" style={{ bottom:"21%", right:"7%" }} />
+              </>
+            )}
 
             {/* logo */}
             <div className="relative z-10 flex items-center gap-4">
               <div style={{ width:54, height:54, borderRadius:18, display:"grid", placeItems:"center",
                 background:"linear-gradient(135deg,var(--color-gold-dark),var(--color-gold),var(--color-gold-light))", color:"var(--color-navy-deep)",
                 boxShadow:"0 0 36px rgba(var(--color-gold-rgb),.55)", animation:"glow-logo-s 2.5s ease-in-out infinite" }}>
-                <BookOpen size={26} strokeWidth={1.7} />
+                {config.logo_url
+                  ? <img src={config.logo_url} alt={config.nome_plataforma} style={{ width: "100%", height: "100%", objectFit: "contain", borderRadius: 18 }} />
+                  : <BookOpen size={26} strokeWidth={1.7} />}
               </div>
               <div>
-                <p style={{ fontSize:10, fontWeight:700, letterSpacing:".44em", color:"rgba(var(--color-blue-sky-rgb),.60)", textTransform:"uppercase" }}>UCM</p>
-                <p style={{ fontSize:22, fontWeight:900, color:"#fff", lineHeight:1.1, letterSpacing:"-.02em" }}>SmartHub</p>
+                <p style={{ fontSize:22, fontWeight:900, color:"#fff", lineHeight:1.1, letterSpacing:"-.02em" }}>{config.nome_plataforma}</p>
               </div>
             </div>
 
@@ -336,7 +350,7 @@ const Login = ({ onLogin }) => {
               <div>
                 <p className="mb-5 text-[11px] font-bold uppercase"
                   style={{ letterSpacing:".5em", color:"rgba(var(--color-gold-rgb),.60)" }}>
-                  Plataforma académica · UCM Tete
+                  Plataforma académica
                 </p>
                 <h1 className="text-[3.4rem] font-black leading-[1.02] tracking-tight text-white"
                   style={{ textShadow:"0 0 50px rgba(var(--color-gold-rgb),.18)" }}>
@@ -361,27 +375,17 @@ const Login = ({ onLogin }) => {
                 ))}
               </ul>
 
-              {/* social proof */}
-              <div className="flex items-center gap-4 pt-1">
-                <div className="flex -space-x-2.5">
-                  {["var(--color-navy-mid)","var(--color-navy-bright)","#2a5298","var(--color-blue-accent)"].map((bg, i) => (
-                    <div key={i}
-                      style={{ width:36, height:36, borderRadius:"50%", display:"grid", placeItems:"center",
-                        fontSize:12, fontWeight:900, color:"#fff", flexShrink:0,
-                        background:bg, border:"2px solid rgba(255,255,255,.15)", boxShadow:"0 2px 8px rgba(var(--color-navy-abyss-rgb),.4)" }}>
-                      {["A","B","C","D"][i]}
-                    </div>
-                  ))}
-                </div>
+              {/* social proof — só aparece quando há utilizadores reais a mostrar */}
+              {stats?.total_utilizadores > 0 && (
                 <p style={{ fontSize:12, color:"rgba(255,255,255,.40)", fontWeight:500 }}>
-                  Já usado por centenas de estudantes
+                  Já usado por {stats.total_utilizadores} estudante{stats.total_utilizadores !== 1 ? 's' : ''} e professores
                 </p>
-              </div>
+              )}
             </div>
 
             {/* copyright */}
             <p style={{ fontSize:10, color:"rgba(255,255,255,.18)", fontWeight:500, letterSpacing:".10em", position:"relative", zIndex:10 }}>
-              © 2025 Universidade Católica de Moçambique · Extensão de Tete
+              © {new Date().getFullYear()} {config.nome_plataforma}
             </p>
           </div>
 
@@ -400,9 +404,11 @@ const Login = ({ onLogin }) => {
               <div style={{ width:44, height:44, borderRadius:14, display:"grid", placeItems:"center",
                 background:"linear-gradient(135deg,var(--color-navy-mid),var(--color-navy))", color:"var(--color-gold)",
                 boxShadow:"0 4px 16px rgba(var(--color-navy-mid-rgb),.35)" }}>
-                <BookOpen size={21} />
+                {config.logo_url
+                  ? <img src={config.logo_url} alt={config.nome_plataforma} style={{ width: "100%", height: "100%", objectFit: "contain", borderRadius: 14 }} />
+                  : <BookOpen size={21} />}
               </div>
-              <span style={{ fontSize:20, fontWeight:900, color:"var(--color-navy-mid)" }}>SmartHub UCM</span>
+              <span style={{ fontSize:20, fontWeight:900, color:"var(--color-navy-mid)" }}>{config.nome_plataforma}</span>
             </div>
 
             <div className="w-full max-w-[370px]">
@@ -418,11 +424,11 @@ const Login = ({ onLogin }) => {
                 </div>
                 <h2 className="leading-tight mb-2"
                   style={{ fontSize:"2.1rem", fontWeight:900, color:"var(--color-navy-deep)", letterSpacing:"-.025em" }}>
-                  {isRegistering ? "Criar conta UCM" : "Bem‑vindo\nde volta"}
+                  {isRegistering ? "Criar conta" : "Bem‑vindo\nde volta"}
                 </h2>
                 <p style={{ fontSize:14, color:"#94a3b8", lineHeight:1.65 }}>
                   {isRegistering
-                    ? "Junte-se à comunidade académica da UCM Tete."
+                    ? "Junte-se à nossa comunidade académica."
                     : "Aceda ao seu espaço de aprendizagem."}
                 </p>
               </div>
@@ -464,12 +470,6 @@ const Login = ({ onLogin }) => {
                       type="text" placeholder="Nome completo" required
                       value={nome} onChange={e => setNome(e.target.value)} />
 
-                    {papel === "estudante" && (
-                      <InputField icon={<FileText size={17} />}
-                        type="text" placeholder="Código estudante (708xxxxxx)" required
-                        value={codigoEstudante} onChange={e => setCodigoEstudante(e.target.value)} />
-                    )}
-
                     <div className="relative">
                       <div className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2" style={{ color:"#94a3b8" }}>
                         <GraduationCap size={17} />
@@ -477,7 +477,7 @@ const Login = ({ onLogin }) => {
                       <select value={curso} onChange={e => setCurso(e.target.value)}
                         className="w-full rounded-2xl py-4 pl-12 pr-4 text-sm outline-none transition-all duration-200 appearance-none"
                         style={{ background:"rgba(var(--color-ice-rgb),.65)", border:"1.5px solid rgba(var(--color-navy-mid-rgb),.11)", color:"#0f172a" }}>
-                        {CURSOS.map(c => <option key={c} value={c}>{c}</option>)}
+                        {cursos.map(c => <option key={c.id} value={c.nome}>{c.nome}</option>)}
                       </select>
                     </div>
                   </>
@@ -555,8 +555,12 @@ const Login = ({ onLogin }) => {
           }}
         >
           <div>
-            <p style={{ fontSize:11, color:"var(--color-navy-deep)", fontWeight:700, marginBottom:2 }}>UCM Extensão de Tete</p>
-            <p style={{ fontSize:10, color:"#94a3b8" }}>Tete, Moçambique · smarthub@ucm.ac.mz</p>
+            <p style={{ fontSize:11, color:"var(--color-navy-deep)", fontWeight:700, marginBottom:2 }}>{config.nome_plataforma}</p>
+            {(config.localizacao || config.contacto_email) && (
+              <p style={{ fontSize:10, color:"#94a3b8" }}>
+                {[config.localizacao, config.contacto_email].filter(Boolean).join(' · ')}
+              </p>
+            )}
           </div>
 
           <div className="hidden sm:flex" style={{ gap:20 }}>

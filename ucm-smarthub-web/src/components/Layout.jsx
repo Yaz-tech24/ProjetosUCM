@@ -3,6 +3,7 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { BookOpen, Home, Library, ShieldCheck, Search, MessageCircle, LogOut, Bell, X, FileText, PlayCircle } from 'lucide-react';
 import Chatbot from './Chatbot';
 import api from '../services/api';
+import { useConfig } from '../context/ConfigContext';
 
 const NAV_ITEMS = [
   { label: 'Painel Inicial',  icon: Home,          path: '/dashboard'   },
@@ -11,6 +12,7 @@ const NAV_ITEMS = [
 ];
 
 const Layout = ({ usuarioLogado, onLogout }) => {
+  const { config } = useConfig();
   const navigate  = useNavigate();
   const location  = useLocation();
   const [searchTerm,   setSearchTerm]   = useState('');
@@ -129,11 +131,12 @@ const Layout = ({ usuarioLogado, onLogout }) => {
                 animation: "glow-logo-small 2.5s ease-in-out infinite",
               }}
             >
-              <BookOpen size={24} strokeWidth={1.7} />
+              {config.logo_url
+                ? <img src={config.logo_url} alt={config.nome_plataforma} className="w-full h-full object-contain rounded-[18px]" />
+                : <BookOpen size={24} strokeWidth={1.7} />}
             </div>
             <div>
-              <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.38em", color: "rgba(var(--color-blue-sky-rgb),0.60)", textTransform: "uppercase" }}>UCM</p>
-              <h1 style={{ fontSize: 22, fontWeight: 900, color: "#fff", letterSpacing: "-0.02em", lineHeight: 1.1 }}>SmartHub</h1>
+              <h1 style={{ fontSize: 22, fontWeight: 900, color: "#fff", letterSpacing: "-0.02em", lineHeight: 1.1 }}>{config.nome_plataforma}</h1>
             </div>
           </div>
         </div>
@@ -144,7 +147,7 @@ const Layout = ({ usuarioLogado, onLogout }) => {
             Menu Principal
           </p>
 
-          {NAV_ITEMS.map(({ label, icon: Icon, path }) => {
+          {NAV_ITEMS.filter(item => item.path !== '/chat' || config.chat_activado).map(({ label, icon: Icon, path }) => {
             const active = isActive(path);
             return (
               <button
@@ -238,7 +241,7 @@ const Layout = ({ usuarioLogado, onLogout }) => {
           <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
             <div>
               <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.38em", color: "#94a3b8", textTransform: "uppercase" }}>
-                UCM Tete · SmartHub
+                {config.nome_plataforma}
               </p>
               <h2 className="mt-1.5 leading-tight" style={{ fontSize: 26, fontWeight: 900, color: "var(--color-navy-deep)", letterSpacing: "-0.02em" }}>
                 Bem-vindo,{' '}
@@ -346,7 +349,7 @@ const Layout = ({ usuarioLogado, onLogout }) => {
           <Outlet />
         </div>
 
-        <Chatbot usuarioLogado={usuarioLogado} />
+        {config.ia_activada && <Chatbot usuarioLogado={usuarioLogado} />}
       </main>
     </div>
   );

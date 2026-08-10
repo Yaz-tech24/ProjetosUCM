@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { BookOpen } from "lucide-react";
+import { useConfig } from "../context/ConfigContext";
 
 /* Partículas flutuantes geradas aleatoriamente */
 const Particle = ({ style }) => (
@@ -19,6 +20,7 @@ const Particle = ({ style }) => (
 );
 
 const SplashScreen = ({ onDone }) => {
+  const { config } = useConfig();
   const [phase, setPhase] = useState("enter"); // enter → show → fill → exit
 
   useEffect(() => {
@@ -161,18 +163,14 @@ const SplashScreen = ({ onDone }) => {
               animation: "glow-logo 2.5s ease-in-out infinite",
             }}
           >
-            <BookOpen size={42} strokeWidth={1.6} />
+            {config.logo_url
+              ? <img src={config.logo_url} alt={config.nome_plataforma} className="w-full h-full object-contain rounded-[26px]" />
+              : <BookOpen size={42} strokeWidth={1.6} />}
           </div>
         </div>
 
         {/* Marca */}
         <div className="text-center space-y-2" style={{ animation: "fade-up 0.6s 0.2s both" }}>
-          <p
-            className="text-[11px] font-bold uppercase tracking-[0.7em]"
-            style={{ color: "rgba(var(--color-blue-sky-rgb),0.50)" }}
-          >
-            UCM · EXTENSÃO DE TETE
-          </p>
           <h1
             className="text-[3.4rem] font-black text-white tracking-tight leading-none"
             style={{
@@ -180,11 +178,13 @@ const SplashScreen = ({ onDone }) => {
               fontFamily: "Inter, sans-serif",
             }}
           >
-            SmartHub
+            {config.nome_plataforma}
           </h1>
-          <p className="text-sm font-light tracking-widest" style={{ color: "rgba(var(--color-blue-sky-rgb),0.55)" }}>
-            Aprenda &nbsp;·&nbsp; Partilhe &nbsp;·&nbsp; Cresça
-          </p>
+          {config.tagline && (
+            <p className="text-sm font-light tracking-widest" style={{ color: "rgba(var(--color-blue-sky-rgb),0.55)" }}>
+              {config.tagline}
+            </p>
+          )}
         </div>
 
         {/* Barra de progresso premium */}
@@ -219,7 +219,7 @@ const SplashScreen = ({ onDone }) => {
         className="absolute bottom-8 text-[10px] font-medium tracking-widest"
         style={{ color: "rgba(255,255,255,0.15)" }}
       >
-        © 2025 Universidade Católica de Moçambique
+        © {new Date().getFullYear()} {config.nome_plataforma}
       </p>
     </div>
   );
