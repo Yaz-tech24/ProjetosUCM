@@ -111,14 +111,14 @@ const Chat = ({ usuarioLogado }) => {
     {/* Modal de confirmação de apagar */}
     {confirmDelete !== null && (
       <div className="fixed inset-0 z-50 flex items-center justify-center px-4"
-        style={{ background: "rgba(2,11,24,0.55)", backdropFilter: "blur(8px)" }}>
+        style={{ background: "rgba(var(--color-navy-abyss-rgb),0.55)", backdropFilter: "blur(8px)" }}>
         <div className="w-full max-w-sm rounded-[28px] p-8 animate-scale-in"
-          style={{ background: "#fff", boxShadow: "0 30px 90px rgba(4,18,46,0.30)" }}>
+          style={{ background: "#fff", boxShadow: "0 30px 90px rgba(var(--color-navy-deep-rgb),0.30)" }}>
           <div className="w-14 h-14 rounded-[18px] grid place-items-center mx-auto mb-5"
             style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.20)" }}>
             <Trash2 size={26} style={{ color: "#ef4444" }} />
           </div>
-          <h3 style={{ fontSize: 17, fontWeight: 900, color: "#04122e", textAlign: "center", marginBottom: 8 }}>
+          <h3 style={{ fontSize: 17, fontWeight: 900, color: "var(--color-navy-deep)", textAlign: "center", marginBottom: 8 }}>
             Apagar mensagem?
           </h3>
           <p style={{ fontSize: 13, color: "#64748b", textAlign: "center", lineHeight: 1.6, marginBottom: 24 }}>
@@ -127,7 +127,7 @@ const Chat = ({ usuarioLogado }) => {
           <div className="grid grid-cols-2 gap-3">
             <button onClick={() => setConfirmDelete(null)}
               className="rounded-2xl px-4 py-3 text-sm font-bold transition-all"
-              style={{ background: "#f0f5ff", border: "1.5px solid rgba(13,37,74,0.10)", color: "#475569" }}>
+              style={{ background: "var(--color-ice)", border: "1.5px solid rgba(var(--color-navy-mid-rgb),0.10)", color: "#475569" }}>
               Cancelar
             </button>
             <button onClick={() => apagarMensagem(confirmDelete)}
@@ -144,9 +144,9 @@ const Chat = ({ usuarioLogado }) => {
       className="flex h-[calc(100vh-160px)] flex-col overflow-hidden animate-fade-in"
       style={{
         borderRadius: 32,
-        border: "1px solid rgba(13,37,74,0.08)",
+        border: "1px solid rgba(var(--color-navy-mid-rgb),0.08)",
         background: "#fff",
-        boxShadow: "0 10px 56px rgba(13,37,74,0.12)",
+        boxShadow: "0 10px 56px rgba(var(--color-navy-mid-rgb),0.12)",
       }}
     >
       {/* Barra dourada topo */}
@@ -154,7 +154,7 @@ const Chat = ({ usuarioLogado }) => {
         className="shrink-0"
         style={{
           height: 3,
-          background: "linear-gradient(90deg, transparent, #c9a800, #ffd700, #ffe88a, transparent)",
+          background: "linear-gradient(90deg, transparent, var(--color-gold-dark), var(--color-gold), var(--color-gold-light), transparent)",
           opacity: 0.90,
         }}
       />
@@ -163,7 +163,7 @@ const Chat = ({ usuarioLogado }) => {
       <header
         className="px-7 pt-6 pb-0 text-white shrink-0"
         style={{
-          background: "linear-gradient(-45deg, #020b18, #04122e, #071832, #0d254a)",
+          background: "linear-gradient(-45deg, var(--color-navy-abyss), var(--color-navy-deep), var(--color-navy), var(--color-navy-mid))",
           backgroundSize: "400% 400%",
           animation: "aurora-chat 10s ease infinite",
         }}
@@ -177,7 +177,7 @@ const Chat = ({ usuarioLogado }) => {
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-5">
           <div>
-            <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.38em", color: "rgba(168,209,255,0.60)", textTransform: "uppercase", marginBottom: 4 }}>
+            <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.38em", color: "rgba(var(--color-blue-sky-rgb),0.60)", textTransform: "uppercase", marginBottom: 4 }}>
               Chat Estudantil
             </p>
             <h1 style={{ fontSize: 24, fontWeight: 900, letterSpacing: "-0.02em" }}>
@@ -199,7 +199,7 @@ const Chat = ({ usuarioLogado }) => {
               style={{ background: "#34d399", boxShadow: "0 0 8px rgba(52,211,153,0.90)" }}
             />
             <span style={{ color: "rgba(255,255,255,0.65)" }}>Sala:</span>
-            <span style={{ color: "#ffd700", fontWeight: 900 }}>{cursoActivo}</span>
+            <span style={{ color: "var(--color-gold)", fontWeight: 900 }}>{cursoActivo}</span>
           </div>
         </div>
 
@@ -215,9 +215,9 @@ const Chat = ({ usuarioLogado }) => {
                 style={active
                   ? {
                       background: "#fff",
-                      color: "#0d254a",
-                      borderBottom: "3px solid #ffd700",
-                      boxShadow: "0 -2px 12px rgba(255,215,0,0.15)",
+                      color: "var(--color-navy-mid)",
+                      borderBottom: "3px solid var(--color-gold)",
+                      boxShadow: "0 -2px 12px rgba(var(--color-gold-rgb),0.15)",
                     }
                   : {
                       color: "rgba(255,255,255,0.45)",
@@ -227,7 +227,7 @@ const Chat = ({ usuarioLogado }) => {
               >
                 {curso}
                 {curso === usuarioLogado?.curso && (
-                  <span style={{ marginLeft: 6, color: "#ffd700", fontSize: 9 }}>●</span>
+                  <span style={{ marginLeft: 6, color: "var(--color-gold)", fontSize: 9 }}>●</span>
                 )}
               </button>
             );
@@ -240,10 +240,10 @@ const Chat = ({ usuarioLogado }) => {
         className="flex-1 overflow-y-auto p-6 space-y-4"
         style={{
           background: `
-            radial-gradient(ellipse at 20% 25%, rgba(30,95,224,.06)  0%, transparent 50%),
-            radial-gradient(ellipse at 80% 75%, rgba(168,209,255,.05) 0%, transparent 50%),
-            radial-gradient(ellipse at 50% 50%, rgba(255,215,0,.025) 0%, transparent 55%),
-            #f0f5ff
+            radial-gradient(ellipse at 20% 25%, rgba(var(--color-blue-accent-rgb),.06)  0%, transparent 50%),
+            radial-gradient(ellipse at 80% 75%, rgba(var(--color-blue-sky-rgb),.05) 0%, transparent 50%),
+            radial-gradient(ellipse at 50% 50%, rgba(var(--color-gold-rgb),.025) 0%, transparent 55%),
+            var(--color-ice)
           `
         }}
       >
@@ -251,7 +251,7 @@ const Chat = ({ usuarioLogado }) => {
           <div className="flex items-center justify-center py-16">
             <div
               className="w-8 h-8 rounded-full border-4 animate-spin"
-              style={{ borderColor: "rgba(13,37,74,0.10)", borderTopColor: "#0d254a" }}
+              style={{ borderColor: "rgba(var(--color-navy-mid-rgb),0.10)", borderTopColor: "var(--color-navy-mid)" }}
             />
           </div>
         ) : messages.length === 0 ? (
@@ -259,8 +259,8 @@ const Chat = ({ usuarioLogado }) => {
             <div
               className="w-16 h-16 rounded-2xl grid place-items-center"
               style={{
-                background: "#f0f5ff",
-                border: "1px solid rgba(13,37,74,0.08)",
+                background: "var(--color-ice)",
+                border: "1px solid rgba(var(--color-navy-mid-rgb),0.08)",
               }}
             >
               <Users size={26} style={{ color: "#94a3b8" }} />
@@ -278,9 +278,9 @@ const Chat = ({ usuarioLogado }) => {
                   <div
                     className="w-8 h-8 rounded-xl grid place-items-center text-xs font-black shrink-0"
                     style={{
-                      background: "linear-gradient(135deg, #04122e, #0d254a)",
-                      color: "#ffd700",
-                      boxShadow: "0 3px 10px rgba(4,18,46,0.25)",
+                      background: "linear-gradient(135deg, var(--color-navy-deep), var(--color-navy-mid))",
+                      color: "var(--color-gold)",
+                      boxShadow: "0 3px 10px rgba(var(--color-navy-deep-rgb),0.25)",
                     }}
                   >
                     {msg.userName?.charAt(0).toUpperCase()}
@@ -302,24 +302,24 @@ const Chat = ({ usuarioLogado }) => {
                 <div
                   className="max-w-xs lg:max-w-md px-5 py-3.5 rounded-2xl text-sm"
                   style={isOwn ? {
-                    background: "linear-gradient(135deg, #c9a800, #ffd700, #ffe88a)",
-                    color: "#04122e",
+                    background: "linear-gradient(135deg, var(--color-gold-dark), var(--color-gold), var(--color-gold-light))",
+                    color: "var(--color-navy-deep)",
                     fontWeight: 600,
                     borderBottomRightRadius: 6,
-                    boxShadow: "0 6px 20px rgba(255,215,0,0.35)",
+                    boxShadow: "0 6px 20px rgba(var(--color-gold-rgb),0.35)",
                   } : {
                     background: "#fff",
                     color: "#334155",
-                    border: "1px solid rgba(13,37,74,0.08)",
+                    border: "1px solid rgba(var(--color-navy-mid-rgb),0.08)",
                     borderBottomLeftRadius: 6,
-                    boxShadow: "0 2px 10px rgba(13,37,74,0.06)",
+                    boxShadow: "0 2px 10px rgba(var(--color-navy-mid-rgb),0.06)",
                   }}
                 >
                   <div
                     style={{
                       fontSize: 10, fontWeight: 700, textTransform: "uppercase",
                       letterSpacing: "0.2em", marginBottom: 6,
-                      color: isOwn ? "rgba(4,18,46,0.50)" : "rgba(13,37,74,0.55)",
+                      color: isOwn ? "rgba(var(--color-navy-deep-rgb),0.50)" : "rgba(var(--color-navy-mid-rgb),0.55)",
                     }}
                   >
                     {msg.userName}
@@ -328,7 +328,7 @@ const Chat = ({ usuarioLogado }) => {
                   <div
                     style={{
                       fontSize: 10, marginTop: 6,
-                      color: isOwn ? "rgba(4,18,46,0.38)" : "#94a3b8",
+                      color: isOwn ? "rgba(var(--color-navy-deep-rgb),0.38)" : "#94a3b8",
                     }}
                   >
                     {new Date(msg.timestamp).toLocaleTimeString("pt-PT")}
@@ -340,9 +340,9 @@ const Chat = ({ usuarioLogado }) => {
                   <div
                     className="w-8 h-8 rounded-xl grid place-items-center text-xs font-black shrink-0"
                     style={{
-                      background: "linear-gradient(135deg, #c9a800, #ffd700)",
-                      color: "#04122e",
-                      boxShadow: "0 3px 10px rgba(255,215,0,0.40)",
+                      background: "linear-gradient(135deg, var(--color-gold-dark), var(--color-gold))",
+                      color: "var(--color-navy-deep)",
+                      boxShadow: "0 3px 10px rgba(var(--color-gold-rgb),0.40)",
                     }}
                   >
                     {usuarioLogado?.nome?.charAt(0).toUpperCase()}
@@ -386,7 +386,7 @@ const Chat = ({ usuarioLogado }) => {
       <footer
         className="px-6 py-5 shrink-0"
         style={{
-          borderTop: "1px solid rgba(13,37,74,0.08)",
+          borderTop: "1px solid rgba(var(--color-navy-mid-rgb),0.08)",
           background: "#fff",
         }}
       >
@@ -399,13 +399,13 @@ const Chat = ({ usuarioLogado }) => {
               placeholder={`Mensagem em ${cursoActivo}...`}
               className="w-full rounded-2xl px-5 py-4 text-sm outline-none transition-all duration-200"
               style={{
-                background: "#f0f5ff",
-                border: `1.5px solid ${newMessage.length >= 480 ? "rgba(245,158,11,0.50)" : "rgba(13,37,74,0.09)"}`,
+                background: "var(--color-ice)",
+                border: `1.5px solid ${newMessage.length >= 480 ? "rgba(245,158,11,0.50)" : "rgba(var(--color-navy-mid-rgb),0.09)"}`,
                 color: "#0f172a",
                 paddingRight: newMessage.length > 400 ? "4rem" : undefined,
               }}
-              onFocus={e => (e.target.style.borderColor = "#0d254a", e.target.style.background = "#fff", e.target.style.boxShadow = "0 0 0 4px rgba(13,37,74,0.07)")}
-              onBlur={e => (e.target.style.borderColor = newMessage.length >= 480 ? "rgba(245,158,11,0.50)" : "rgba(13,37,74,0.09)", e.target.style.background = "#f0f5ff", e.target.style.boxShadow = "")}
+              onFocus={e => (e.target.style.borderColor = "var(--color-navy-mid)", e.target.style.background = "#fff", e.target.style.boxShadow = "0 0 0 4px rgba(var(--color-navy-mid-rgb),0.07)")}
+              onBlur={e => (e.target.style.borderColor = newMessage.length >= 480 ? "rgba(245,158,11,0.50)" : "rgba(var(--color-navy-mid-rgb),0.09)", e.target.style.background = "var(--color-ice)", e.target.style.boxShadow = "")}
               required
             />
             {newMessage.length > 400 && (
@@ -419,13 +419,13 @@ const Chat = ({ usuarioLogado }) => {
             type="submit"
             className="inline-flex items-center justify-center gap-2 rounded-2xl px-7 py-4 text-sm font-black uppercase tracking-wider shrink-0 transition-all duration-250"
             style={{
-              background: "linear-gradient(135deg, #c9a800, #ffd700, #ffe88a)",
-              color: "#04122e",
-              boxShadow: "0 6px 22px rgba(255,215,0,0.45)",
+              background: "linear-gradient(135deg, var(--color-gold-dark), var(--color-gold), var(--color-gold-light))",
+              color: "var(--color-navy-deep)",
+              boxShadow: "0 6px 22px rgba(var(--color-gold-rgb),0.45)",
               letterSpacing: "0.08em",
             }}
-            onMouseEnter={e => (e.currentTarget.style.transform = "translateY(-2px)", e.currentTarget.style.boxShadow = "0 10px 30px rgba(255,215,0,0.60)")}
-            onMouseLeave={e => (e.currentTarget.style.transform = "", e.currentTarget.style.boxShadow = "0 6px 22px rgba(255,215,0,0.45)")}
+            onMouseEnter={e => (e.currentTarget.style.transform = "translateY(-2px)", e.currentTarget.style.boxShadow = "0 10px 30px rgba(var(--color-gold-rgb),0.60)")}
+            onMouseLeave={e => (e.currentTarget.style.transform = "", e.currentTarget.style.boxShadow = "0 6px 22px rgba(var(--color-gold-rgb),0.45)")}
           >
             <Send size={16} /> Enviar
           </button>

@@ -11,8 +11,8 @@ const Particle = ({ style }) => (
       left:   style.left,
       top:    style.top,
       background: style.isGold
-        ? `radial-gradient(circle, rgba(255,215,0,${style.opacity}) 0%, transparent 70%)`
-        : `radial-gradient(circle, rgba(168,209,255,${style.opacity}) 0%, transparent 70%)`,
+        ? `radial-gradient(circle, rgba(var(--color-gold-rgb),${style.opacity}) 0%, transparent 70%)`
+        : `radial-gradient(circle, rgba(var(--color-blue-sky-rgb),${style.opacity}) 0%, transparent 70%)`,
       animation: `particle-rise ${style.duration}s ease-out ${style.delay}s infinite`,
     }}
   />
@@ -51,7 +51,7 @@ const SplashScreen = ({ onDone }) => {
     <div
       className="fixed inset-0 z-[9999] flex flex-col items-center justify-center overflow-hidden"
       style={{
-        background: "linear-gradient(-45deg, #020b18, #04122e, #071832, #0d254a)",
+        background: "linear-gradient(-45deg, var(--color-navy-abyss), var(--color-navy-deep), var(--color-navy), var(--color-navy-mid))",
         backgroundSize: "400% 400%",
         animation: "aurora 8s ease infinite",
         opacity: exiting ? 0 : 1,
@@ -78,8 +78,8 @@ const SplashScreen = ({ onDone }) => {
         @keyframes spin-slow    { to { transform: rotate(360deg);  } }
         @keyframes spin-reverse { to { transform: rotate(-360deg); } }
         @keyframes glow-logo {
-          0%,100% { box-shadow: 0 0 40px rgba(255,215,0,0.5), 0 0 80px rgba(255,215,0,0.2); }
-          50%      { box-shadow: 0 0 70px rgba(255,215,0,0.8), 0 0 140px rgba(255,215,0,0.35); }
+          0%,100% { box-shadow: 0 0 40px rgba(var(--color-gold-rgb),0.5), 0 0 80px rgba(var(--color-gold-rgb),0.2); }
+          50%      { box-shadow: 0 0 70px rgba(var(--color-gold-rgb),0.8), 0 0 140px rgba(var(--color-gold-rgb),0.35); }
         }
         @keyframes progress-elastic {
           0%   { width: 0%;   }
@@ -99,7 +99,7 @@ const SplashScreen = ({ onDone }) => {
       {/* Gradiente de profundidade central */}
       <div
         className="absolute inset-0 pointer-events-none"
-        style={{ background: "radial-gradient(ellipse at 50% 48%, rgba(255,215,0,0.08) 0%, transparent 65%)" }}
+        style={{ background: "radial-gradient(ellipse at 50% 48%, rgba(var(--color-gold-rgb),0.08) 0%, transparent 65%)" }}
       />
 
       {/* Padrão de pontos */}
@@ -128,7 +128,7 @@ const SplashScreen = ({ onDone }) => {
             className="absolute rounded-full border border-dashed"
             style={{
               width: 144, height: 144,
-              borderColor: "rgba(255,215,0,0.20)",
+              borderColor: "rgba(var(--color-gold-rgb),0.20)",
               animation: "spin-slow 12s linear infinite",
             }}
           />
@@ -138,7 +138,7 @@ const SplashScreen = ({ onDone }) => {
             className="absolute rounded-full border"
             style={{
               width: 120, height: 120,
-              borderColor: "rgba(168,209,255,0.18)",
+              borderColor: "rgba(var(--color-blue-sky-rgb),0.18)",
               borderStyle: "dashed",
               animation: "spin-reverse 8s linear infinite",
             }}
@@ -146,7 +146,7 @@ const SplashScreen = ({ onDone }) => {
 
           {/* Anel pulsante */}
           <div
-            className="absolute rounded-full border border-[#ffd700]/25"
+            className="absolute rounded-full border border-[var(--color-gold)]/25"
             style={{
               width: 104, height: 104,
               animation: "ring-pulse 2.2s ease-in-out infinite",
@@ -155,9 +155,9 @@ const SplashScreen = ({ onDone }) => {
 
           {/* Ícone central */}
           <div
-            className="relative w-[88px] h-[88px] rounded-[26px] grid place-items-center text-[#071832]"
+            className="relative w-[88px] h-[88px] rounded-[26px] grid place-items-center text-[var(--color-navy)]"
             style={{
-              background: "linear-gradient(135deg, #c9a800 0%, #ffd700 50%, #ffe88a 100%)",
+              background: "linear-gradient(135deg, var(--color-gold-dark) 0%, var(--color-gold) 50%, var(--color-gold-light) 100%)",
               animation: "glow-logo 2.5s ease-in-out infinite",
             }}
           >
@@ -169,20 +169,20 @@ const SplashScreen = ({ onDone }) => {
         <div className="text-center space-y-2" style={{ animation: "fade-up 0.6s 0.2s both" }}>
           <p
             className="text-[11px] font-bold uppercase tracking-[0.7em]"
-            style={{ color: "rgba(168,209,255,0.50)" }}
+            style={{ color: "rgba(var(--color-blue-sky-rgb),0.50)" }}
           >
             UCM · EXTENSÃO DE TETE
           </p>
           <h1
             className="text-[3.4rem] font-black text-white tracking-tight leading-none"
             style={{
-              textShadow: "0 0 50px rgba(255,215,0,0.30)",
+              textShadow: "0 0 50px rgba(var(--color-gold-rgb),0.30)",
               fontFamily: "Inter, sans-serif",
             }}
           >
             SmartHub
           </h1>
-          <p className="text-sm font-light tracking-widest" style={{ color: "rgba(168,209,255,0.55)" }}>
+          <p className="text-sm font-light tracking-widest" style={{ color: "rgba(var(--color-blue-sky-rgb),0.55)" }}>
             Aprenda &nbsp;·&nbsp; Partilhe &nbsp;·&nbsp; Cresça
           </p>
         </div>
@@ -196,8 +196,8 @@ const SplashScreen = ({ onDone }) => {
             <div
               className="h-full rounded-full"
               style={{
-                background: "linear-gradient(90deg, #c9a800, #ffd700, #ffe88a)",
-                boxShadow: "0 0 16px rgba(255,215,0,0.7)",
+                background: "linear-gradient(90deg, var(--color-gold-dark), var(--color-gold), var(--color-gold-light))",
+                boxShadow: "0 0 16px rgba(var(--color-gold-rgb),0.7)",
                 width: phase === "fill" || phase === "exit" ? "100%" : "0%",
                 transition: phase === "fill"
                   ? "width 1.9s cubic-bezier(0.3, 0, 0.1, 1)"
@@ -207,7 +207,7 @@ const SplashScreen = ({ onDone }) => {
           </div>
           <p
             className="text-[10px] font-mono uppercase tracking-[0.5em]"
-            style={{ color: "rgba(168,209,255,0.35)" }}
+            style={{ color: "rgba(var(--color-blue-sky-rgb),0.35)" }}
           >
             A iniciar sistema...
           </p>

@@ -40,14 +40,14 @@ const ConfirmModal = ({ message, onConfirm, onCancel }) => {
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center px-4"
-      style={{ background: "rgba(2,11,24,0.55)", backdropFilter: "blur(8px)" }}
+      style={{ background: "rgba(var(--color-navy-abyss-rgb),0.55)", backdropFilter: "blur(8px)" }}
     >
       <div
         className="w-full max-w-sm rounded-[28px] p-8 animate-scale-in"
         style={{
           background: "#fff",
-          border: "1px solid rgba(13,37,74,0.08)",
-          boxShadow: "0 30px 90px rgba(4,18,46,0.30)",
+          border: "1px solid rgba(var(--color-navy-mid-rgb),0.08)",
+          boxShadow: "0 30px 90px rgba(var(--color-navy-deep-rgb),0.30)",
         }}
       >
         <div
@@ -56,7 +56,7 @@ const ConfirmModal = ({ message, onConfirm, onCancel }) => {
         >
           <AlertTriangle size={30} style={{ color: "#ef4444" }} />
         </div>
-        <h3 style={{ fontSize: 18, fontWeight: 900, color: "#04122e", textAlign: "center", marginBottom: 8 }}>
+        <h3 style={{ fontSize: 18, fontWeight: 900, color: "var(--color-navy-deep)", textAlign: "center", marginBottom: 8 }}>
           Confirmar acção
         </h3>
         <p style={{ fontSize: 14, color: "#64748b", textAlign: "center", lineHeight: 1.65, marginBottom: 28 }}>
@@ -66,9 +66,9 @@ const ConfirmModal = ({ message, onConfirm, onCancel }) => {
           <button
             onClick={onCancel}
             className="rounded-2xl px-5 py-3 text-sm font-bold transition-all duration-200"
-            style={{ background: "#f0f5ff", border: "1.5px solid rgba(13,37,74,0.10)", color: "#475569" }}
-            onMouseEnter={e => (e.currentTarget.style.background = "#e8effc")}
-            onMouseLeave={e => (e.currentTarget.style.background = "#f0f5ff")}
+            style={{ background: "var(--color-ice)", border: "1.5px solid rgba(var(--color-navy-mid-rgb),0.10)", color: "#475569" }}
+            onMouseEnter={e => (e.currentTarget.style.background = "var(--color-ice-mid)")}
+            onMouseLeave={e => (e.currentTarget.style.background = "var(--color-ice)")}
           >
             Cancelar
           </button>
@@ -151,10 +151,10 @@ const Admin = ({ usuarioLogado }) => {
         >
           <ShieldCheck size={44} style={{ color: "#ef4444" }} />
         </div>
-        <h2 style={{ fontSize: 30, fontWeight: 900, color: "#04122e", marginBottom: 12 }}>Acesso Negado</h2>
+        <h2 style={{ fontSize: 30, fontWeight: 900, color: "var(--color-navy-deep)", marginBottom: 12 }}>Acesso Negado</h2>
         <p style={{ fontSize: 15, color: "#64748b", maxWidth: 400, lineHeight: 1.65 }}>
           Esta área é reservada a administradores do UCM SmartHub.
-          O seu perfil actual é de <strong style={{ color: "#0d254a" }}>{usuarioLogado?.papel}</strong>.
+          O seu perfil actual é de <strong style={{ color: "var(--color-navy-mid)" }}>{usuarioLogado?.papel}</strong>.
         </p>
       </div>
     );
@@ -211,10 +211,10 @@ const Admin = ({ usuarioLogado }) => {
         <section
           className="relative overflow-hidden rounded-[32px] text-white"
           style={{
-            background: "linear-gradient(-45deg, #020b18, #04122e, #071832, #0d254a)",
+            background: "linear-gradient(-45deg, var(--color-navy-abyss), var(--color-navy-deep), var(--color-navy), var(--color-navy-mid))",
             backgroundSize: "400% 400%",
             animation: "aurora-admin 10s ease infinite",
-            boxShadow: "0 24px 80px rgba(2,11,24,0.50)",
+            boxShadow: "0 24px 80px rgba(var(--color-navy-abyss-rgb),0.50)",
             padding: "2.8rem",
           }}
         >
@@ -230,23 +230,23 @@ const Admin = ({ usuarioLogado }) => {
             backgroundSize: "28px 28px",
           }} />
           <div className="absolute inset-0 pointer-events-none" style={{
-            background: "radial-gradient(ellipse at 75% 25%, rgba(255,215,0,0.10) 0%, transparent 55%)",
+            background: "radial-gradient(ellipse at 75% 25%, rgba(var(--color-gold-rgb),0.10) 0%, transparent 55%)",
           }} />
           <div className="absolute top-0 inset-x-0" style={{
             height: 3,
-            background: "linear-gradient(90deg, transparent, #c9a800, #ffd700, #ffe88a, transparent)",
+            background: "linear-gradient(90deg, transparent, var(--color-gold-dark), var(--color-gold), var(--color-gold-light), transparent)",
             opacity: 0.85,
           }} />
 
           <div className="relative flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
             <div>
-              <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.38em", color: "rgba(168,209,255,0.60)", textTransform: "uppercase", marginBottom: 8 }}>
+              <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.38em", color: "rgba(var(--color-blue-sky-rgb),0.60)", textTransform: "uppercase", marginBottom: 8 }}>
                 Administração
               </p>
               <h1 style={{ fontSize: "clamp(1.8rem, 3.5vw, 2.8rem)", fontWeight: 900, letterSpacing: "-0.025em", lineHeight: 1.1 }}>
                 Painel Administrativo
               </h1>
-              <p style={{ marginTop: 12, color: "rgba(168,209,255,0.75)", fontSize: 15 }}>
+              <p style={{ marginTop: 12, color: "rgba(var(--color-blue-sky-rgb),0.75)", fontSize: 15 }}>
                 Moderação e aprovação de materiais submetidos pela comunidade.
               </p>
             </div>
@@ -264,19 +264,19 @@ const Admin = ({ usuarioLogado }) => {
                 className="w-12 h-12 rounded-2xl grid place-items-center"
                 style={{
                   background: pendentes.length > 0
-                    ? "linear-gradient(135deg, #c9a800, #ffd700)"
+                    ? "linear-gradient(135deg, var(--color-gold-dark), var(--color-gold))"
                     : "rgba(52,211,153,0.25)",
                   boxShadow: pendentes.length > 0
-                    ? "0 6px 20px rgba(255,215,0,0.45)"
+                    ? "0 6px 20px rgba(var(--color-gold-rgb),0.45)"
                     : "0 6px 20px rgba(52,211,153,0.25)",
-                  color: pendentes.length > 0 ? "#04122e" : "#34d399",
+                  color: pendentes.length > 0 ? "var(--color-navy-deep)" : "#34d399",
                 }}
               >
                 <Clock size={22} />
               </div>
               <div>
                 <p style={{ fontSize: 28, fontWeight: 900, color: "#fff", lineHeight: 1 }}>{pendentes.length}</p>
-                <p style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.3em", color: "rgba(168,209,255,0.60)" }}>
+                <p style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.3em", color: "rgba(var(--color-blue-sky-rgb),0.60)" }}>
                   Pendentes
                 </p>
               </div>
@@ -295,12 +295,12 @@ const Admin = ({ usuarioLogado }) => {
               onClick={() => setAba(key)}
               className="flex items-center gap-2.5 rounded-2xl px-5 py-3 text-sm font-bold transition-all duration-200"
               style={aba === key ? {
-                background: "linear-gradient(135deg,#04122e,#0d254a)",
+                background: "linear-gradient(135deg,var(--color-navy-deep),var(--color-navy-mid))",
                 color: "#fff",
-                boxShadow: "0 6px 24px rgba(4,18,46,0.30)",
+                boxShadow: "0 6px 24px rgba(var(--color-navy-deep-rgb),0.30)",
               } : {
                 background: "rgba(255,255,255,0.85)",
-                border: "1.5px solid rgba(13,37,74,0.10)",
+                border: "1.5px solid rgba(var(--color-navy-mid-rgb),0.10)",
                 color: "#475569",
               }}
             >
@@ -309,8 +309,8 @@ const Admin = ({ usuarioLogado }) => {
               {badge > 0 && (
                 <span className="rounded-full px-2 py-0.5 text-[10px] font-black"
                   style={aba === key
-                    ? { background: "rgba(255,215,0,0.22)", color: "#ffd700" }
-                    : { background: "rgba(13,37,74,0.10)", color: "#0d254a" }}>
+                    ? { background: "rgba(var(--color-gold-rgb),0.22)", color: "var(--color-gold)" }
+                    : { background: "rgba(var(--color-navy-mid-rgb),0.10)", color: "var(--color-navy-mid)" }}>
                   {badge}
                 </span>
               )}
@@ -324,27 +324,27 @@ const Admin = ({ usuarioLogado }) => {
           className="rounded-[28px] overflow-hidden"
           style={{
             background: "#fff",
-            border: "1px solid rgba(13,37,74,0.08)",
-            boxShadow: "0 4px 32px rgba(13,37,74,0.07)",
+            border: "1px solid rgba(var(--color-navy-mid-rgb),0.08)",
+            boxShadow: "0 4px 32px rgba(var(--color-navy-mid-rgb),0.07)",
           }}
         >
           {/* Cabeçalho da secção */}
           <div
             className="flex items-center justify-between gap-4 px-7 py-5"
-            style={{ borderBottom: "1px solid rgba(13,37,74,0.06)" }}
+            style={{ borderBottom: "1px solid rgba(var(--color-navy-mid-rgb),0.06)" }}
           >
             <h2
               className="flex items-center gap-2.5"
-              style={{ fontSize: 18, fontWeight: 900, color: "#04122e" }}
+              style={{ fontSize: 18, fontWeight: 900, color: "var(--color-navy-deep)" }}
             >
-              <Clock size={19} style={{ color: "#0d254a" }} />
+              <Clock size={19} style={{ color: "var(--color-navy-mid)" }} />
               Fila de Aprovação
             </h2>
             <span
               className="rounded-full px-4 py-1.5 text-xs font-bold uppercase"
               style={{
-                background: pendentes.length > 0 ? "rgba(255,215,0,0.12)" : "rgba(16,185,129,0.09)",
-                border: pendentes.length > 0 ? "1px solid rgba(255,215,0,0.35)" : "1px solid rgba(16,185,129,0.28)",
+                background: pendentes.length > 0 ? "rgba(var(--color-gold-rgb),0.12)" : "rgba(16,185,129,0.09)",
+                border: pendentes.length > 0 ? "1px solid rgba(var(--color-gold-rgb),0.35)" : "1px solid rgba(16,185,129,0.28)",
                 color: pendentes.length > 0 ? "#8a6800" : "#065f46",
                 letterSpacing: "0.25em",
               }}
@@ -358,7 +358,7 @@ const Admin = ({ usuarioLogado }) => {
               <div className="text-center p-14">
                 <div
                   className="w-12 h-12 rounded-full border-4 animate-spin mx-auto mb-4"
-                  style={{ borderColor: "rgba(13,37,74,0.10)", borderTopColor: "#0d254a" }}
+                  style={{ borderColor: "rgba(var(--color-navy-mid-rgb),0.10)", borderTopColor: "var(--color-navy-mid)" }}
                 />
                 <p style={{ color: "#64748b", fontWeight: 600 }}>Carregando materiais pendentes...</p>
               </div>
@@ -392,34 +392,34 @@ const Admin = ({ usuarioLogado }) => {
                     key={m.id}
                     className="group flex flex-col gap-5 rounded-[24px] p-6 transition-all duration-250"
                     style={{
-                      border: "1px solid rgba(13,37,74,0.08)",
+                      border: "1px solid rgba(var(--color-navy-mid-rgb),0.08)",
                       background: "#fff",
-                      boxShadow: "0 2px 14px rgba(13,37,74,0.05)",
+                      boxShadow: "0 2px 14px rgba(var(--color-navy-mid-rgb),0.05)",
                     }}
-                    onMouseEnter={e => (e.currentTarget.style.transform = "translateY(-2px)", e.currentTarget.style.boxShadow = "0 10px 36px rgba(13,37,74,0.12)")}
-                    onMouseLeave={e => (e.currentTarget.style.transform = "", e.currentTarget.style.boxShadow = "0 2px 14px rgba(13,37,74,0.05)")}
+                    onMouseEnter={e => (e.currentTarget.style.transform = "translateY(-2px)", e.currentTarget.style.boxShadow = "0 10px 36px rgba(var(--color-navy-mid-rgb),0.12)")}
+                    onMouseLeave={e => (e.currentTarget.style.transform = "", e.currentTarget.style.boxShadow = "0 2px 14px rgba(var(--color-navy-mid-rgb),0.05)")}
                   >
                     <div>
                       <h3
-                        style={{ fontSize: 20, fontWeight: 900, color: "#04122e", marginBottom: 12 }}
-                        className="group-hover:text-[#0d254a] transition-colors"
+                        style={{ fontSize: 20, fontWeight: 900, color: "var(--color-navy-deep)", marginBottom: 12 }}
+                        className="group-hover:text-[var(--color-navy-mid)] transition-colors"
                       >
                         {m.titulo}
                       </h3>
 
                       <div className="flex flex-wrap gap-2">
                         {[
-                          { label: `👤 ${m.autor}`,   bg: "#f0f5ff", border: "rgba(13,37,74,0.10)", color: "#475569" },
-                          { label: `📚 ${m.cadeira}`, bg: "#eff6ff", border: "#bfdbfe",             color: "#0d254a" },
+                          { label: `👤 ${m.autor}`,   bg: "var(--color-ice)", border: "rgba(var(--color-navy-mid-rgb),0.10)", color: "#475569" },
+                          { label: `📚 ${m.cadeira}`, bg: "#eff6ff", border: "#bfdbfe",             color: "var(--color-navy-mid)" },
                           {
                             label: m.tipo === 'Vídeo' ? `▶ ${m.tipo}` : `📄 ${m.tipo}`,
                             bg: m.tipo === 'Vídeo' ? "#eff6ff" : "#fff1f2",
                             border: m.tipo === 'Vídeo' ? "#bfdbfe" : "#fecdd3",
-                            color: m.tipo === 'Vídeo' ? "#0d254a" : "#be123c",
+                            color: m.tipo === 'Vídeo' ? "var(--color-navy-mid)" : "#be123c",
                           },
                           {
                             label: `📅 ${new Date(m.data_upload).toLocaleDateString("pt-PT")}`,
-                            bg: "#f0f5ff", border: "rgba(13,37,74,0.10)", color: "#64748b",
+                            bg: "var(--color-ice)", border: "rgba(var(--color-navy-mid-rgb),0.10)", color: "#64748b",
                           },
                         ].map(({ label, bg, border, color }) => (
                           <span
@@ -435,7 +435,7 @@ const Admin = ({ usuarioLogado }) => {
 
                     <div
                       className="grid gap-3 sm:grid-cols-2 pt-1"
-                      style={{ borderTop: "1px solid rgba(13,37,74,0.06)" }}
+                      style={{ borderTop: "1px solid rgba(var(--color-navy-mid-rgb),0.06)" }}
                     >
                       {/* Botão Rejeitar */}
                       <button
@@ -478,14 +478,14 @@ const Admin = ({ usuarioLogado }) => {
         {aba === 'chat' && (
           <section
             className="rounded-[28px] overflow-hidden"
-            style={{ background: "#fff", border: "1px solid rgba(13,37,74,0.08)", boxShadow: "0 4px 32px rgba(13,37,74,0.07)" }}
+            style={{ background: "#fff", border: "1px solid rgba(var(--color-navy-mid-rgb),0.08)", boxShadow: "0 4px 32px rgba(var(--color-navy-mid-rgb),0.07)" }}
           >
             {/* Cabeçalho + filtro */}
             <div className="flex flex-wrap items-center justify-between gap-4 px-7 py-5"
-              style={{ borderBottom: "1px solid rgba(13,37,74,0.06)" }}>
+              style={{ borderBottom: "1px solid rgba(var(--color-navy-mid-rgb),0.06)" }}>
               <h2 className="flex items-center gap-2.5"
-                style={{ fontSize: 18, fontWeight: 900, color: "#04122e" }}>
-                <MessageCircle size={19} style={{ color: "#0d254a" }} />
+                style={{ fontSize: 18, fontWeight: 900, color: "var(--color-navy-deep)" }}>
+                <MessageCircle size={19} style={{ color: "var(--color-navy-mid)" }} />
                 Mensagens do Chat
               </h2>
               <div className="flex items-center gap-3">
@@ -493,7 +493,7 @@ const Admin = ({ usuarioLogado }) => {
                   value={cursoChatFiltro}
                   onChange={e => setCursoChatFiltro(e.target.value)}
                   className="rounded-2xl px-4 py-2.5 text-sm outline-none appearance-none"
-                  style={{ background: "#f0f5ff", border: "1.5px solid rgba(13,37,74,0.09)", color: "#334155", minWidth: 180 }}
+                  style={{ background: "var(--color-ice)", border: "1.5px solid rgba(var(--color-navy-mid-rgb),0.09)", color: "#334155", minWidth: 180 }}
                 >
                   <option value="">Todos os cursos</option>
                   {CURSOS.map(c => <option key={c} value={c}>{c}</option>)}
@@ -501,7 +501,7 @@ const Admin = ({ usuarioLogado }) => {
                 <button
                   onClick={() => fetchMensagens(cursoChatFiltro)}
                   className="rounded-2xl px-4 py-2.5 text-sm font-bold transition-all"
-                  style={{ background: "#f0f5ff", border: "1.5px solid rgba(13,37,74,0.09)", color: "#0d254a" }}
+                  style={{ background: "var(--color-ice)", border: "1.5px solid rgba(var(--color-navy-mid-rgb),0.09)", color: "var(--color-navy-mid)" }}
                 >
                   Actualizar
                 </button>
@@ -512,12 +512,12 @@ const Admin = ({ usuarioLogado }) => {
               {loadingChat ? (
                 <div className="text-center p-12">
                   <div className="w-10 h-10 rounded-full border-4 animate-spin mx-auto mb-3"
-                    style={{ borderColor: "rgba(13,37,74,0.10)", borderTopColor: "#0d254a" }} />
+                    style={{ borderColor: "rgba(var(--color-navy-mid-rgb),0.10)", borderTopColor: "var(--color-navy-mid)" }} />
                   <p style={{ color: "#64748b", fontWeight: 600 }}>A carregar mensagens...</p>
                 </div>
               ) : mensagens.length === 0 ? (
                 <div className="text-center rounded-[24px] p-12"
-                  style={{ border: "2px dashed rgba(13,37,74,0.10)", background: "#f8faff" }}>
+                  style={{ border: "2px dashed rgba(var(--color-navy-mid-rgb),0.10)", background: "#f8faff" }}>
                   <MessageCircle size={32} style={{ color: "#cbd5e1", margin: "0 auto 12px" }} />
                   <p style={{ fontSize: 16, fontWeight: 900, color: "#94a3b8" }}>Nenhuma mensagem encontrada.</p>
                 </div>
@@ -527,16 +527,16 @@ const Admin = ({ usuarioLogado }) => {
                     <div
                       key={msg.id}
                       className="group flex items-start gap-4 rounded-[18px] px-5 py-4 transition-all"
-                      style={{ background: "#f8faff", border: "1px solid rgba(13,37,74,0.06)" }}
-                      onMouseEnter={e => e.currentTarget.style.borderColor = "rgba(13,37,74,0.14)"}
-                      onMouseLeave={e => e.currentTarget.style.borderColor = "rgba(13,37,74,0.06)"}
+                      style={{ background: "#f8faff", border: "1px solid rgba(var(--color-navy-mid-rgb),0.06)" }}
+                      onMouseEnter={e => e.currentTarget.style.borderColor = "rgba(var(--color-navy-mid-rgb),0.14)"}
+                      onMouseLeave={e => e.currentTarget.style.borderColor = "rgba(var(--color-navy-mid-rgb),0.06)"}
                     >
                       {/* Avatar */}
                       <div style={{
                         width: 36, height: 36, borderRadius: 10, flexShrink: 0,
-                        background: "linear-gradient(135deg,#04122e,#0d254a)",
+                        background: "linear-gradient(135deg,var(--color-navy-deep),var(--color-navy-mid))",
                         display: "grid", placeItems: "center",
-                        color: "#ffd700", fontWeight: 900, fontSize: 14,
+                        color: "var(--color-gold)", fontWeight: 900, fontSize: 14,
                       }}>
                         {msg.userName?.charAt(0).toUpperCase()}
                       </div>
@@ -544,9 +544,9 @@ const Admin = ({ usuarioLogado }) => {
                       {/* Conteúdo */}
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-wrap items-center gap-2 mb-1">
-                          <span style={{ fontSize: 13, fontWeight: 800, color: "#04122e" }}>{msg.userName}</span>
+                          <span style={{ fontSize: 13, fontWeight: 800, color: "var(--color-navy-deep)" }}>{msg.userName}</span>
                           <span className="rounded-full px-2.5 py-0.5 text-[10px] font-bold"
-                            style={{ background: "#eff6ff", border: "1px solid #bfdbfe", color: "#0d254a", letterSpacing: "0.15em" }}>
+                            style={{ background: "#eff6ff", border: "1px solid #bfdbfe", color: "var(--color-navy-mid)", letterSpacing: "0.15em" }}>
                             {msg.curso}
                           </span>
                           <span style={{ fontSize: 11, color: "#94a3b8" }}>

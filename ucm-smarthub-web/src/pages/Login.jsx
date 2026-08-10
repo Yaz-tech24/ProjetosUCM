@@ -25,7 +25,7 @@ const FloatCard = ({ icon: Icon, label, value, delay, style }) => (
     style={{
       background: "rgba(255,255,255,0.08)",
       border: "1px solid rgba(255,255,255,0.14)",
-      boxShadow: "0 8px 32px rgba(2,11,24,0.35), inset 0 1px 0 rgba(255,255,255,0.08)",
+      boxShadow: "0 8px 32px rgba(var(--color-navy-abyss-rgb),0.35), inset 0 1px 0 rgba(255,255,255,0.08)",
       animation: `float-card 4.5s ease-in-out ${delay} infinite alternate`,
       ...style,
     }}
@@ -33,15 +33,15 @@ const FloatCard = ({ icon: Icon, label, value, delay, style }) => (
     <div
       className="w-9 h-9 rounded-xl grid place-items-center shrink-0"
       style={{
-        background: "linear-gradient(135deg, rgba(255,215,0,.25), rgba(255,215,0,.12))",
-        border: "1px solid rgba(255,215,0,.35)",
-        boxShadow: "0 0 16px rgba(255,215,0,.20)",
+        background: "linear-gradient(135deg, rgba(var(--color-gold-rgb),.25), rgba(var(--color-gold-rgb),.12))",
+        border: "1px solid rgba(var(--color-gold-rgb),.35)",
+        boxShadow: "0 0 16px rgba(var(--color-gold-rgb),.20)",
       }}
     >
-      <Icon size={17} style={{ color: "#ffd700" }} />
+      <Icon size={17} style={{ color: "var(--color-gold)" }} />
     </div>
     <div>
-      <p style={{ fontSize: 10, color: "rgba(168,209,255,.55)", fontWeight: 600, lineHeight: 1, marginBottom: 3 }}>{label}</p>
+      <p style={{ fontSize: 10, color: "rgba(var(--color-blue-sky-rgb),.55)", fontWeight: 600, lineHeight: 1, marginBottom: 3 }}>{label}</p>
       <p style={{ fontSize: 15, color: "#fff", fontWeight: 900, lineHeight: 1 }}>{value}</p>
     </div>
   </div>
@@ -62,9 +62,9 @@ const InputField = ({ icon, ...props }) => (
     <input
       {...props}
       className="w-full rounded-2xl py-4 pl-12 pr-4 text-sm text-slate-800 outline-none transition-all duration-200 placeholder:text-slate-400"
-      style={{ background: "rgba(240,245,255,.65)", border: "1.5px solid rgba(13,37,74,.11)", boxShadow: "0 2px 8px rgba(13,37,74,.04)" }}
-      onFocus={e => { e.target.style.borderColor = "#0d254a"; e.target.style.background = "#fff"; e.target.style.boxShadow = "0 0 0 4px rgba(13,37,74,.08)"; }}
-      onBlur={e  => { e.target.style.borderColor = "rgba(13,37,74,.11)"; e.target.style.background = "rgba(240,245,255,.65)"; e.target.style.boxShadow = "0 2px 8px rgba(13,37,74,.04)"; }}
+      style={{ background: "rgba(var(--color-ice-rgb),.65)", border: "1.5px solid rgba(var(--color-navy-mid-rgb),.11)", boxShadow: "0 2px 8px rgba(var(--color-navy-mid-rgb),.04)" }}
+      onFocus={e => { e.target.style.borderColor = "var(--color-navy-mid)"; e.target.style.background = "#fff"; e.target.style.boxShadow = "0 0 0 4px rgba(var(--color-navy-mid-rgb),.08)"; }}
+      onBlur={e  => { e.target.style.borderColor = "rgba(var(--color-navy-mid-rgb),.11)"; e.target.style.background = "rgba(var(--color-ice-rgb),.65)"; e.target.style.boxShadow = "0 2px 8px rgba(var(--color-navy-mid-rgb),.04)"; }}
     />
   </div>
 );
@@ -146,8 +146,8 @@ const Login = ({ onLogin }) => {
         @keyframes spin-slow    { to { transform: rotate(360deg);  } }
         @keyframes spin-reverse { to { transform: rotate(-360deg); } }
         @keyframes glow-logo-s {
-          0%,100% { box-shadow: 0 0 24px rgba(255,215,0,.45); }
-          50%      { box-shadow: 0 0 48px rgba(255,215,0,.80), 0 0 80px rgba(255,215,0,.25); }
+          0%,100% { box-shadow: 0 0 24px rgba(var(--color-gold-rgb),.45); }
+          50%      { box-shadow: 0 0 48px rgba(var(--color-gold-rgb),.80), 0 0 80px rgba(var(--color-gold-rgb),.25); }
         }
 
         /* aurora central azul */
@@ -166,12 +166,12 @@ const Login = ({ onLogin }) => {
         }
 
         /* nav / footer links */
-        .lp-navlink { font-size:13px; font-weight:500; color:rgba(13,37,74,.65); text-decoration:none; transition:color .2s; }
-        .lp-navlink:hover { color:#04122e; }
+        .lp-navlink { font-size:13px; font-weight:500; color:rgba(var(--color-navy-mid-rgb),.65); text-decoration:none; transition:color .2s; }
+        .lp-navlink:hover { color:var(--color-navy-deep); }
         .lp-footlink { font-size:11px; color:#64748b; text-decoration:none; transition:color .2s; }
-        .lp-footlink:hover { color:#04122e; }
+        .lp-footlink:hover { color:var(--color-navy-deep); }
         .lp-social { color:#94a3b8; transition:color .2s; }
-        .lp-social:hover { color:#c9a800; }
+        .lp-social:hover { color:var(--color-gold-dark); }
       `}</style>
 
       {/* ╔══════════════════════════════════════════════════════════╗
@@ -182,9 +182,9 @@ const Login = ({ onLogin }) => {
           minHeight: "100vh", display: "flex", flexDirection: "column",
           fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
           background: `
-            radial-gradient(ellipse at 8%  8%,  rgba(255,215,0,.07)   0%, transparent 35%),
+            radial-gradient(ellipse at 8%  8%,  rgba(var(--color-gold-rgb),.07)   0%, transparent 35%),
             radial-gradient(ellipse at 92% 92%, rgba(0,51,102,.07)    0%, transparent 35%),
-            #f0f5ff
+            var(--color-ice)
           `,
           position: "relative",
         }}
@@ -196,7 +196,7 @@ const Login = ({ onLogin }) => {
             position:"absolute", left:"50%", top:"50%",
             transform:"translate(-50%,-50%)",
             width:"min(75vw,820px)", height:"min(75vw,820px)", borderRadius:"50%",
-            background:"radial-gradient(ellipse, rgba(30,95,224,.22) 0%, rgba(30,95,224,.11) 38%, rgba(168,209,255,.06) 62%, transparent 78%)",
+            background:"radial-gradient(ellipse, rgba(var(--color-blue-accent-rgb),.22) 0%, rgba(var(--color-blue-accent-rgb),.11) 38%, rgba(var(--color-blue-sky-rgb),.06) 62%, transparent 78%)",
             filter:"blur(62px)",
             animation:"aurora-breath 7s ease-in-out infinite",
           }} />
@@ -204,7 +204,7 @@ const Login = ({ onLogin }) => {
             position:"absolute", left:"50%", top:"50%",
             transform:"translate(-50%,-50%)",
             width:"min(38vw,420px)", height:"min(38vw,420px)", borderRadius:"50%",
-            background:"radial-gradient(ellipse, rgba(59,130,246,.35) 0%, rgba(30,95,224,.18) 45%, transparent 72%)",
+            background:"radial-gradient(ellipse, rgba(59,130,246,.35) 0%, rgba(var(--color-blue-accent-rgb),.18) 45%, transparent 72%)",
             filter:"blur(32px)",
             animation:"aurora-core 4.5s ease-in-out infinite alternate",
           }} />
@@ -212,7 +212,7 @@ const Login = ({ onLogin }) => {
             position:"absolute", left:"50%", top:"50%",
             transform:"translate(-50%,-50%)",
             width:"min(26vw,290px)", height:"min(26vw,290px)", borderRadius:"50%",
-            background:"radial-gradient(ellipse, rgba(168,209,255,.28) 0%, rgba(59,130,246,.10) 55%, transparent 75%)",
+            background:"radial-gradient(ellipse, rgba(var(--color-blue-sky-rgb),.28) 0%, rgba(59,130,246,.10) 55%, transparent 75%)",
             filter:"blur(20px)",
             animation:"aurora-drift 9s ease-in-out infinite",
           }} />
@@ -224,10 +224,10 @@ const Login = ({ onLogin }) => {
             position:"relative", zIndex:30, flexShrink:0,
             display:"flex", alignItems:"center", justifyContent:"space-between",
             padding:"14px 40px",
-            background:"rgba(240,245,255,.90)",
+            background:"rgba(var(--color-ice-rgb),.90)",
             backdropFilter:"blur(24px)", WebkitBackdropFilter:"blur(24px)",
-            borderBottom:"1px solid rgba(13,37,74,.09)",
-            boxShadow:"0 1px 20px rgba(13,37,74,.05)",
+            borderBottom:"1px solid rgba(var(--color-navy-mid-rgb),.09)",
+            boxShadow:"0 1px 20px rgba(var(--color-navy-mid-rgb),.05)",
           }}
         >
           {/* Logo */}
@@ -235,17 +235,17 @@ const Login = ({ onLogin }) => {
             <div
               style={{
                 width:40, height:40, borderRadius:13,
-                background:"linear-gradient(135deg,#c9a800,#ffd700,#ffe88a)",
-                display:"grid", placeItems:"center", color:"#04122e",
-                boxShadow:"0 0 24px rgba(255,215,0,.45)",
+                background:"linear-gradient(135deg,var(--color-gold-dark),var(--color-gold),var(--color-gold-light))",
+                display:"grid", placeItems:"center", color:"var(--color-navy-deep)",
+                boxShadow:"0 0 24px rgba(var(--color-gold-rgb),.45)",
                 animation:"glow-logo-s 2.5s ease-in-out infinite",
               }}
             >
               <BookOpen size={20} strokeWidth={1.7} />
             </div>
             <div style={{ lineHeight:1 }}>
-              <span style={{ display:"block", fontSize:9, fontWeight:700, letterSpacing:".44em", color:"rgba(13,37,74,.45)", textTransform:"uppercase", marginBottom:2 }}>UCM</span>
-              <span style={{ display:"block", fontSize:18, fontWeight:900, color:"#04122e", letterSpacing:"-.02em" }}>SmartHub</span>
+              <span style={{ display:"block", fontSize:9, fontWeight:700, letterSpacing:".44em", color:"rgba(var(--color-navy-mid-rgb),.45)", textTransform:"uppercase", marginBottom:2 }}>UCM</span>
+              <span style={{ display:"block", fontSize:18, fontWeight:900, color:"var(--color-navy-deep)", letterSpacing:"-.02em" }}>SmartHub</span>
             </div>
           </div>
 
@@ -258,7 +258,7 @@ const Login = ({ onLogin }) => {
           <button
             className="lg:hidden"
             onClick={() => setMobileMenu(m => !m)}
-            style={{ background:"none", border:"none", cursor:"pointer", padding:4, color:"#04122e" }}
+            style={{ background:"none", border:"none", cursor:"pointer", padding:4, color:"var(--color-navy-deep)" }}
           >
             {mobileMenu ? <X size={22} /> : <Menu size={22} />}
           </button>
@@ -270,10 +270,10 @@ const Login = ({ onLogin }) => {
             className="lg:hidden"
             style={{
               position:"relative", zIndex:25,
-              background:"rgba(240,245,255,.97)", backdropFilter:"blur(16px)",
-              borderBottom:"1px solid rgba(13,37,74,.08)",
+              background:"rgba(var(--color-ice-rgb),.97)", backdropFilter:"blur(16px)",
+              borderBottom:"1px solid rgba(var(--color-navy-mid-rgb),.08)",
               padding:"18px 40px", display:"flex", flexDirection:"column", gap:18,
-              boxShadow:"0 8px 32px rgba(13,37,74,.10)",
+              boxShadow:"0 8px 32px rgba(var(--color-navy-mid-rgb),.10)",
             }}
           >
             {NAV_LINKS.map(l => (
@@ -293,7 +293,7 @@ const Login = ({ onLogin }) => {
             className="hidden lg:flex relative flex-1 flex-col justify-between overflow-hidden"
             style={{
               padding:"3.5rem",
-              background:"linear-gradient(-45deg,#020b18,#04122e,#071832,#0d254a,#0a1f3d)",
+              background:"linear-gradient(-45deg,var(--color-navy-abyss),var(--color-navy-deep),var(--color-navy),var(--color-navy-mid),#0a1f3d)",
               backgroundSize:"400% 400%",
               animation:"aurora-hero 10s ease infinite",
             }}
@@ -303,14 +303,14 @@ const Login = ({ onLogin }) => {
               style={{ backgroundImage:"radial-gradient(circle,rgba(255,255,255,.045) 1px,transparent 1px)", backgroundSize:"30px 30px" }} />
             {/* gold glow */}
             <div className="absolute inset-0 pointer-events-none"
-              style={{ background:"radial-gradient(ellipse at 30% 35%,rgba(255,215,0,.10) 0%,transparent 55%)" }} />
+              style={{ background:"radial-gradient(ellipse at 30% 35%,rgba(var(--color-gold-rgb),.10) 0%,transparent 55%)" }} />
             {/* gold top bar */}
             <div className="absolute top-0 inset-x-0"
-              style={{ height:3, background:"linear-gradient(90deg,transparent,#c9a800,#ffd700,#ffe88a,transparent)" }} />
+              style={{ height:3, background:"linear-gradient(90deg,transparent,var(--color-gold-dark),var(--color-gold),var(--color-gold-light),transparent)" }} />
             {/* decorative corners */}
             {["top-5 left-5 border-t-2 border-l-2","top-5 right-5 border-t-2 border-r-2",
               "bottom-5 left-5 border-b-2 border-l-2","bottom-5 right-5 border-b-2 border-r-2"].map(c => (
-              <div key={c} className={`absolute w-8 h-8 ${c}`} style={{ borderColor:"rgba(255,215,0,.28)" }} />
+              <div key={c} className={`absolute w-8 h-8 ${c}`} style={{ borderColor:"rgba(var(--color-gold-rgb),.28)" }} />
             ))}
 
             {/* float cards */}
@@ -321,12 +321,12 @@ const Login = ({ onLogin }) => {
             {/* logo */}
             <div className="relative z-10 flex items-center gap-4">
               <div style={{ width:54, height:54, borderRadius:18, display:"grid", placeItems:"center",
-                background:"linear-gradient(135deg,#c9a800,#ffd700,#ffe88a)", color:"#04122e",
-                boxShadow:"0 0 36px rgba(255,215,0,.55)", animation:"glow-logo-s 2.5s ease-in-out infinite" }}>
+                background:"linear-gradient(135deg,var(--color-gold-dark),var(--color-gold),var(--color-gold-light))", color:"var(--color-navy-deep)",
+                boxShadow:"0 0 36px rgba(var(--color-gold-rgb),.55)", animation:"glow-logo-s 2.5s ease-in-out infinite" }}>
                 <BookOpen size={26} strokeWidth={1.7} />
               </div>
               <div>
-                <p style={{ fontSize:10, fontWeight:700, letterSpacing:".44em", color:"rgba(168,209,255,.60)", textTransform:"uppercase" }}>UCM</p>
+                <p style={{ fontSize:10, fontWeight:700, letterSpacing:".44em", color:"rgba(var(--color-blue-sky-rgb),.60)", textTransform:"uppercase" }}>UCM</p>
                 <p style={{ fontSize:22, fontWeight:900, color:"#fff", lineHeight:1.1, letterSpacing:"-.02em" }}>SmartHub</p>
               </div>
             </div>
@@ -335,13 +335,13 @@ const Login = ({ onLogin }) => {
             <div className="relative z-10 max-w-sm space-y-9">
               <div>
                 <p className="mb-5 text-[11px] font-bold uppercase"
-                  style={{ letterSpacing:".5em", color:"rgba(255,215,0,.60)" }}>
+                  style={{ letterSpacing:".5em", color:"rgba(var(--color-gold-rgb),.60)" }}>
                   Plataforma académica · UCM Tete
                 </p>
                 <h1 className="text-[3.4rem] font-black leading-[1.02] tracking-tight text-white"
-                  style={{ textShadow:"0 0 50px rgba(255,215,0,.18)" }}>
+                  style={{ textShadow:"0 0 50px rgba(var(--color-gold-rgb),.18)" }}>
                   Aprenda.<br />
-                  <span style={{ background:"linear-gradient(135deg,#c9a800,#ffd700,#ffe88a)",
+                  <span style={{ background:"linear-gradient(135deg,var(--color-gold-dark),var(--color-gold),var(--color-gold-light))",
                     WebkitBackgroundClip:"text", backgroundClip:"text", WebkitTextFillColor:"transparent" }}>
                     Partilhe.
                   </span><br />
@@ -353,10 +353,10 @@ const Login = ({ onLogin }) => {
                 {FEATURES.map(({ icon: Icon, text }) => (
                   <li key={text} className="flex items-center gap-4">
                     <div style={{ width:36, height:36, borderRadius:12, display:"grid", placeItems:"center", flexShrink:0,
-                      background:"rgba(255,215,0,.12)", border:"1px solid rgba(255,215,0,.25)" }}>
-                      <Icon size={16} style={{ color:"#ffd700" }} />
+                      background:"rgba(var(--color-gold-rgb),.12)", border:"1px solid rgba(var(--color-gold-rgb),.25)" }}>
+                      <Icon size={16} style={{ color:"var(--color-gold)" }} />
                     </div>
-                    <span style={{ fontSize:14, color:"rgba(168,209,255,.80)", fontWeight:500 }}>{text}</span>
+                    <span style={{ fontSize:14, color:"rgba(var(--color-blue-sky-rgb),.80)", fontWeight:500 }}>{text}</span>
                   </li>
                 ))}
               </ul>
@@ -364,11 +364,11 @@ const Login = ({ onLogin }) => {
               {/* social proof */}
               <div className="flex items-center gap-4 pt-1">
                 <div className="flex -space-x-2.5">
-                  {["#0d254a","#1a3a6b","#2a5298","#1e5fe0"].map((bg, i) => (
+                  {["var(--color-navy-mid)","var(--color-navy-bright)","#2a5298","var(--color-blue-accent)"].map((bg, i) => (
                     <div key={i}
                       style={{ width:36, height:36, borderRadius:"50%", display:"grid", placeItems:"center",
                         fontSize:12, fontWeight:900, color:"#fff", flexShrink:0,
-                        background:bg, border:"2px solid rgba(255,255,255,.15)", boxShadow:"0 2px 8px rgba(2,11,24,.4)" }}>
+                        background:bg, border:"2px solid rgba(255,255,255,.15)", boxShadow:"0 2px 8px rgba(var(--color-navy-abyss-rgb),.4)" }}>
                       {["A","B","C","D"][i]}
                     </div>
                   ))}
@@ -391,18 +391,18 @@ const Login = ({ onLogin }) => {
             style={{
               padding:"2.5rem 3.5rem",
               background:"#ffffff",
-              boxShadow:"-28px 0 90px rgba(4,18,46,.14)",
+              boxShadow:"-28px 0 90px rgba(var(--color-navy-deep-rgb),.14)",
               position:"relative", zIndex:15,
             }}
           >
             {/* Logo mobile */}
             <div className="flex items-center gap-3 mb-8 lg:hidden self-start">
               <div style={{ width:44, height:44, borderRadius:14, display:"grid", placeItems:"center",
-                background:"linear-gradient(135deg,#0d254a,#071832)", color:"#ffd700",
-                boxShadow:"0 4px 16px rgba(13,37,74,.35)" }}>
+                background:"linear-gradient(135deg,var(--color-navy-mid),var(--color-navy))", color:"var(--color-gold)",
+                boxShadow:"0 4px 16px rgba(var(--color-navy-mid-rgb),.35)" }}>
                 <BookOpen size={21} />
               </div>
-              <span style={{ fontSize:20, fontWeight:900, color:"#0d254a" }}>SmartHub UCM</span>
+              <span style={{ fontSize:20, fontWeight:900, color:"var(--color-navy-mid)" }}>SmartHub UCM</span>
             </div>
 
             <div className="w-full max-w-[370px]">
@@ -410,14 +410,14 @@ const Login = ({ onLogin }) => {
               {/* badge de estado */}
               <div className="mb-9">
                 <div className="inline-flex items-center gap-2 rounded-full px-4 py-2 mb-5"
-                  style={{ background:"rgba(13,37,74,.06)", border:"1px solid rgba(13,37,74,.10)" }}>
+                  style={{ background:"rgba(var(--color-navy-mid-rgb),.06)", border:"1px solid rgba(var(--color-navy-mid-rgb),.10)" }}>
                   <div className="w-2 h-2 rounded-full" style={{ background:"#10b981", boxShadow:"0 0 6px rgba(16,185,129,.80)" }} />
-                  <span style={{ fontSize:10, fontWeight:700, letterSpacing:".4em", color:"rgba(13,37,74,.60)", textTransform:"uppercase" }}>
+                  <span style={{ fontSize:10, fontWeight:700, letterSpacing:".4em", color:"rgba(var(--color-navy-mid-rgb),.60)", textTransform:"uppercase" }}>
                     {isRegistering ? "Novo acesso" : "Acesso seguro"}
                   </span>
                 </div>
                 <h2 className="leading-tight mb-2"
-                  style={{ fontSize:"2.1rem", fontWeight:900, color:"#04122e", letterSpacing:"-.025em" }}>
+                  style={{ fontSize:"2.1rem", fontWeight:900, color:"var(--color-navy-deep)", letterSpacing:"-.025em" }}>
                   {isRegistering ? "Criar conta UCM" : "Bem‑vindo\nde volta"}
                 </h2>
                 <p style={{ fontSize:14, color:"#94a3b8", lineHeight:1.65 }}>
@@ -448,12 +448,12 @@ const Login = ({ onLogin }) => {
                   <>
                     {/* toggle aluno / docente */}
                     <div className="grid grid-cols-2 gap-2 p-1.5 rounded-2xl"
-                      style={{ background:"#f0f5ff", border:"1px solid rgba(13,37,74,.09)" }}>
+                      style={{ background:"var(--color-ice)", border:"1px solid rgba(var(--color-navy-mid-rgb),.09)" }}>
                       {[["estudante","Aluno"],["professor","Docente"]].map(([v, lbl]) => (
                         <button key={v} type="button" onClick={() => setPapel(v)}
                           className="rounded-xl py-2.5 text-sm font-bold transition-all duration-200"
                           style={papel === v
-                            ? { background:"linear-gradient(135deg,#04122e,#0d254a)", color:"#fff", boxShadow:"0 4px 16px rgba(4,18,46,.30)" }
+                            ? { background:"linear-gradient(135deg,var(--color-navy-deep),var(--color-navy-mid))", color:"#fff", boxShadow:"0 4px 16px rgba(var(--color-navy-deep-rgb),.30)" }
                             : { color:"#64748b" }}>
                           {v === "estudante" ? "🎓" : "👨‍🏫"} {lbl}
                         </button>
@@ -476,7 +476,7 @@ const Login = ({ onLogin }) => {
                       </div>
                       <select value={curso} onChange={e => setCurso(e.target.value)}
                         className="w-full rounded-2xl py-4 pl-12 pr-4 text-sm outline-none transition-all duration-200 appearance-none"
-                        style={{ background:"rgba(240,245,255,.65)", border:"1.5px solid rgba(13,37,74,.11)", color:"#0f172a" }}>
+                        style={{ background:"rgba(var(--color-ice-rgb),.65)", border:"1.5px solid rgba(var(--color-navy-mid-rgb),.11)", color:"#0f172a" }}>
                         {CURSOS.map(c => <option key={c} value={c}>{c}</option>)}
                       </select>
                     </div>
@@ -493,7 +493,7 @@ const Login = ({ onLogin }) => {
 
                 {!isRegistering && (
                   <div className="flex justify-end -mt-1">
-                    <button type="button" className="text-xs font-semibold transition-colors hover:text-[#0d254a]"
+                    <button type="button" className="text-xs font-semibold transition-colors hover:text-[var(--color-navy-mid)]"
                       style={{ color:"#94a3b8" }}>
                       Esqueceu a senha?
                     </button>
@@ -505,12 +505,12 @@ const Login = ({ onLogin }) => {
                   disabled={loading}
                   className="w-full flex items-center justify-center gap-2.5 rounded-2xl py-[14px] text-sm font-black uppercase tracking-[.10em] transition-all duration-250 disabled:opacity-60 mt-1"
                   style={{
-                    background:"linear-gradient(135deg,#04122e 0%,#0d254a 60%,#1a3a6b 100%)",
+                    background:"linear-gradient(135deg,var(--color-navy-deep) 0%,var(--color-navy-mid) 60%,var(--color-navy-bright) 100%)",
                     color:"#fff",
-                    boxShadow:"0 8px 32px rgba(4,18,46,.38), inset 0 1px 0 rgba(255,255,255,.08)",
+                    boxShadow:"0 8px 32px rgba(var(--color-navy-deep-rgb),.38), inset 0 1px 0 rgba(255,255,255,.08)",
                   }}
-                  onMouseEnter={e => !loading && (e.currentTarget.style.transform="translateY(-2px)", e.currentTarget.style.boxShadow="0 12px 40px rgba(4,18,46,.50), inset 0 1px 0 rgba(255,255,255,.08)")}
-                  onMouseLeave={e => (e.currentTarget.style.transform="", e.currentTarget.style.boxShadow="0 8px 32px rgba(4,18,46,.38), inset 0 1px 0 rgba(255,255,255,.08)")}
+                  onMouseEnter={e => !loading && (e.currentTarget.style.transform="translateY(-2px)", e.currentTarget.style.boxShadow="0 12px 40px rgba(var(--color-navy-deep-rgb),.50), inset 0 1px 0 rgba(255,255,255,.08)")}
+                  onMouseLeave={e => (e.currentTarget.style.transform="", e.currentTarget.style.boxShadow="0 8px 32px rgba(var(--color-navy-deep-rgb),.38), inset 0 1px 0 rgba(255,255,255,.08)")}
                 >
                   {loading
                     ? <div className="w-5 h-5 rounded-full border-2 border-white/25 border-t-white animate-spin" />
@@ -521,7 +521,7 @@ const Login = ({ onLogin }) => {
 
               {/* divisor */}
               <div className="relative my-6">
-                <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-px" style={{ background:"#e8effc" }} />
+                <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-px" style={{ background:"var(--color-ice-mid)" }} />
                 <div className="relative flex justify-center">
                   <span className="px-4 text-xs" style={{ background:"#fff", color:"#94a3b8", fontWeight:500 }}>
                     {isRegistering ? "Já tem conta?" : "Ainda não tem acesso?"}
@@ -531,9 +531,9 @@ const Login = ({ onLogin }) => {
 
               <button onClick={switchMode}
                 className="w-full rounded-2xl py-3.5 text-sm font-bold transition-all duration-200"
-                style={{ background:"rgba(13,37,74,.05)", border:"1.5px solid rgba(13,37,74,.10)", color:"#0d254a" }}
-                onMouseEnter={e => (e.currentTarget.style.background="rgba(13,37,74,.09)", e.currentTarget.style.borderColor="rgba(13,37,74,.20)")}
-                onMouseLeave={e => (e.currentTarget.style.background="rgba(13,37,74,.05)", e.currentTarget.style.borderColor="rgba(13,37,74,.10)")}
+                style={{ background:"rgba(var(--color-navy-mid-rgb),.05)", border:"1.5px solid rgba(var(--color-navy-mid-rgb),.10)", color:"var(--color-navy-mid)" }}
+                onMouseEnter={e => (e.currentTarget.style.background="rgba(var(--color-navy-mid-rgb),.09)", e.currentTarget.style.borderColor="rgba(var(--color-navy-mid-rgb),.20)")}
+                onMouseLeave={e => (e.currentTarget.style.background="rgba(var(--color-navy-mid-rgb),.05)", e.currentTarget.style.borderColor="rgba(var(--color-navy-mid-rgb),.10)")}
               >
                 {isRegistering ? "Entrar na minha conta →" : "Criar conta gratuita →"}
               </button>
@@ -549,13 +549,13 @@ const Login = ({ onLogin }) => {
             display:"flex", alignItems:"center", justifyContent:"space-between",
             flexWrap:"wrap", gap:12,
             padding:"13px 40px",
-            background:"rgba(240,245,255,.90)",
+            background:"rgba(var(--color-ice-rgb),.90)",
             backdropFilter:"blur(24px)", WebkitBackdropFilter:"blur(24px)",
-            borderTop:"1px solid rgba(13,37,74,.09)",
+            borderTop:"1px solid rgba(var(--color-navy-mid-rgb),.09)",
           }}
         >
           <div>
-            <p style={{ fontSize:11, color:"#04122e", fontWeight:700, marginBottom:2 }}>UCM Extensão de Tete</p>
+            <p style={{ fontSize:11, color:"var(--color-navy-deep)", fontWeight:700, marginBottom:2 }}>UCM Extensão de Tete</p>
             <p style={{ fontSize:10, color:"#94a3b8" }}>Tete, Moçambique · smarthub@ucm.ac.mz</p>
           </div>
 

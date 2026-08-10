@@ -7,36 +7,34 @@
    Paleta: Azul Profundo · Branco Cristalino · Dourado Metálico
 ═══════════════════════════════════════════════════════════ */
 
+/*
+ * Valores por defeito — reproduzidos aqui para que o primeiro render (antes
+ * de JS carregar a configuração da BD) já use a paleta correcta, sem "flash".
+ * src/utils/palette.js recalcula e sobrepõe estas mesmas propriedades em
+ * runtime a partir das duas cores escolhidas pelo admin (cor_primaria/cor_destaque).
+ */
 :root {
   color-scheme: light;
 
-  /* ── Azuis ── */
-  --navy-abyss:   #020b18;
-  --navy-deep:    #04122e;
-  --navy:         #071832;
-  --navy-mid:     #0d254a;
-  --navy-bright:  #1a3a6b;
-  --blue-accent:  #1e5fe0;
-  --blue-sky:     #a8d1ff;
+  /* ── Azuis (derivados da cor primária) ── */
+  --color-navy-abyss:      #020b18;  --color-navy-abyss-rgb:      2,11,24;
+  --color-navy-deep:       #04122e;  --color-navy-deep-rgb:       4,18,46;
+  --color-navy:            #071832;  --color-navy-rgb:            7,24,50;
+  --color-navy-mid:        #0d254a;  --color-navy-mid-rgb:        13,37,74;
+  --color-navy-bright:     #1a3a6b;  --color-navy-bright-rgb:     26,58,107;
+  --color-blue-accent:     #1e5fe0;  --color-blue-accent-rgb:     30,95,224;
+  --color-blue-sky:        #a8d1ff;  --color-blue-sky-rgb:        168,209,255;
 
-  /* ── Dourados ── */
-  --gold:         #ffd700;
-  --gold-light:   #ffe88a;
-  --gold-pale:    #fff4b8;
-  --gold-dark:    #c9a800;
-  --gold-rich:    #e6c200;
+  /* ── Dourados (derivados da cor de destaque) ── */
+  --color-gold-dark:       #c9a800;  --color-gold-dark-rgb:       201,168,0;
+  --color-gold:            #ffd700;  --color-gold-rgb:            255,215,0;
+  --color-gold-light:      #ffe88a;  --color-gold-light-rgb:      255,232,138;
+  --color-gold-pale:       #fff4b8;  --color-gold-pale-rgb:       255,244,184;
+  --color-gold-rich:       #e6c200;  --color-gold-rich-rgb:       230,194,0;
 
-  /* ── Brancos/Ices ── */
-  --white:        #ffffff;
-  --ice:          #f0f5ff;
-  --ice-mid:      #e8effc;
-  --frost:        rgba(255,255,255,0.07);
-
-  /* ── Sombras ── */
-  --shadow-gold:  0 0 40px rgba(255, 215, 0, 0.35);
-  --shadow-navy:  0 24px 80px rgba(4, 18, 46, 0.55);
-  --shadow-card:  0 4px 32px rgba(13, 37, 74, 0.08), 0 1px 6px rgba(13, 37, 74, 0.05);
-  --shadow-float: 0 20px 60px rgba(4, 18, 46, 0.4);
+  /* ── Brancos/Ices (derivados da cor primária) ── */
+  --color-ice:             #f0f5ff;  --color-ice-rgb:             240,245,255;
+  --color-ice-mid:         #e8effc;  --color-ice-mid-rgb:         232,239,252;
 }
 
 html { min-height: 100%; }
@@ -44,26 +42,26 @@ html { min-height: 100%; }
 body {
   min-height: 100vh;
   background:
-    radial-gradient(ellipse at 8% 5%,  rgba(255,215,0,0.10)  0%, transparent 38%),
+    radial-gradient(ellipse at 8% 5%,  rgba(var(--color-gold-rgb),0.10)  0%, transparent 38%),
     radial-gradient(ellipse at 92% 95%, rgba(0, 51,102,0.10) 0%, transparent 38%),
-    radial-gradient(ellipse at 55% 45%, rgba(168,209,255,0.07) 0%, transparent 55%),
-    #f0f5ff;
+    radial-gradient(ellipse at 55% 45%, rgba(var(--color-blue-sky-rgb),0.07) 0%, transparent 55%),
+    var(--color-ice);
   font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: #0f172a;
 }
 
 /* ─── Scrollbar Personalizada ─── */
 ::-webkit-scrollbar       { width: 7px; height: 7px; }
-::-webkit-scrollbar-track { background: #e8effc; border-radius: 99px; }
+::-webkit-scrollbar-track { background: var(--color-ice-mid); border-radius: 99px; }
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #1a3a6b 0%, #0d254a 100%);
+  background: linear-gradient(180deg, var(--color-navy-bright) 0%, var(--color-navy-mid) 100%);
   border-radius: 99px;
-  border: 2px solid #e8effc;
+  border: 2px solid var(--color-ice-mid);
 }
-::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, #1e5fe0 0%, #0d254a 100%); }
+::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, var(--color-blue-accent) 0%, var(--color-navy-mid) 100%); }
 
 /* ─── Seleção de texto ─── */
-::selection { background: rgba(255,215,0,0.35); color: #04122e; }
+::selection { background: rgba(var(--color-gold-rgb),0.35); color: var(--color-navy-deep); }
 
 /* ══════════════════════════════════════════════════
    ANIMAÇÕES PRINCIPAIS
@@ -126,17 +124,17 @@ body {
 /* Brilho dourado pulsante */
 @keyframes glow-gold {
   0%, 100% {
-    box-shadow: 0 0 20px rgba(255,215,0,0.3), 0 0 40px rgba(255,215,0,0.1);
+    box-shadow: 0 0 20px rgba(var(--color-gold-rgb),0.3), 0 0 40px rgba(var(--color-gold-rgb),0.1);
   }
   50% {
-    box-shadow: 0 0 40px rgba(255,215,0,0.6), 0 0 80px rgba(255,215,0,0.25), 0 0 120px rgba(255,215,0,0.1);
+    box-shadow: 0 0 40px rgba(var(--color-gold-rgb),0.6), 0 0 80px rgba(var(--color-gold-rgb),0.25), 0 0 120px rgba(var(--color-gold-rgb),0.1);
   }
 }
 
 /* Brilho azul pulsante */
 @keyframes glow-blue {
-  0%, 100% { box-shadow: 0 0 20px rgba(30,95,224,0.3); }
-  50%       { box-shadow: 0 0 50px rgba(30,95,224,0.6), 0 0 100px rgba(30,95,224,0.2); }
+  0%, 100% { box-shadow: 0 0 20px rgba(var(--color-blue-accent-rgb),0.3); }
+  50%       { box-shadow: 0 0 50px rgba(var(--color-blue-accent-rgb),0.6), 0 0 100px rgba(var(--color-blue-accent-rgb),0.2); }
 }
 
 /* Aurora — movimento de gradiente */
@@ -223,7 +221,7 @@ body {
 
 /* Texto dourado metálico */
 .text-gold-gradient {
-  background: linear-gradient(135deg, #c9a800 0%, #ffd700 40%, #ffe88a 65%, #e6c200 100%);
+  background: linear-gradient(135deg, var(--color-gold-dark) 0%, var(--color-gold) 40%, var(--color-gold-light) 65%, var(--color-gold-rich) 100%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -231,7 +229,7 @@ body {
 
 /* Texto aurora animado */
 .text-aurora {
-  background: linear-gradient(135deg, #ffd700 0%, #ffe88a 25%, #ffffff 50%, #a8d1ff 75%, #ffd700 100%);
+  background: linear-gradient(135deg, var(--color-gold) 0%, var(--color-gold-light) 25%, #ffffff 50%, var(--color-blue-sky) 75%, var(--color-gold) 100%);
   background-size: 300% auto;
   -webkit-background-clip: text;
   background-clip: text;
@@ -241,41 +239,41 @@ body {
 
 /* Botão dourado premium */
 .btn-gold {
-  background: linear-gradient(135deg, #c9a800 0%, #ffd700 50%, #ffe88a 100%);
-  color: #04122e;
+  background: linear-gradient(135deg, var(--color-gold-dark) 0%, var(--color-gold) 50%, var(--color-gold-light) 100%);
+  color: var(--color-navy-deep);
   font-weight: 800;
-  box-shadow: 0 6px 28px rgba(255,215,0,0.45), 0 2px 8px rgba(255,215,0,0.25), inset 0 1px 0 rgba(255,255,255,0.35);
+  box-shadow: 0 6px 28px rgba(var(--color-gold-rgb),0.45), 0 2px 8px rgba(var(--color-gold-rgb),0.25), inset 0 1px 0 rgba(255,255,255,0.35);
   transition: all 0.25s cubic-bezier(0.22,1,0.36,1);
 }
 .btn-gold:hover {
   transform: translateY(-2px);
-  box-shadow: 0 10px 40px rgba(255,215,0,0.60), 0 4px 14px rgba(255,215,0,0.35), inset 0 1px 0 rgba(255,255,255,0.35);
+  box-shadow: 0 10px 40px rgba(var(--color-gold-rgb),0.60), 0 4px 14px rgba(var(--color-gold-rgb),0.35), inset 0 1px 0 rgba(255,255,255,0.35);
 }
 
 /* Botão navy premium */
 .btn-navy {
-  background: linear-gradient(135deg, #04122e 0%, #0d254a 100%);
+  background: linear-gradient(135deg, var(--color-navy-deep) 0%, var(--color-navy-mid) 100%);
   color: #ffffff;
   font-weight: 700;
-  box-shadow: 0 6px 28px rgba(4,18,46,0.40), inset 0 1px 0 rgba(255,255,255,0.08);
+  box-shadow: 0 6px 28px rgba(var(--color-navy-deep-rgb),0.40), inset 0 1px 0 rgba(255,255,255,0.08);
   transition: all 0.25s cubic-bezier(0.22,1,0.36,1);
 }
 .btn-navy:hover {
   transform: translateY(-2px);
-  box-shadow: 0 10px 40px rgba(4,18,46,0.55), inset 0 1px 0 rgba(255,255,255,0.08);
+  box-shadow: 0 10px 40px rgba(var(--color-navy-deep-rgb),0.55), inset 0 1px 0 rgba(255,255,255,0.08);
 }
 
 /* ══════════════════════════════════════════════════
    FUNDO AURORA (para elementos dark)
 ══════════════════════════════════════════════════ */
 .bg-aurora-dark {
-  background: linear-gradient(-45deg, #020b18, #04122e, #071832, #0d254a, #0a1f3d, #04122e);
+  background: linear-gradient(-45deg, var(--color-navy-abyss), var(--color-navy-deep), var(--color-navy), var(--color-navy-mid), #0a1f3d, var(--color-navy-deep));
   background-size: 400% 400%;
   animation: aurora 12s ease infinite;
 }
 
 .bg-aurora-light {
-  background: linear-gradient(-45deg, #e8effc, #f0f5ff, #dce8ff, #e8f0ff, #f5f8ff, #e0eaff);
+  background: linear-gradient(-45deg, var(--color-ice-mid), var(--color-ice), #dce8ff, #e8f0ff, #f5f8ff, #e0eaff);
   background-size: 400% 400%;
   animation: aurora 14s ease infinite;
 }

@@ -22,8 +22,8 @@ const SummaryRenderer = ({ text }) => {
         if (isSecao(linha)) return (
           <div key={i} style={{ paddingTop: i === 0 ? 0 : 14, paddingBottom: 6 }}>
             <div className="flex items-center gap-2.5">
-              <div style={{ width: 3, height: 16, borderRadius: 2, background: "linear-gradient(180deg,#c9a800,#ffd700)", flexShrink: 0 }} />
-              <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.38em", color: "rgba(255,215,0,0.85)", textTransform: "uppercase" }}>
+              <div style={{ width: 3, height: 16, borderRadius: 2, background: "linear-gradient(180deg,var(--color-gold-dark),var(--color-gold))", flexShrink: 0 }} />
+              <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.38em", color: "rgba(var(--color-gold-rgb),0.85)", textTransform: "uppercase" }}>
                 {linha.trim()}
               </p>
             </div>
@@ -35,7 +35,7 @@ const SummaryRenderer = ({ text }) => {
           const temLabel = partes.length > 1;
           return (
             <div key={i} className="flex items-start gap-3" style={{ paddingLeft: 8, paddingTop: 3 }}>
-              <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#ffd700", boxShadow: "0 0 5px rgba(255,215,0,0.60)", flexShrink: 0, marginTop: 7 }} />
+              <span style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--color-gold)", boxShadow: "0 0 5px rgba(var(--color-gold-rgb),0.60)", flexShrink: 0, marginTop: 7 }} />
               <p style={{ fontSize: 13.5, color: "rgba(226,232,240,0.88)", lineHeight: 1.65 }}>
                 {temLabel
                   ? <><strong style={{ color: "#fff", fontWeight: 700 }}>{partes[0].trim()}</strong>:{partes[1]}</>
@@ -46,7 +46,7 @@ const SummaryRenderer = ({ text }) => {
         }
 
         return (
-          <p key={i} style={{ fontSize: 13.5, color: "rgba(168,209,255,0.80)", lineHeight: 1.70, paddingTop: 2 }}>
+          <p key={i} style={{ fontSize: 13.5, color: "rgba(var(--color-blue-sky-rgb),0.80)", lineHeight: 1.70, paddingTop: 2 }}>
             {linha.trim()}
           </p>
         );
@@ -116,7 +116,7 @@ const Visualizador = () => {
   if (loading) {
     return (
       <div className="h-full flex flex-col items-center justify-center p-8 gap-4">
-        <div className="w-12 h-12 rounded-full border-4 animate-spin" style={{ borderColor: "rgba(13,37,74,0.12)", borderTopColor: "#ffd700" }} />
+        <div className="w-12 h-12 rounded-full border-4 animate-spin" style={{ borderColor: "rgba(var(--color-navy-mid-rgb),0.12)", borderTopColor: "var(--color-gold)" }} />
         <p style={{ fontSize: 14, fontWeight: 600, color: "#64748b" }}>A carregar o material...</p>
       </div>
     );
@@ -128,12 +128,12 @@ const Visualizador = () => {
         <div className="w-24 h-24 rounded-[28px] grid place-items-center" style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.18)" }}>
           <DownloadCloud size={38} style={{ color: "#ef4444" }} />
         </div>
-        <h2 style={{ fontSize: 26, fontWeight: 900, color: "#04122e" }}>Material não encontrado</h2>
+        <h2 style={{ fontSize: 26, fontWeight: 900, color: "var(--color-navy-deep)" }}>Material não encontrado</h2>
         <p style={{ fontSize: 14, color: "#64748b" }}>Este recurso não existe no repositório da UCM.</p>
         <button
           onClick={() => navigate('/repositorio')}
           className="inline-flex items-center gap-2 rounded-2xl px-6 py-3 text-sm font-bold text-white transition-all duration-200 mt-2"
-          style={{ background: "linear-gradient(135deg,#04122e,#0d254a)", boxShadow: "0 6px 22px rgba(4,18,46,0.35)" }}
+          style={{ background: "linear-gradient(135deg,var(--color-navy-deep),var(--color-navy-mid))", boxShadow: "0 6px 22px rgba(var(--color-navy-deep-rgb),0.35)" }}
           onMouseEnter={e => (e.currentTarget.style.transform = "translateY(-2px)")}
           onMouseLeave={e => (e.currentTarget.style.transform = "")}
         >
@@ -157,9 +157,9 @@ const Visualizador = () => {
           <button
             onClick={() => navigate("/repositorio")}
             className="inline-flex items-center gap-2 rounded-2xl px-5 py-2.5 text-sm font-bold transition-all duration-200"
-            style={{ background: "#fff", border: "1.5px solid rgba(13,37,74,0.10)", color: "#0d254a", boxShadow: "0 2px 10px rgba(13,37,74,0.06)" }}
-            onMouseEnter={e => (e.currentTarget.style.background = "#0d254a", e.currentTarget.style.color = "#fff")}
-            onMouseLeave={e => (e.currentTarget.style.background = "#fff", e.currentTarget.style.color = "#0d254a")}
+            style={{ background: "#fff", border: "1.5px solid rgba(var(--color-navy-mid-rgb),0.10)", color: "var(--color-navy-mid)", boxShadow: "0 2px 10px rgba(var(--color-navy-mid-rgb),0.06)" }}
+            onMouseEnter={e => (e.currentTarget.style.background = "var(--color-navy-mid)", e.currentTarget.style.color = "#fff")}
+            onMouseLeave={e => (e.currentTarget.style.background = "#fff", e.currentTarget.style.color = "var(--color-navy-mid)")}
           >
             <ArrowLeft size={17} /> Voltar
           </button>
@@ -171,7 +171,7 @@ const Visualizador = () => {
               className="inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-bold transition-all duration-200"
               style={fav
                 ? { background: "rgba(239,68,68,0.09)", border: "1.5px solid rgba(239,68,68,0.28)", color: "#dc2626" }
-                : { background: "#fff", border: "1.5px solid rgba(13,37,74,0.10)", color: "#64748b", boxShadow: "0 2px 10px rgba(13,37,74,0.06)" }
+                : { background: "#fff", border: "1.5px solid rgba(var(--color-navy-mid-rgb),0.10)", color: "#64748b", boxShadow: "0 2px 10px rgba(var(--color-navy-mid-rgb),0.06)" }
               }
               title={fav ? "Remover dos favoritos" : "Adicionar aos favoritos"}
             >
@@ -183,7 +183,7 @@ const Visualizador = () => {
             <button
               onClick={handleCopiarLink}
               className="inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-bold transition-all duration-200"
-              style={{ background: "#fff", border: "1.5px solid rgba(13,37,74,0.10)", color: "#64748b", boxShadow: "0 2px 10px rgba(13,37,74,0.06)" }}
+              style={{ background: "#fff", border: "1.5px solid rgba(var(--color-navy-mid-rgb),0.10)", color: "#64748b", boxShadow: "0 2px 10px rgba(var(--color-navy-mid-rgb),0.06)" }}
             >
               <Share2 size={16} />
               {copiado ? "Copiado!" : "Partilhar"}
@@ -197,9 +197,9 @@ const Visualizador = () => {
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-black transition-all duration-200"
-                style={{ background: "linear-gradient(135deg,#c9a800,#ffd700)", color: "#04122e", boxShadow: "0 4px 16px rgba(255,215,0,0.40)" }}
-                onMouseEnter={e => (e.currentTarget.style.transform = "translateY(-1px)", e.currentTarget.style.boxShadow = "0 6px 22px rgba(255,215,0,0.60)")}
-                onMouseLeave={e => (e.currentTarget.style.transform = "", e.currentTarget.style.boxShadow = "0 4px 16px rgba(255,215,0,0.40)")}
+                style={{ background: "linear-gradient(135deg,var(--color-gold-dark),var(--color-gold))", color: "var(--color-navy-deep)", boxShadow: "0 4px 16px rgba(var(--color-gold-rgb),0.40)" }}
+                onMouseEnter={e => (e.currentTarget.style.transform = "translateY(-1px)", e.currentTarget.style.boxShadow = "0 6px 22px rgba(var(--color-gold-rgb),0.60)")}
+                onMouseLeave={e => (e.currentTarget.style.transform = "", e.currentTarget.style.boxShadow = "0 4px 16px rgba(var(--color-gold-rgb),0.40)")}
               >
                 <DownloadCloud size={16} /> Download PDF
               </a>
@@ -210,7 +210,7 @@ const Visualizador = () => {
         {/* Player de media */}
         <div
           className="overflow-hidden"
-          style={{ borderRadius: 28, border: "1px solid rgba(13,37,74,0.08)", background: "#020b18", boxShadow: "0 20px 70px rgba(2,11,24,0.45)" }}
+          style={{ borderRadius: 28, border: "1px solid rgba(var(--color-navy-mid-rgb),0.08)", background: "var(--color-navy-abyss)", boxShadow: "0 20px 70px rgba(var(--color-navy-abyss-rgb),0.45)" }}
         >
           {isVideo ? (
             <video controls className="w-full" style={{ minHeight: "50vh", background: "#000" }} autoPlay>
@@ -227,20 +227,20 @@ const Visualizador = () => {
           ) : (
             <div
               className="flex flex-col items-center justify-center p-14 text-center text-white"
-              style={{ minHeight: "40vh", background: "linear-gradient(145deg,#020b18,#04122e,#071832)" }}
+              style={{ minHeight: "40vh", background: "linear-gradient(145deg,var(--color-navy-abyss),var(--color-navy-deep),var(--color-navy))" }}
             >
-              <div className="w-24 h-24 rounded-[28px] grid place-items-center mb-7" style={{ background: "rgba(255,215,0,0.12)", border: "1px solid rgba(255,215,0,0.25)" }}>
-                <DownloadCloud size={40} style={{ color: "#ffd700" }} />
+              <div className="w-24 h-24 rounded-[28px] grid place-items-center mb-7" style={{ background: "rgba(var(--color-gold-rgb),0.12)", border: "1px solid rgba(var(--color-gold-rgb),0.25)" }}>
+                <DownloadCloud size={40} style={{ color: "var(--color-gold)" }} />
               </div>
               <h3 style={{ fontSize: 20, fontWeight: 900, marginBottom: 10 }}>Visualização indisponível</h3>
-              <p style={{ color: "rgba(168,209,255,0.60)", fontSize: 14, marginBottom: 28, maxWidth: 360, lineHeight: 1.65 }}>
+              <p style={{ color: "rgba(var(--color-blue-sky-rgb),0.60)", fontSize: 14, marginBottom: 28, maxWidth: 360, lineHeight: 1.65 }}>
                 Este material não pode ser exibido diretamente.
               </p>
               <a
                 href={material.url_arquivo}
                 target="_blank" rel="noreferrer"
                 className="inline-flex items-center gap-2 rounded-full font-black text-sm transition-all"
-                style={{ background: "linear-gradient(135deg,#c9a800,#ffd700,#ffe88a)", color: "#04122e", padding: "12px 28px", boxShadow: "0 8px 28px rgba(255,215,0,0.50)" }}
+                style={{ background: "linear-gradient(135deg,var(--color-gold-dark),var(--color-gold),var(--color-gold-light))", color: "var(--color-navy-deep)", padding: "12px 28px", boxShadow: "0 8px 28px rgba(var(--color-gold-rgb),0.50)" }}
               >
                 Baixar Documento <ExternalLink size={16} />
               </a>
@@ -249,14 +249,14 @@ const Visualizador = () => {
         </div>
 
         {/* Info do material */}
-        <div className="rounded-[28px] p-7" style={{ background: "#fff", border: "1px solid rgba(13,37,74,0.08)", boxShadow: "0 4px 28px rgba(13,37,74,0.07)" }}>
-          <h1 style={{ fontSize: 22, fontWeight: 900, color: "#04122e", marginBottom: 16, lineHeight: 1.3 }}>{material.titulo}</h1>
+        <div className="rounded-[28px] p-7" style={{ background: "#fff", border: "1px solid rgba(var(--color-navy-mid-rgb),0.08)", boxShadow: "0 4px 28px rgba(var(--color-navy-mid-rgb),0.07)" }}>
+          <h1 style={{ fontSize: 22, fontWeight: 900, color: "var(--color-navy-deep)", marginBottom: 16, lineHeight: 1.3 }}>{material.titulo}</h1>
           <div className="flex flex-wrap gap-3">
             {[
-              { label: `📚 ${material.cadeira}`, bg: "#f0f5ff",              border: "rgba(13,37,74,0.10)", color: "#475569" },
-              { label: `👤 ${material.autor}`,   bg: "rgba(13,37,74,0.06)", border: "rgba(13,37,74,0.12)", color: "#0d254a" },
-              { label: `📅 ${new Date(material.data_upload).toLocaleDateString("pt-PT")}`, bg: "#f0f5ff", border: "rgba(13,37,74,0.10)", color: "#64748b" },
-              { label: material.tipo === 'Vídeo' ? '🎬 Vídeo' : '📄 PDF',    bg: material.tipo === 'Vídeo' ? "#eff6ff" : "#fff1f2", border: material.tipo === 'Vídeo' ? "#bfdbfe" : "#fecdd3", color: material.tipo === 'Vídeo' ? "#0d254a" : "#be123c" },
+              { label: `📚 ${material.cadeira}`, bg: "var(--color-ice)",              border: "rgba(var(--color-navy-mid-rgb),0.10)", color: "#475569" },
+              { label: `👤 ${material.autor}`,   bg: "rgba(var(--color-navy-mid-rgb),0.06)", border: "rgba(var(--color-navy-mid-rgb),0.12)", color: "var(--color-navy-mid)" },
+              { label: `📅 ${new Date(material.data_upload).toLocaleDateString("pt-PT")}`, bg: "var(--color-ice)", border: "rgba(var(--color-navy-mid-rgb),0.10)", color: "#64748b" },
+              { label: material.tipo === 'Vídeo' ? '🎬 Vídeo' : '📄 PDF',    bg: material.tipo === 'Vídeo' ? "#eff6ff" : "#fff1f2", border: material.tipo === 'Vídeo' ? "#bfdbfe" : "#fecdd3", color: material.tipo === 'Vídeo' ? "var(--color-navy-mid)" : "#be123c" },
             ].map(({ label, bg, border, color }) => (
               <span key={label} className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold" style={{ background: bg, border: `1px solid ${border}`, color }}>
                 {label}
@@ -272,24 +272,24 @@ const Visualizador = () => {
           className="sticky top-24 overflow-hidden text-white"
           style={{
             borderRadius: 28,
-            background: "linear-gradient(-45deg,#020b18,#04122e,#071832,#0d254a)",
+            background: "linear-gradient(-45deg,var(--color-navy-abyss),var(--color-navy-deep),var(--color-navy),var(--color-navy-mid))",
             backgroundSize: "400% 400%",
             animation: "aurora-vis 10s ease infinite",
-            boxShadow: "0 18px 60px rgba(2,11,24,0.45)",
+            boxShadow: "0 18px 60px rgba(var(--color-navy-abyss-rgb),0.45)",
           }}
         >
           <style>{`@keyframes aurora-vis { 0%,100%{background-position:0% 50%} 50%{background-position:100% 50%} }`}</style>
-          <div style={{ height: 3, background: "linear-gradient(90deg, transparent, #c9a800, #ffd700, #ffe88a, transparent)", opacity: 0.85 }} />
-          <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse at 20% 20%, rgba(255,215,0,0.10) 0%, transparent 55%)" }} />
+          <div style={{ height: 3, background: "linear-gradient(90deg, transparent, var(--color-gold-dark), var(--color-gold), var(--color-gold-light), transparent)", opacity: 0.85 }} />
+          <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse at 20% 20%, rgba(var(--color-gold-rgb),0.10) 0%, transparent 55%)" }} />
 
           <div className="relative p-7">
             <div className="flex items-center justify-between gap-3 mb-6">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl grid place-items-center" style={{ background: "linear-gradient(135deg,#c9a800,#ffd700)", color: "#04122e", boxShadow: "0 6px 20px rgba(255,215,0,0.50)" }}>
+                <div className="w-12 h-12 rounded-2xl grid place-items-center" style={{ background: "linear-gradient(135deg,var(--color-gold-dark),var(--color-gold))", color: "var(--color-navy-deep)", boxShadow: "0 6px 20px rgba(var(--color-gold-rgb),0.50)" }}>
                   <Sparkles size={22} />
                 </div>
                 <div>
-                  <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.38em", color: "rgba(168,209,255,0.55)", textTransform: "uppercase", marginBottom: 3 }}>IA Gemini</p>
+                  <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.38em", color: "rgba(var(--color-blue-sky-rgb),0.55)", textTransform: "uppercase", marginBottom: 3 }}>IA Gemini</p>
                   <h3 style={{ fontSize: 18, fontWeight: 900, color: "#fff", lineHeight: 1 }}>Smart Resumo</h3>
                 </div>
               </div>
@@ -312,9 +312,9 @@ const Visualizador = () => {
             >
               {summaryLoading ? (
                 <div className="flex flex-col items-center justify-center py-12 gap-3">
-                  <div className="w-9 h-9 rounded-full border-[3px] animate-spin" style={{ borderColor: "rgba(255,255,255,0.12)", borderTopColor: "#ffd700" }} />
-                  <p style={{ fontSize: 13, color: "rgba(168,209,255,0.50)" }}>A analisar o documento...</p>
-                  <p style={{ fontSize: 11, color: "rgba(168,209,255,0.30)" }}>Pode demorar alguns segundos</p>
+                  <div className="w-9 h-9 rounded-full border-[3px] animate-spin" style={{ borderColor: "rgba(255,255,255,0.12)", borderTopColor: "var(--color-gold)" }} />
+                  <p style={{ fontSize: 13, color: "rgba(var(--color-blue-sky-rgb),0.50)" }}>A analisar o documento...</p>
+                  <p style={{ fontSize: 11, color: "rgba(var(--color-blue-sky-rgb),0.30)" }}>Pode demorar alguns segundos</p>
                 </div>
               ) : summaryError ? (
                 <div className="flex flex-col items-center gap-3 text-center py-8 rounded-[18px]"
@@ -333,13 +333,13 @@ const Visualizador = () => {
                 <SummaryRenderer text={summary} />
               ) : (
                 <div className="flex flex-col items-center justify-center py-12 gap-2">
-                  <div className="w-9 h-9 rounded-full border-[3px] animate-spin" style={{ borderColor: "rgba(255,255,255,0.12)", borderTopColor: "#ffd700" }} />
-                  <p style={{ fontSize: 13, color: "rgba(168,209,255,0.35)" }}>A preparar resumo...</p>
+                  <div className="w-9 h-9 rounded-full border-[3px] animate-spin" style={{ borderColor: "rgba(255,255,255,0.12)", borderTopColor: "var(--color-gold)" }} />
+                  <p style={{ fontSize: 13, color: "rgba(var(--color-blue-sky-rgb),0.35)" }}>A preparar resumo...</p>
                 </div>
               )}
             </div>
 
-            <p style={{ fontSize: 11, color: "rgba(168,209,255,0.28)", marginTop: 14, textAlign: "center", lineHeight: 1.5 }}>
+            <p style={{ fontSize: 11, color: "rgba(var(--color-blue-sky-rgb),0.28)", marginTop: 14, textAlign: "center", lineHeight: 1.5 }}>
               Gerado por IA Gemini · UCM SmartHub
             </p>
           </div>

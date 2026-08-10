@@ -20,9 +20,9 @@ const PageLoader = () => (
     <div className="flex flex-col items-center gap-3">
       <div
         className="w-10 h-10 rounded-full border-4 animate-spin"
-        style={{ borderColor: "rgba(13,37,74,0.12)", borderTopColor: "#ffd700" }}
+        style={{ borderColor: "rgba(var(--color-navy-mid-rgb),0.12)", borderTopColor: "var(--color-gold)" }}
       />
-      <p style={{ fontSize: 13, fontWeight: 600, color: "rgba(13,37,74,0.45)" }}>A carregar...</p>
+      <p style={{ fontSize: 13, fontWeight: 600, color: "rgba(var(--color-navy-mid-rgb),0.45)" }}>A carregar...</p>
     </div>
   </div>
 );
@@ -86,9 +86,9 @@ const App = () => {
   // ─── Transição token→perfil ───────────────────────────────
   if (isLoggedIn && !usuarioLogado) {
     return (
-      <div className="h-screen flex flex-col items-center justify-center gap-4" style={{ background: "#f0f5ff" }}>
-        <div className="w-12 h-12 rounded-full border-4 animate-spin" style={{ borderColor: "rgba(13,37,74,0.15)", borderTopColor: "#ffd700" }} />
-        <p style={{ fontSize: 14, fontWeight: 600, color: "rgba(13,37,74,0.50)" }}>A carregar perfil UCM...</p>
+      <div className="h-screen flex flex-col items-center justify-center gap-4" style={{ background: "var(--color-ice)" }}>
+        <div className="w-12 h-12 rounded-full border-4 animate-spin" style={{ borderColor: "rgba(var(--color-navy-mid-rgb),0.15)", borderTopColor: "var(--color-gold)" }} />
+        <p style={{ fontSize: 14, fontWeight: 600, color: "rgba(var(--color-navy-mid-rgb),0.50)" }}>A carregar perfil UCM...</p>
       </div>
     );
   }
@@ -134,15 +134,15 @@ const App = () => {
 };
 
 const Pagina404 = ({ navigate }) => (
-  <div className="h-screen flex flex-col items-center justify-center p-8 text-center" style={{ background: "#f0f5ff" }}>
+  <div className="h-screen flex flex-col items-center justify-center p-8 text-center" style={{ background: "var(--color-ice)" }}>
     <div className="animate-fade-in">
       <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.5em", color: "#94a3b8", textTransform: "uppercase", marginBottom: 12 }}>Erro</p>
-      <h1 style={{ fontSize: "clamp(5rem,15vw,9rem)", fontWeight: 900, color: "#04122e", lineHeight: 1, marginBottom: 16 }}>404</h1>
+      <h1 style={{ fontSize: "clamp(5rem,15vw,9rem)", fontWeight: 900, color: "var(--color-navy-deep)", lineHeight: 1, marginBottom: 16 }}>404</h1>
       <p style={{ fontSize: 18, fontWeight: 700, color: "#64748b", marginBottom: 32 }}>A página que procura não existe.</p>
       <button
         onClick={() => navigate('/dashboard')}
         className="inline-flex items-center gap-2 rounded-2xl px-8 py-4 text-sm font-black text-white uppercase tracking-wider transition-all duration-200"
-        style={{ background: "linear-gradient(135deg,#04122e,#0d254a)", boxShadow: "0 8px 28px rgba(4,18,46,0.38)", letterSpacing: "0.10em" }}
+        style={{ background: "linear-gradient(135deg,var(--color-navy-deep),var(--color-navy-mid))", boxShadow: "0 8px 28px rgba(var(--color-navy-deep-rgb),0.38)", letterSpacing: "0.10em" }}
         onMouseEnter={e => (e.currentTarget.style.transform = "translateY(-2px)")}
         onMouseLeave={e => (e.currentTarget.style.transform = "")}
       >

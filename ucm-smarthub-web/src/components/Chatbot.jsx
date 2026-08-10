@@ -96,8 +96,8 @@ const Chatbot = ({ usuarioLogado }) => {
     <div className="fixed bottom-7 right-7 z-50">
       <style>{`
         @keyframes fab-glow {
-          0%,100% { box-shadow: 0 8px 36px rgba(4,18,46,0.50), 0 0 0 0 rgba(255,215,0,0); }
-          50%      { box-shadow: 0 12px 48px rgba(4,18,46,0.60), 0 0 0 8px rgba(255,215,0,0.08); }
+          0%,100% { box-shadow: 0 8px 36px rgba(var(--color-navy-deep-rgb),0.50), 0 0 0 0 rgba(var(--color-gold-rgb),0); }
+          50%      { box-shadow: 0 12px 48px rgba(var(--color-navy-deep-rgb),0.60), 0 0 0 8px rgba(var(--color-gold-rgb),0.08); }
         }
         @keyframes chat-slide-up {
           from { opacity: 0; transform: translateY(20px) scale(0.95); }
@@ -120,15 +120,15 @@ const Chatbot = ({ usuarioLogado }) => {
           style={{
             borderRadius: 28,
             background: "#fff",
-            border: "1px solid rgba(13,37,74,0.08)",
-            boxShadow: "0 28px 90px rgba(4,18,46,0.35), 0 6px 24px rgba(4,18,46,0.12)",
+            border: "1px solid rgba(var(--color-navy-mid-rgb),0.08)",
+            boxShadow: "0 28px 90px rgba(var(--color-navy-deep-rgb),0.35), 0 6px 24px rgba(var(--color-navy-deep-rgb),0.12)",
             animation: "chat-slide-up 0.35s cubic-bezier(0.22,1,0.36,1) both",
           }}
         >
           {/* Barra dourada topo */}
           <div style={{
             height: 3, flexShrink: 0,
-            background: "linear-gradient(90deg, transparent, #c9a800, #ffd700, #ffe88a, transparent)",
+            background: "linear-gradient(90deg, transparent, var(--color-gold-dark), var(--color-gold), var(--color-gold-light), transparent)",
             opacity: 0.90,
           }} />
 
@@ -136,7 +136,7 @@ const Chatbot = ({ usuarioLogado }) => {
           <div
             className="px-5 py-4 flex items-center justify-between shrink-0"
             style={{
-              background: "linear-gradient(-45deg, #020b18, #04122e, #071832)",
+              background: "linear-gradient(-45deg, var(--color-navy-abyss), var(--color-navy-deep), var(--color-navy))",
               backgroundSize: "300% 300%",
               animation: "aurora-chat-w 8s ease infinite",
             }}
@@ -146,9 +146,9 @@ const Chatbot = ({ usuarioLogado }) => {
               <div
                 className="w-11 h-11 rounded-[16px] grid place-items-center"
                 style={{
-                  background: "linear-gradient(135deg, #c9a800, #ffd700, #ffe88a)",
-                  color: "#04122e",
-                  boxShadow: "0 6px 20px rgba(255,215,0,0.50)",
+                  background: "linear-gradient(135deg, var(--color-gold-dark), var(--color-gold), var(--color-gold-light))",
+                  color: "var(--color-navy-deep)",
+                  boxShadow: "0 6px 20px rgba(var(--color-gold-rgb),0.50)",
                 }}
               >
                 <Sparkles size={20} />
@@ -159,7 +159,7 @@ const Chatbot = ({ usuarioLogado }) => {
                 </span>
                 <span
                   className="flex items-center gap-1.5"
-                  style={{ fontSize: 9, fontWeight: 700, color: "rgba(168,209,255,0.55)", textTransform: "uppercase", letterSpacing: "0.4em" }}
+                  style={{ fontSize: 9, fontWeight: 700, color: "rgba(var(--color-blue-sky-rgb),0.55)", textTransform: "uppercase", letterSpacing: "0.4em" }}
                 >
                   <span
                     className="w-1.5 h-1.5 rounded-full animate-pulse"
@@ -177,7 +177,7 @@ const Chatbot = ({ usuarioLogado }) => {
                 title={voiceEnabled ? "Desactivar voz" : "Activar voz"}
                 className="w-9 h-9 rounded-xl grid place-items-center transition-all duration-200"
                 style={voiceEnabled
-                  ? { background: "linear-gradient(135deg, #c9a800, #ffd700)", color: "#04122e", boxShadow: "0 0 14px rgba(255,215,0,0.55)" }
+                  ? { background: "linear-gradient(135deg, var(--color-gold-dark), var(--color-gold))", color: "var(--color-navy-deep)", boxShadow: "0 0 14px rgba(var(--color-gold-rgb),0.55)" }
                   : { background: "rgba(255,255,255,0.09)", color: "rgba(255,255,255,0.45)" }
                 }
               >
@@ -212,10 +212,10 @@ const Chatbot = ({ usuarioLogado }) => {
                   <div
                     className="w-7 h-7 rounded-xl grid place-items-center text-xs shrink-0 mr-2.5 self-end"
                     style={{
-                      background: "linear-gradient(135deg, #c9a800, #ffd700)",
-                      color: "#04122e",
+                      background: "linear-gradient(135deg, var(--color-gold-dark), var(--color-gold))",
+                      color: "var(--color-navy-deep)",
                       fontWeight: 900,
-                      boxShadow: "0 3px 10px rgba(255,215,0,0.40)",
+                      boxShadow: "0 3px 10px rgba(var(--color-gold-rgb),0.40)",
                     }}
                   >
                     ✦
@@ -226,17 +226,17 @@ const Chatbot = ({ usuarioLogado }) => {
                   style={msg.sender === "bot"
                     ? {
                         background: "#fff",
-                        border: "1px solid rgba(13,37,74,0.08)",
+                        border: "1px solid rgba(var(--color-navy-mid-rgb),0.08)",
                         color: "#334155",
                         borderBottomLeftRadius: 6,
-                        boxShadow: "0 2px 10px rgba(13,37,74,0.06)",
+                        boxShadow: "0 2px 10px rgba(var(--color-navy-mid-rgb),0.06)",
                         lineHeight: 1.6,
                       }
                     : {
-                        background: "linear-gradient(135deg, #04122e, #0d254a)",
+                        background: "linear-gradient(135deg, var(--color-navy-deep), var(--color-navy-mid))",
                         color: "#fff",
                         borderBottomRightRadius: 6,
-                        boxShadow: "0 6px 20px rgba(4,18,46,0.30)",
+                        boxShadow: "0 6px 20px rgba(var(--color-navy-deep-rgb),0.30)",
                         lineHeight: 1.6,
                       }
                   }
@@ -252,17 +252,17 @@ const Chatbot = ({ usuarioLogado }) => {
                 <div
                   className="w-7 h-7 rounded-xl grid place-items-center text-xs shrink-0"
                   style={{
-                    background: "linear-gradient(135deg, #c9a800, #ffd700)",
-                    color: "#04122e",
+                    background: "linear-gradient(135deg, var(--color-gold-dark), var(--color-gold))",
+                    color: "var(--color-navy-deep)",
                     fontWeight: 900,
-                    boxShadow: "0 3px 10px rgba(255,215,0,0.40)",
+                    boxShadow: "0 3px 10px rgba(var(--color-gold-rgb),0.40)",
                   }}
                 >
                   ✦
                 </div>
                 <div
                   className="flex items-center gap-1.5 px-4 py-3 rounded-2xl"
-                  style={{ background: "#fff", border: "1px solid rgba(13,37,74,0.08)", borderBottomLeftRadius: 6 }}
+                  style={{ background: "#fff", border: "1px solid rgba(var(--color-navy-mid-rgb),0.08)", borderBottomLeftRadius: 6 }}
                 >
                   {[0, 1, 2].map(i => (
                     <div
@@ -301,7 +301,7 @@ const Chatbot = ({ usuarioLogado }) => {
           {/* Input */}
           <div
             className="p-3.5 flex gap-2 shrink-0"
-            style={{ borderTop: "1px solid rgba(13,37,74,0.07)", background: "#fff" }}
+            style={{ borderTop: "1px solid rgba(var(--color-navy-mid-rgb),0.07)", background: "#fff" }}
           >
             <input
               type="text"
@@ -312,12 +312,12 @@ const Chatbot = ({ usuarioLogado }) => {
               disabled={isTyping || isListening}
               className="flex-1 px-4 py-2.5 rounded-xl text-sm outline-none transition-all duration-200"
               style={{
-                background: "#f0f5ff",
-                border: "1.5px solid rgba(13,37,74,0.09)",
+                background: "var(--color-ice)",
+                border: "1.5px solid rgba(var(--color-navy-mid-rgb),0.09)",
                 color: "#0f172a",
               }}
-              onFocus={e => (e.target.style.borderColor = "#0d254a", e.target.style.background = "#fff")}
-              onBlur={e => (e.target.style.borderColor = "rgba(13,37,74,0.09)", e.target.style.background = "#f0f5ff")}
+              onFocus={e => (e.target.style.borderColor = "var(--color-navy-mid)", e.target.style.background = "#fff")}
+              onBlur={e => (e.target.style.borderColor = "rgba(var(--color-navy-mid-rgb),0.09)", e.target.style.background = "var(--color-ice)")}
             />
 
             {/* Microfone */}
@@ -333,8 +333,8 @@ const Chatbot = ({ usuarioLogado }) => {
                       animation: "pulse 1s ease-in-out infinite",
                     }
                   : {
-                      background: "#f0f5ff",
-                      border: "1.5px solid rgba(13,37,74,0.09)",
+                      background: "var(--color-ice)",
+                      border: "1.5px solid rgba(var(--color-navy-mid-rgb),0.09)",
                       color: "#64748b",
                     }
                 }
@@ -349,12 +349,12 @@ const Chatbot = ({ usuarioLogado }) => {
               disabled={isTyping || isListening}
               className="p-2.5 rounded-xl transition-all duration-200 shrink-0 disabled:opacity-40"
               style={{
-                background: "linear-gradient(135deg, #c9a800, #ffd700, #ffe88a)",
-                color: "#04122e",
-                boxShadow: "0 4px 16px rgba(255,215,0,0.45)",
+                background: "linear-gradient(135deg, var(--color-gold-dark), var(--color-gold), var(--color-gold-light))",
+                color: "var(--color-navy-deep)",
+                boxShadow: "0 4px 16px rgba(var(--color-gold-rgb),0.45)",
               }}
-              onMouseEnter={e => !isTyping && !isListening && (e.currentTarget.style.transform = "scale(1.08)", e.currentTarget.style.boxShadow = "0 6px 22px rgba(255,215,0,0.65)")}
-              onMouseLeave={e => (e.currentTarget.style.transform = "", e.currentTarget.style.boxShadow = "0 4px 16px rgba(255,215,0,0.45)")}
+              onMouseEnter={e => !isTyping && !isListening && (e.currentTarget.style.transform = "scale(1.08)", e.currentTarget.style.boxShadow = "0 6px 22px rgba(var(--color-gold-rgb),0.65)")}
+              onMouseLeave={e => (e.currentTarget.style.transform = "", e.currentTarget.style.boxShadow = "0 4px 16px rgba(var(--color-gold-rgb),0.45)")}
             >
               <Send size={18} />
             </button>
@@ -368,9 +368,9 @@ const Chatbot = ({ usuarioLogado }) => {
         className="relative w-16 h-16 rounded-[22px] flex items-center justify-center transition-all duration-300"
         style={{
           background: chatOpen
-            ? "linear-gradient(135deg, #c9a800, #ffd700)"
-            : "linear-gradient(135deg, #04122e, #0d254a)",
-          color: chatOpen ? "#04122e" : "#fff",
+            ? "linear-gradient(135deg, var(--color-gold-dark), var(--color-gold))"
+            : "linear-gradient(135deg, var(--color-navy-deep), var(--color-navy-mid))",
+          color: chatOpen ? "var(--color-navy-deep)" : "#fff",
           border: "4px solid rgba(255,255,255,0.95)",
           animation: "fab-glow 3s ease-in-out infinite",
         }}
