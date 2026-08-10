@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import api, { getFavoritos, toggleFavorito } from "../services/api";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Search, Plus, X, ChevronLeft, ChevronRight,
   Upload, BookOpen, PlayCircle, FileText, Filter, Heart, CheckCircle,
 } from "lucide-react";
-import { CURSOS } from "../constants/cursos";
+import { useConfig } from "../context/ConfigContext";
 
 /* Card de material com botão de favorito */
 const MaterialCard = ({ m, onClick, favs, onToggleFav }) => {
@@ -89,6 +89,7 @@ const MaterialCard = ({ m, onClick, favs, onToggleFav }) => {
 const Repositorio = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { config, cursos } = useConfig();
 
   /* Estado — inicializado a partir do URL ?q= e ?tipo= */
   const [materiais,       setMateriais]       = useState([]);
@@ -100,11 +101,19 @@ const Repositorio = () => {
   const [totalResultados, setTotalResultados] = useState(0);
   const [loading,         setLoading]         = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
-  const [newMaterial,     setNewMaterial]     = useState({ titulo: "", cadeira: "Informática", tipo: "PDF" });
+  const [newMaterial,     setNewMaterial]     = useState({ titulo: "", cadeira: "", tipo: "PDF" });
   const [arquivoReal,     setArquivoReal]     = useState(null);
   const [uploadErro,      setUploadErro]      = useState('');
   const [uploadSucesso,   setUploadSucesso]   = useState(false);
   const [favs,            setFavs]            = useState(getFavoritos);
+
+  const TIPOS_MATERIAL_DISPONIVEIS = useMemo(() => {
+    const tiposPermitidos = (config.tipos_ficheiro_permitidos || '').split(',');
+    return [
+      ...(tiposPermitidos.includes('pdf') ? ['PDF'] : []),
+      ...(['mp4', 'webm', 'ogg', 'mov'].some(t => tiposPermitidos.includes(t)) ? ['Vídeo'] : []),
+    ];
+  }, [config.tipos_ficheiro_permitidos]);
 
   const fetchMateriais = useCallback(async (page = 1) => {
     setLoading(true);
@@ -128,6 +137,20 @@ const Repositorio = () => {
 
   /* Recarrega ao mudar qualquer filtro */
   useEffect(() => { fetchMateriais(1); }, [fetchMateriais]);
+
+  /* Pré-selecciona o primeiro curso disponível no formulário de upload */
+  useEffect(() => {
+    if (!newMaterial.cadeira && cursos.length > 0) {
+      setNewMaterial(m => ({ ...m, cadeira: cursos[0].nome }));
+    }
+  }, [cursos, newMaterial.cadeira]);
+
+  /* Garante que o tipo seleccionado continua permitido pela configuração actual */
+  useEffect(() => {
+    if (TIPOS_MATERIAL_DISPONIVEIS.length > 0 && !TIPOS_MATERIAL_DISPONIVEIS.includes(newMaterial.tipo)) {
+      setNewMaterial(m => ({ ...m, tipo: TIPOS_MATERIAL_DISPONIVEIS[0] }));
+    }
+  }, [TIPOS_MATERIAL_DISPONIVEIS, newMaterial.tipo]);
 
   /* Sincroniza URL params — reage só a mudanças no URL (ex: pesquisa global do Layout),
      não ao estado local, para não reverter o que o utilizador está a escrever aqui. */
@@ -255,7 +278,7 @@ const Repositorio = () => {
               onChange={e => setFiltroCadeira(e.target.value)}
             >
               <option value="Todas">Todas as cadeiras</option>
-              {CURSOS.map(c => <option key={c} value={c}>{c}</option>)}
+              {cursos.map(c => <option key={c.id} value={c.nome}>{c.nome}</option>)}
             </select>
           </div>
         </div>
@@ -405,13 +428,13 @@ const Repositorio = () => {
                     className="w-full rounded-2xl px-5 py-4 text-sm outline-none appearance-none"
                     style={{ background: "var(--color-ice)", border: "1.5px solid rgba(var(--color-navy-mid-rgb),0.10)", color: "#334155" }}
                   >
-                    {CURSOS.map(c => <option key={c} value={c}>{c}</option>)}
+                    {cursos.map(c => <option key={c.id} value={c.nome}>{c.nome}</option>)}
                   </select>
                 </div>
                 <div>
                   <label style={{ display: "block", marginBottom: 10, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.28em", color: "#64748b" }}>Tipo</label>
                   <div className="grid grid-cols-2 gap-3">
-                    {['PDF', 'Vídeo'].map(tipo => (
+                    {TIPOS_MATERIAL_DISPONIVEIS.map(tipo => (
                       <button
                         key={tipo} type="button"
                         onClick={() => setNewMaterial({...newMaterial, tipo})}
@@ -438,6 +461,7 @@ const Repositorio = () => {
                   className="w-full rounded-2xl px-4 py-5 text-sm cursor-pointer transition-all duration-200"
                   style={{ background: "var(--color-ice)", border: "2px dashed rgba(var(--color-navy-mid-rgb),0.18)", color: "#64748b" }}
                 />
+                <p style={{ fontSize: 11, color: "#94a3b8", marginTop: 8 }}>Tamanho máximo: {config.tamanho_maximo_mb} MB</p>
               </div>
 
               <button

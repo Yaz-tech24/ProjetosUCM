@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import api, { isFavorito, toggleFavorito } from "../services/api";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, ExternalLink, DownloadCloud, Sparkles, RotateCcw, Heart, Share2 } from "lucide-react";
+import { useConfig } from "../context/ConfigContext";
 
 /* ── Renderiza o resumo estruturado devolvido pela IA ── */
 const SummaryRenderer = ({ text }) => {
@@ -56,6 +57,7 @@ const SummaryRenderer = ({ text }) => {
 };
 
 const Visualizador = () => {
+  const { config } = useConfig();
   const { id } = useParams();
   const navigate = useNavigate();
 
@@ -129,7 +131,7 @@ const Visualizador = () => {
           <DownloadCloud size={38} style={{ color: "#ef4444" }} />
         </div>
         <h2 style={{ fontSize: 26, fontWeight: 900, color: "var(--color-navy-deep)" }}>Material não encontrado</h2>
-        <p style={{ fontSize: 14, color: "#64748b" }}>Este recurso não existe no repositório da UCM.</p>
+        <p style={{ fontSize: 14, color: "#64748b" }}>Este recurso não existe no repositório.</p>
         <button
           onClick={() => navigate('/repositorio')}
           className="inline-flex items-center gap-2 rounded-2xl px-6 py-3 text-sm font-bold text-white transition-all duration-200 mt-2"
@@ -290,7 +292,7 @@ const Visualizador = () => {
                 </div>
                 <div>
                   <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.38em", color: "rgba(var(--color-blue-sky-rgb),0.55)", textTransform: "uppercase", marginBottom: 3 }}>IA Gemini</p>
-                  <h3 style={{ fontSize: 18, fontWeight: 900, color: "#fff", lineHeight: 1 }}>Smart Resumo</h3>
+                  <h3 style={{ fontSize: 18, fontWeight: 900, color: "#fff", lineHeight: 1 }}>Resumo IA</h3>
                 </div>
               </div>
               <button
@@ -340,7 +342,7 @@ const Visualizador = () => {
             </div>
 
             <p style={{ fontSize: 11, color: "rgba(var(--color-blue-sky-rgb),0.28)", marginTop: 14, textAlign: "center", lineHeight: 1.5 }}>
-              Gerado por IA Gemini · UCM SmartHub
+              Gerado por IA Gemini · {config.nome_plataforma}
             </p>
           </div>
         </div>

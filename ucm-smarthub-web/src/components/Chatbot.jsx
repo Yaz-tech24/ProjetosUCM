@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import api from "../services/api";
 import { MessageSquare, X, Send, Loader2, Mic, MicOff, Volume2, VolumeX, Sparkles } from "lucide-react";
+import { useConfig } from "../context/ConfigContext";
 
 const SpeechRecognitionAPI =
   typeof window !== "undefined"
@@ -8,12 +9,13 @@ const SpeechRecognitionAPI =
     : null;
 
 const Chatbot = ({ usuarioLogado }) => {
+  const { config } = useConfig();
   const primeiroNome = usuarioLogado?.nome?.split(" ")[0] || "";
   const curso = usuarioLogado?.curso || "";
 
   const saudacaoInicial = primeiroNome
-    ? `Olá, ${primeiroNome}! Sou o UCM Brain, o teu assistente académico.${curso ? ` Estou preparado para te ajudar com ${curso} e qualquer outra matéria.` : ""} Faz-me uma pergunta sobre um conceito, exercício ou tema de estudo.`
-    : "Olá! Sou o UCM Brain, o teu assistente académico no SmartHub UCM. Posso explicar conceitos, ajudar em exercícios ou preparar-te para exames. O que queres estudar?";
+    ? `Olá, ${primeiroNome}! Sou o assistente académico da ${config.nome_plataforma}.${curso ? ` Estou preparado para te ajudar com ${curso} e qualquer outra matéria.` : ""} Faz-me uma pergunta sobre um conceito, exercício ou tema de estudo.`
+    : `Olá! Sou o assistente académico da ${config.nome_plataforma}. Posso explicar conceitos, ajudar em exercícios ou preparar-te para exames. O que queres estudar?`;
 
   const [chatOpen, setChatOpen]     = useState(false);
   const [chatInput, setChatInput]   = useState("");
@@ -155,7 +157,7 @@ const Chatbot = ({ usuarioLogado }) => {
               </div>
               <div>
                 <span style={{ fontSize: 14, fontWeight: 900, color: "#fff", display: "block", lineHeight: 1.2 }}>
-                  UCM Brain
+                  Assistente IA
                 </span>
                 <span
                   className="flex items-center gap-1.5"

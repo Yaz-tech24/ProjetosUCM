@@ -1,13 +1,14 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import io from 'socket.io-client';
 import api from '../services/api';
 import { Send, Users, ShieldAlert, Trash2 } from 'lucide-react';
-import { CURSOS } from '../constants/cursos';
+import { useConfig } from '../context/ConfigContext';
 import { analisarMensagem, mensagemAviso } from '../utils/filtroChat';
 
 const Chat = ({ usuarioLogado }) => {
-  const cursoPadrao = CURSOS.includes(usuarioLogado?.curso) ? usuarioLogado.curso : CURSOS[0];
-  const [cursoActivo, setCursoActivo] = useState(cursoPadrao);
+  const { config, cursos } = useConfig();
+  const nomesCursos = useMemo(() => cursos.map(c => c.nome), [cursos]);
+  const [cursoActivo, setCursoActivo] = useState('');
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [loadingMessages, setLoadingMessages] = useState(false);
@@ -17,6 +18,12 @@ const Chat = ({ usuarioLogado }) => {
   const messagesEndRef = useRef(null);
   const socketRef      = useRef(null);
   const avisoTimer     = useRef(null);
+
+  /* Selecciona a sala do próprio curso assim que a lista de cursos carrega */
+  useEffect(() => {
+    if (cursoActivo || nomesCursos.length === 0) return;
+    setCursoActivo(nomesCursos.includes(usuarioLogado?.curso) ? usuarioLogado.curso : nomesCursos[0]);
+  }, [cursoActivo, nomesCursos, usuarioLogado]);
 
   /* Liga o socket uma única vez, ao montar */
   useEffect(() => {
@@ -33,7 +40,7 @@ const Chat = ({ usuarioLogado }) => {
      e carrega o histórico — tudo num só efeito, sem registos duplicados */
   useEffect(() => {
     const sock = socketRef.current;
-    if (!sock) return;
+    if (!sock || !cursoActivo) return;
 
     sock.emit('joinRoom', { curso: cursoActivo });
 
@@ -105,6 +112,20 @@ const Chat = ({ usuarioLogado }) => {
     });
     setNewMessage('');
   };
+
+  if (!config.chat_activado) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center p-8 text-center gap-4 animate-fade-in">
+        <div className="w-20 h-20 rounded-[28px] grid place-items-center" style={{ background: "var(--color-ice)", border: "1px solid rgba(var(--color-navy-mid-rgb),0.08)" }}>
+          <Users size={32} style={{ color: "#94a3b8" }} />
+        </div>
+        <h2 style={{ fontSize: 22, fontWeight: 900, color: "var(--color-navy-deep)" }}>Chat desactivado</h2>
+        <p style={{ fontSize: 14, color: "#64748b", maxWidth: 360 }}>
+          O chat entre estudantes foi desactivado pelo administrador.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -205,7 +226,7 @@ const Chat = ({ usuarioLogado }) => {
 
         {/* Abas de curso */}
         <div className="flex gap-1 overflow-x-auto pb-0" style={{ scrollbarWidth: "none" }}>
-          {CURSOS.map(curso => {
+          {nomesCursos.map(curso => {
             const active = cursoActivo === curso;
             return (
               <button

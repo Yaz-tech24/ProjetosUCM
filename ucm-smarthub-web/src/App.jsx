@@ -4,6 +4,7 @@ import "./App.css";
 
 import SplashScreen from "./components/SplashScreen";
 import Layout      from "./components/Layout";
+import { useConfig } from "./context/ConfigContext";
 
 // ─── Lazy loading: cada página só carrega quando for acedida ──
 // Isto divide o bundle inicial de ~1 MB em pedaços de ~100–200 KB
@@ -52,6 +53,7 @@ const sessaoValida = () => {
 };
 
 const App = () => {
+  const { config } = useConfig();
   // Utilizadores já autenticados não precisam ver o splash
   const [splash,       setSplash]  = useState(() => !sessaoValida());
   const [isLoggedIn,   setLoggedIn]= useState(sessaoValida);
@@ -88,7 +90,7 @@ const App = () => {
     return (
       <div className="h-screen flex flex-col items-center justify-center gap-4" style={{ background: "var(--color-ice)" }}>
         <div className="w-12 h-12 rounded-full border-4 animate-spin" style={{ borderColor: "rgba(var(--color-navy-mid-rgb),0.15)", borderTopColor: "var(--color-gold)" }} />
-        <p style={{ fontSize: 14, fontWeight: 600, color: "rgba(var(--color-navy-mid-rgb),0.50)" }}>A carregar perfil UCM...</p>
+        <p style={{ fontSize: 14, fontWeight: 600, color: "rgba(var(--color-navy-mid-rgb),0.50)" }}>A carregar perfil {config.nome_plataforma}...</p>
       </div>
     );
   }

@@ -1,5 +1,5 @@
 /*
- * Filtro de conteúdo — Chat UCM SmartHub
+ * Filtro de conteúdo do chat entre estudantes
  *
  * Pipeline de normalização aplicado TANTO à mensagem COMO aos termos:
  *   1. minúsculas

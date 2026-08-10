@@ -6,6 +6,7 @@ import {
   Sparkles, ArrowRight, MessageCircle, TrendingUp,
   Users, Heart, BookOpen, Upload,
 } from "lucide-react";
+import { useConfig } from "../context/ConfigContext";
 
 /* Card de estatística */
 const StatCard = ({ icon: Icon, label, value, iconBg, glow, delay }) => (
@@ -68,6 +69,7 @@ const MiniCard = ({ m, onClick }) => (
 );
 
 const Dashboard = ({ usuarioLogado }) => {
+  const { config } = useConfig();
   const [materiais, setMateriais]       = useState([]);
   const [meusMateriais, setMeusMat]     = useState([]);
   const [stats, setStats]               = useState(null);
@@ -169,7 +171,7 @@ const Dashboard = ({ usuarioLogado }) => {
               className="inline-flex items-center gap-2.5 rounded-full px-4 py-2 text-[11px] font-bold uppercase"
               style={{ background: "rgba(255,255,255,0.10)", border: "1px solid rgba(255,255,255,0.16)", letterSpacing: "0.32em", color: "rgba(var(--color-gold-rgb),0.90)", backdropFilter: "blur(8px)" }}
             >
-              <Sparkles size={14} style={{ color: "var(--color-gold)" }} /> SmartHub UCM
+              <Sparkles size={14} style={{ color: "var(--color-gold)" }} /> {config.nome_plataforma}
             </div>
 
             <h1 className="font-black leading-tight" style={{ fontSize: "clamp(2.2rem,4vw,3rem)", letterSpacing: "-0.025em" }}>
@@ -215,8 +217,8 @@ const Dashboard = ({ usuarioLogado }) => {
       <section className="grid gap-4 sm:grid-cols-3">
         {[
           { icon: Library,       label: "Repositório",   desc: "Materiais aprovados", path: "/repositorio", bg: "linear-gradient(135deg,var(--color-navy-deep),var(--color-navy-mid))", glow: "rgba(var(--color-navy-mid-rgb),0.40)" },
-          { icon: MessageCircle, label: "Chat",           desc: "Turma em tempo real", path: "/chat",        bg: "linear-gradient(135deg,#0a3d62,var(--color-blue-accent))", glow: "rgba(var(--color-blue-accent-rgb),0.35)" },
-          { icon: Sparkles,      label: "UCM Brain",     desc: "IA de estudo activa",  path: "/repositorio", bg: "linear-gradient(135deg,#3b0764,#7c3aed)", glow: "rgba(124,58,237,0.35)" },
+          ...(config.chat_activado ? [{ icon: MessageCircle, label: "Chat", desc: "Turma em tempo real", path: "/chat", bg: "linear-gradient(135deg,#0a3d62,var(--color-blue-accent))", glow: "rgba(var(--color-blue-accent-rgb),0.35)" }] : []),
+          ...(config.ia_activada ? [{ icon: Sparkles, label: "Assistente IA", desc: "IA de estudo activa", path: "/repositorio", bg: "linear-gradient(135deg,#3b0764,#7c3aed)", glow: "rgba(124,58,237,0.35)" }] : []),
         ].map(({ icon: Icon, label, desc, path, bg, glow }) => (
           <button
             key={label} onClick={() => navigate(path)}

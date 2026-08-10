@@ -1,7 +1,18 @@
 import React, { useState, useEffect, useCallback } from "react";
 import api from "../services/api";
-import { ShieldCheck, CheckCircle, XCircle, Clock, AlertTriangle, X, FileText, PlayCircle, MessageCircle, Trash2 } from "lucide-react";
-import { CURSOS } from "../constants/cursos";
+import {
+  ShieldCheck, CheckCircle, XCircle, Clock, AlertTriangle, X, MessageCircle, Trash2,
+  Settings, Upload, Plus, Save, Sparkles,
+} from "lucide-react";
+import { useConfig } from "../context/ConfigContext";
+
+const TIPOS_FICHEIRO_OPCOES = [
+  { valor: "pdf",  label: "PDF" },
+  { valor: "mp4",  label: "MP4" },
+  { valor: "webm", label: "WebM" },
+  { valor: "ogg",  label: "Ogg" },
+  { valor: "mov",  label: "QuickTime (.mov)" },
+];
 
 /* Toast de notificação */
 const Toast = ({ message, type, onClose }) => {
@@ -91,7 +102,8 @@ const ConfirmModal = ({ message, onConfirm, onCancel }) => {
 };
 
 const Admin = ({ usuarioLogado }) => {
-  const [aba, setAba]           = useState('materiais'); // 'materiais' | 'chat'
+  const { config, cursos, refetchConfig } = useConfig();
+  const [aba, setAba]           = useState('materiais'); // 'materiais' | 'chat' | 'config'
   const [pendentes, setPendentes] = useState([]);
   const [loading, setLoading]   = useState(true);
   const [toast, setToast]       = useState({ message: '', type: '' });
@@ -101,6 +113,19 @@ const Admin = ({ usuarioLogado }) => {
   const [mensagens,     setMensagens]     = useState([]);
   const [loadingChat,   setLoadingChat]   = useState(false);
   const [cursoChatFiltro, setCursoChatFiltro] = useState('');
+
+  /* ── Configurações state ── */
+  const [configForm,    setConfigForm]    = useState(null);
+  const [savingConfig,  setSavingConfig]  = useState(false);
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [novoCurso,     setNovoCurso]     = useState('');
+
+  /* Semeia o rascunho local uma única vez, quando a configuração chega */
+  useEffect(() => {
+    if (!configForm && config) {
+      setConfigForm({ ...config, tipos_ficheiro_permitidos: (config.tipos_ficheiro_permitidos || '').split(',') });
+    }
+  }, [config, configForm]);
 
   const showToast = useCallback((message, type = 'success') => {
     setToast({ message, type });
@@ -153,7 +178,7 @@ const Admin = ({ usuarioLogado }) => {
         </div>
         <h2 style={{ fontSize: 30, fontWeight: 900, color: "var(--color-navy-deep)", marginBottom: 12 }}>Acesso Negado</h2>
         <p style={{ fontSize: 15, color: "#64748b", maxWidth: 400, lineHeight: 1.65 }}>
-          Esta área é reservada a administradores do UCM SmartHub.
+          Esta área é reservada a administradores da {config.nome_plataforma}.
           O seu perfil actual é de <strong style={{ color: "var(--color-navy-mid)" }}>{usuarioLogado?.papel}</strong>.
         </p>
       </div>
@@ -168,6 +193,10 @@ const Admin = ({ usuarioLogado }) => {
     setConfirm({ message: 'Apagar esta mensagem permanentemente para todos os utilizadores?', id, tipo: 'mensagem' });
   };
 
+  const handleRemoverCurso = (id) => {
+    setConfirm({ message: 'Remover este curso da lista? Materiais e contas já criados com ele não são afectados.', id, tipo: 'curso' });
+  };
+
   const handleConfirmRejeitar = async () => {
     const { id, tipo } = confirm;
     setConfirm({ message: '', id: null, tipo: 'material' });
@@ -176,6 +205,10 @@ const Admin = ({ usuarioLogado }) => {
         await api.delete(`/admin/mensagens/${id}`);
         setMensagens(prev => prev.filter(m => m.id !== id));
         showToast('Mensagem apagada.', 'success');
+      } else if (tipo === 'curso') {
+        await api.delete(`/admin/cursos/${id}`);
+        showToast('Curso removido.', 'success');
+        await refetchConfig();
       } else {
         await api.put(`/admin/materiais/${id}/status`, { acao: 'rejeitar' });
         showToast('Material rejeitado e removido do sistema.', 'error');
@@ -194,6 +227,70 @@ const Admin = ({ usuarioLogado }) => {
     } catch {
       showToast('Erro ao aprovar. Verifique a ligação ao servidor.', 'error');
     }
+  };
+
+  const handleSalvarConfig = async (e) => {
+    e.preventDefault();
+    setSavingConfig(true);
+    try {
+      await api.put('/admin/config', configForm);
+      showToast('Configuração guardada com sucesso!', 'success');
+      await refetchConfig();
+    } catch (err) {
+      showToast(err.response?.data?.erro || 'Erro ao guardar configuração.', 'error');
+    } finally {
+      setSavingConfig(false);
+    }
+  };
+
+  const handleLogoUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setLogoUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('logo', file);
+      await api.post('/admin/config/logo', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+      showToast('Logótipo actualizado!', 'success');
+      await refetchConfig();
+    } catch (err) {
+      showToast(err.response?.data?.erro || 'Erro ao enviar logótipo.', 'error');
+    } finally {
+      setLogoUploading(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleRemoverLogo = async () => {
+    try {
+      await api.delete('/admin/config/logo');
+      showToast('Logótipo removido.', 'success');
+      await refetchConfig();
+    } catch {
+      showToast('Erro ao remover logótipo.', 'error');
+    }
+  };
+
+  const handleAdicionarCurso = async (e) => {
+    e.preventDefault();
+    if (!novoCurso.trim()) return;
+    try {
+      await api.post('/admin/cursos', { nome: novoCurso.trim() });
+      setNovoCurso('');
+      showToast('Curso adicionado.', 'success');
+      await refetchConfig();
+    } catch (err) {
+      showToast(err.response?.data?.erro || 'Erro ao adicionar curso.', 'error');
+    }
+  };
+
+  const toggleTipoFicheiro = (valor) => {
+    setConfigForm(f => ({
+      ...f,
+      tipos_ficheiro_permitidos: f.tipos_ficheiro_permitidos.includes(valor)
+        ? f.tipos_ficheiro_permitidos.filter(t => t !== valor)
+        : [...f.tipos_ficheiro_permitidos, valor],
+    }));
   };
 
   return (
@@ -289,6 +386,7 @@ const Admin = ({ usuarioLogado }) => {
           {[
             { key: 'materiais', label: 'Fila de Aprovação', icon: Clock, badge: pendentes.length },
             { key: 'chat',      label: 'Moderação do Chat', icon: MessageCircle, badge: mensagens.length },
+            { key: 'config',    label: 'Configurações',     icon: Settings, badge: 0 },
           ].map(({ key, label, icon: Icon, badge }) => (
             <button
               key={key}
@@ -407,6 +505,18 @@ const Admin = ({ usuarioLogado }) => {
                         {m.titulo}
                       </h3>
 
+                      {m.ia_sinalizado === 1 && (
+                        <div
+                          className="flex items-start gap-2.5 rounded-2xl px-4 py-3 mb-3"
+                          style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.25)" }}
+                        >
+                          <AlertTriangle size={16} style={{ color: "#d97706", flexShrink: 0, marginTop: 1 }} />
+                          <p style={{ fontSize: 13, color: "#92400e", lineHeight: 1.5 }}>
+                            <strong>IA sinalizou:</strong> {m.ia_motivo || "possível desvio do propósito da plataforma."}
+                          </p>
+                        </div>
+                      )}
+
                       <div className="flex flex-wrap gap-2">
                         {[
                           { label: `👤 ${m.autor}`,   bg: "var(--color-ice)", border: "rgba(var(--color-navy-mid-rgb),0.10)", color: "#475569" },
@@ -496,7 +606,7 @@ const Admin = ({ usuarioLogado }) => {
                   style={{ background: "var(--color-ice)", border: "1.5px solid rgba(var(--color-navy-mid-rgb),0.09)", color: "#334155", minWidth: 180 }}
                 >
                   <option value="">Todos os cursos</option>
-                  {CURSOS.map(c => <option key={c} value={c}>{c}</option>)}
+                  {cursos.map(c => <option key={c.id} value={c.nome}>{c.nome}</option>)}
                 </select>
                 <button
                   onClick={() => fetchMensagens(cursoChatFiltro)}
@@ -571,6 +681,227 @@ const Admin = ({ usuarioLogado }) => {
               )}
             </div>
           </section>
+        )}
+
+        {/* ═══ CONFIGURAÇÕES ════════════════════════════════════════ */}
+        {aba === 'config' && configForm && (
+          <div className="space-y-6">
+
+            <form onSubmit={handleSalvarConfig}>
+              <section
+                className="rounded-[28px] overflow-hidden"
+                style={{ background: "#fff", border: "1px solid rgba(var(--color-navy-mid-rgb),0.08)", boxShadow: "0 4px 32px rgba(var(--color-navy-mid-rgb),0.07)" }}
+              >
+                <div className="flex items-center gap-2.5 px-7 py-5" style={{ borderBottom: "1px solid rgba(var(--color-navy-mid-rgb),0.06)" }}>
+                  <Settings size={19} style={{ color: "var(--color-navy-mid)" }} />
+                  <h2 style={{ fontSize: 18, fontWeight: 900, color: "var(--color-navy-deep)" }}>Identidade e Funcionalidades</h2>
+                </div>
+
+                <div className="p-7 space-y-6">
+                  {/* Logótipo */}
+                  <div className="flex items-center gap-5">
+                    <div style={{
+                      width: 72, height: 72, borderRadius: 20, display: "grid", placeItems: "center",
+                      background: configForm.logo_url ? "var(--color-ice)" : "linear-gradient(135deg,var(--color-gold-dark),var(--color-gold))",
+                      border: "1px solid rgba(var(--color-navy-mid-rgb),0.10)", overflow: "hidden", flexShrink: 0,
+                    }}>
+                      {configForm.logo_url
+                        ? <img src={configForm.logo_url} alt="Logótipo" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                        : <Sparkles size={28} style={{ color: "var(--color-navy-deep)" }} />}
+                    </div>
+                    <div className="flex flex-col gap-2 items-start">
+                      <label
+                        className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold cursor-pointer transition-all"
+                        style={{ background: "var(--color-ice)", border: "1.5px solid rgba(var(--color-navy-mid-rgb),0.10)", color: "var(--color-navy-mid)" }}
+                      >
+                        <Upload size={15} /> {logoUploading ? "A enviar..." : "Carregar logótipo"}
+                        <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" onChange={handleLogoUpload} disabled={logoUploading} className="hidden" />
+                      </label>
+                      {configForm.logo_url && (
+                        <button type="button" onClick={handleRemoverLogo} className="text-xs font-semibold" style={{ color: "#dc2626" }}>
+                          Remover logótipo
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <label style={{ display: "block", marginBottom: 8, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.22em", color: "#64748b" }}>Nome da plataforma</label>
+                      <input required value={configForm.nome_plataforma}
+                        onChange={e => setConfigForm(f => ({ ...f, nome_plataforma: e.target.value }))}
+                        className="w-full rounded-2xl px-5 py-3.5 text-sm outline-none"
+                        style={{ background: "var(--color-ice)", border: "1.5px solid rgba(var(--color-navy-mid-rgb),0.10)", color: "#0f172a" }} />
+                    </div>
+                    <div>
+                      <label style={{ display: "block", marginBottom: 8, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.22em", color: "#64748b" }}>Tagline</label>
+                      <input value={configForm.tagline}
+                        onChange={e => setConfigForm(f => ({ ...f, tagline: e.target.value }))}
+                        className="w-full rounded-2xl px-5 py-3.5 text-sm outline-none"
+                        style={{ background: "var(--color-ice)", border: "1.5px solid rgba(var(--color-navy-mid-rgb),0.10)", color: "#0f172a" }} />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ display: "block", marginBottom: 8, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.22em", color: "#64748b" }}>Propósito da plataforma</label>
+                    <textarea rows={3} value={configForm.descricao_proposito || ''}
+                      onChange={e => setConfigForm(f => ({ ...f, descricao_proposito: e.target.value }))}
+                      className="w-full rounded-2xl px-5 py-3.5 text-sm outline-none resize-none"
+                      style={{ background: "var(--color-ice)", border: "1.5px solid rgba(var(--color-navy-mid-rgb),0.10)", color: "#0f172a" }} />
+                    <p style={{ fontSize: 11, color: "#94a3b8", marginTop: 6, lineHeight: 1.5 }}>
+                      Mostrado publicamente e usado pela IA para avaliar se os materiais submetidos correspondem ao propósito da plataforma.
+                    </p>
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <label style={{ display: "block", marginBottom: 8, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.22em", color: "#64748b" }}>Email de contacto</label>
+                      <input type="email" value={configForm.contacto_email || ''}
+                        onChange={e => setConfigForm(f => ({ ...f, contacto_email: e.target.value }))}
+                        className="w-full rounded-2xl px-5 py-3.5 text-sm outline-none"
+                        style={{ background: "var(--color-ice)", border: "1.5px solid rgba(var(--color-navy-mid-rgb),0.10)", color: "#0f172a" }} />
+                    </div>
+                    <div>
+                      <label style={{ display: "block", marginBottom: 8, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.22em", color: "#64748b" }}>Localização</label>
+                      <input value={configForm.localizacao || ''}
+                        onChange={e => setConfigForm(f => ({ ...f, localizacao: e.target.value }))}
+                        className="w-full rounded-2xl px-5 py-3.5 text-sm outline-none"
+                        style={{ background: "var(--color-ice)", border: "1.5px solid rgba(var(--color-navy-mid-rgb),0.10)", color: "#0f172a" }} />
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <label style={{ display: "block", marginBottom: 8, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.22em", color: "#64748b" }}>Cor primária</label>
+                      <div className="flex items-center gap-3">
+                        <input type="color" value={configForm.cor_primaria}
+                          onChange={e => setConfigForm(f => ({ ...f, cor_primaria: e.target.value }))}
+                          style={{ width: 48, height: 44, borderRadius: 12, border: "1.5px solid rgba(var(--color-navy-mid-rgb),0.15)", cursor: "pointer", padding: 2 }} />
+                        <input type="text" value={configForm.cor_primaria}
+                          onChange={e => setConfigForm(f => ({ ...f, cor_primaria: e.target.value }))}
+                          className="flex-1 rounded-2xl px-4 py-3 text-sm outline-none font-mono"
+                          style={{ background: "var(--color-ice)", border: "1.5px solid rgba(var(--color-navy-mid-rgb),0.10)", color: "#0f172a" }} />
+                      </div>
+                    </div>
+                    <div>
+                      <label style={{ display: "block", marginBottom: 8, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.22em", color: "#64748b" }}>Cor de destaque</label>
+                      <div className="flex items-center gap-3">
+                        <input type="color" value={configForm.cor_destaque}
+                          onChange={e => setConfigForm(f => ({ ...f, cor_destaque: e.target.value }))}
+                          style={{ width: 48, height: 44, borderRadius: 12, border: "1.5px solid rgba(var(--color-navy-mid-rgb),0.15)", cursor: "pointer", padding: 2 }} />
+                        <input type="text" value={configForm.cor_destaque}
+                          onChange={e => setConfigForm(f => ({ ...f, cor_destaque: e.target.value }))}
+                          className="flex-1 rounded-2xl px-4 py-3 text-sm outline-none font-mono"
+                          style={{ background: "var(--color-ice)", border: "1.5px solid rgba(var(--color-navy-mid-rgb),0.10)", color: "#0f172a" }} />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Toggles de funcionalidades */}
+                  <div>
+                    <label style={{ display: "block", marginBottom: 10, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.22em", color: "#64748b" }}>Funcionalidades</label>
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      {[
+                        { key: 'chat_activado',          label: 'Chat entre estudantes' },
+                        { key: 'ia_activada',             label: 'Assistente de IA' },
+                        { key: 'moderacao_ia_activada',   label: 'Moderação de IA nos uploads' },
+                      ].map(({ key, label }) => (
+                        <button key={key} type="button" onClick={() => setConfigForm(f => ({ ...f, [key]: !f[key] }))}
+                          className="flex items-center justify-between gap-3 rounded-2xl px-4 py-3.5 text-sm font-bold transition-all"
+                          style={configForm[key]
+                            ? { background: "rgba(16,185,129,0.08)", border: "1.5px solid rgba(16,185,129,0.30)", color: "#065f46" }
+                            : { background: "var(--color-ice)", border: "1.5px solid rgba(var(--color-navy-mid-rgb),0.10)", color: "#64748b" }}
+                        >
+                          {label}
+                          <span style={{ width: 34, height: 20, borderRadius: 99, background: configForm[key] ? "#10b981" : "#cbd5e1", position: "relative", flexShrink: 0, transition: "background .2s" }}>
+                            <span style={{ position: "absolute", top: 2, left: configForm[key] ? 16 : 2, width: 16, height: 16, borderRadius: "50%", background: "#fff", transition: "left .2s" }} />
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Tipos de ficheiro */}
+                  <div>
+                    <label style={{ display: "block", marginBottom: 10, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.22em", color: "#64748b" }}>Tipos de ficheiro permitidos</label>
+                    <div className="flex flex-wrap gap-2">
+                      {TIPOS_FICHEIRO_OPCOES.map(({ valor, label }) => {
+                        const activo = configForm.tipos_ficheiro_permitidos.includes(valor);
+                        return (
+                          <button key={valor} type="button" onClick={() => toggleTipoFicheiro(valor)}
+                            className="rounded-xl px-4 py-2.5 text-xs font-bold transition-all"
+                            style={activo
+                              ? { background: "linear-gradient(135deg,var(--color-navy-deep),var(--color-navy-mid))", color: "#fff" }
+                              : { background: "var(--color-ice)", border: "1.5px solid rgba(var(--color-navy-mid-rgb),0.10)", color: "#64748b" }}
+                          >
+                            {label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="max-w-xs">
+                    <label style={{ display: "block", marginBottom: 8, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.22em", color: "#64748b" }}>Tamanho máximo por ficheiro (MB)</label>
+                    <input type="number" min={1} max={500} value={configForm.tamanho_maximo_mb}
+                      onChange={e => setConfigForm(f => ({ ...f, tamanho_maximo_mb: e.target.value }))}
+                      className="w-full rounded-2xl px-5 py-3.5 text-sm outline-none"
+                      style={{ background: "var(--color-ice)", border: "1.5px solid rgba(var(--color-navy-mid-rgb),0.10)", color: "#0f172a" }} />
+                  </div>
+
+                  <button type="submit" disabled={savingConfig}
+                    className="inline-flex items-center gap-2.5 rounded-2xl px-6 py-3.5 text-sm font-black uppercase tracking-wider text-white transition-all duration-200 disabled:opacity-60"
+                    style={{ background: "linear-gradient(135deg,var(--color-navy-deep),var(--color-navy-mid))", boxShadow: "0 8px 28px rgba(var(--color-navy-deep-rgb),0.38)", letterSpacing: "0.08em" }}
+                  >
+                    <Save size={16} /> {savingConfig ? "A guardar..." : "Guardar configuração"}
+                  </button>
+                </div>
+              </section>
+            </form>
+
+            {/* Cursos / Disciplinas */}
+            <section
+              className="rounded-[28px] overflow-hidden"
+              style={{ background: "#fff", border: "1px solid rgba(var(--color-navy-mid-rgb),0.08)", boxShadow: "0 4px 32px rgba(var(--color-navy-mid-rgb),0.07)" }}
+            >
+              <div className="flex items-center gap-2.5 px-7 py-5" style={{ borderBottom: "1px solid rgba(var(--color-navy-mid-rgb),0.06)" }}>
+                <ShieldCheck size={19} style={{ color: "var(--color-navy-mid)" }} />
+                <h2 style={{ fontSize: 18, fontWeight: 900, color: "var(--color-navy-deep)" }}>Cursos / Disciplinas</h2>
+              </div>
+              <div className="p-7">
+                <form onSubmit={handleAdicionarCurso} className="flex gap-3 mb-6">
+                  <input value={novoCurso} onChange={e => setNovoCurso(e.target.value)} placeholder="Nome do novo curso"
+                    className="flex-1 rounded-2xl px-5 py-3.5 text-sm outline-none"
+                    style={{ background: "var(--color-ice)", border: "1.5px solid rgba(var(--color-navy-mid-rgb),0.10)", color: "#0f172a" }} />
+                  <button type="submit"
+                    className="inline-flex items-center gap-2 rounded-2xl px-5 py-3.5 text-sm font-bold text-white shrink-0 transition-all"
+                    style={{ background: "linear-gradient(135deg,var(--color-navy-deep),var(--color-navy-mid))" }}>
+                    <Plus size={16} /> Adicionar
+                  </button>
+                </form>
+                <div className="flex flex-wrap gap-2">
+                  {cursos.length === 0 && (
+                    <p style={{ fontSize: 13, color: "#94a3b8" }}>Nenhum curso configurado ainda.</p>
+                  )}
+                  {cursos.map(c => (
+                    <span key={c.id}
+                      className="inline-flex items-center gap-2 rounded-full pl-4 pr-2 py-2 text-sm font-semibold"
+                      style={{ background: "var(--color-ice)", border: "1px solid rgba(var(--color-navy-mid-rgb),0.10)", color: "#334155" }}
+                    >
+                      {c.nome}
+                      <button type="button" onClick={() => handleRemoverCurso(c.id)}
+                        className="rounded-full p-1 transition-colors"
+                        style={{ color: "#94a3b8" }}
+                        title="Remover curso"
+                      >
+                        <X size={13} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </section>
+          </div>
         )}
 
       </div>
