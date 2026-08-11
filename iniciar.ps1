@@ -1,6 +1,6 @@
 # =================================================================
-#   UCM SmartHub -- Script de Inicializacao (PowerShell 5.1+)
-#   Universidade Catolica de Mocambique . Extensao de Tete
+#   SmartHub -- Script de Inicializacao (PowerShell 5.1+)
+#   Plataforma academica configuravel
 # =================================================================
 
 $raiz   = $PSScriptRoot
@@ -22,8 +22,7 @@ function Write-Sep { Write-Host "  ---------------------------------------------
 Clear-Host
 Write-Host ""
 Write-Host "  ================================================================" -ForegroundColor DarkBlue
-Write-Host "       UCM SmartHub -- Sistema Academico                        " -ForegroundColor Cyan
-Write-Host "       Universidade Catolica de Mocambique - Extensao de Tete   " -ForegroundColor White
+Write-Host "       SmartHub -- Plataforma Academica                         " -ForegroundColor Cyan
 Write-Host "  ================================================================" -ForegroundColor DarkBlue
 Write-Host ""
 
@@ -48,9 +47,16 @@ Write-Info "A verificar dependencias da API..."
 if (-not (Test-Path (Join-Path $apiDir "node_modules"))) {
     Write-Host "       Instalando..." -ForegroundColor DarkYellow
     Push-Location $apiDir
-    npm install --silent 2>$null
+    npm install --silent
+    $instalouApi = $LASTEXITCODE -eq 0
     Pop-Location
-    Write-Ok "Dependencias da API instaladas"
+    if ($instalouApi) {
+        Write-Ok "Dependencias da API instaladas"
+    } else {
+        Write-Err "Falha ao instalar dependencias da API (ver mensagens acima)"
+        Read-Host "Prima Enter para sair"
+        exit 1
+    }
 } else {
     Write-Ok "Dependencias da API OK"
 }
@@ -62,9 +68,16 @@ Write-Info "A verificar dependencias do frontend..."
 if (-not (Test-Path (Join-Path $webDir "node_modules"))) {
     Write-Host "       Instalando..." -ForegroundColor DarkYellow
     Push-Location $webDir
-    npm install --silent 2>$null
+    npm install --silent
+    $instalouWeb = $LASTEXITCODE -eq 0
     Pop-Location
-    Write-Ok "Dependencias do frontend instaladas"
+    if ($instalouWeb) {
+        Write-Ok "Dependencias do frontend instaladas"
+    } else {
+        Write-Err "Falha ao instalar dependencias do frontend (ver mensagens acima)"
+        Read-Host "Prima Enter para sair"
+        exit 1
+    }
 } else {
     Write-Ok "Dependencias do frontend OK"
 }
@@ -79,11 +92,11 @@ Write-Host ""
 # Criar script temporario para a janela da API
 # -----------------------------------------------------------------
 $scriptAPI = @"
-`$Host.UI.RawUI.WindowTitle = 'UCM SmartHub - API (Porta 5000)'
+`$Host.UI.RawUI.WindowTitle = 'SmartHub - API (Porta 5000)'
 `$Host.UI.RawUI.BackgroundColor = 'DarkBlue'
 Clear-Host
 Write-Host ''
-Write-Host '  UCM SmartHub - SERVIDOR API' -ForegroundColor Yellow
+Write-Host '  SmartHub - SERVIDOR API' -ForegroundColor Yellow
 Write-Host '  Porta: 5000  |  http://localhost:5000' -ForegroundColor Cyan
 Write-Host ''
 Write-Host '  --------------------------------------------------' -ForegroundColor DarkGray
@@ -102,11 +115,11 @@ $scriptAPI | Out-File -FilePath $caminhoAPI -Encoding UTF8 -Force
 # Criar script temporario para a janela do Frontend
 # -----------------------------------------------------------------
 $scriptWeb = @"
-`$Host.UI.RawUI.WindowTitle = 'UCM SmartHub - Frontend (Porta 5173)'
+`$Host.UI.RawUI.WindowTitle = 'SmartHub - Frontend (Porta 5173)'
 `$Host.UI.RawUI.BackgroundColor = 'DarkGreen'
 Clear-Host
 Write-Host ''
-Write-Host '  UCM SmartHub - SERVIDOR WEB (Vite)' -ForegroundColor Yellow
+Write-Host '  SmartHub - SERVIDOR WEB (Vite)' -ForegroundColor Yellow
 Write-Host '  Porta: 5173  |  http://localhost:5173' -ForegroundColor Cyan
 Write-Host ''
 Write-Host '  --------------------------------------------------' -ForegroundColor DarkGray
@@ -144,7 +157,7 @@ Write-Ok "Browser aberto em http://localhost:5173"
 
 Write-Host ""
 Write-Sep
-Write-Ok "Sistema UCM SmartHub iniciado com sucesso!"
+Write-Ok "Sistema SmartHub iniciado com sucesso!"
 Write-Host ""
 Write-Host "      API:     http://localhost:5000" -ForegroundColor Cyan
 Write-Host "      Website: http://localhost:5173" -ForegroundColor Cyan

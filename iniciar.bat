@@ -1,10 +1,10 @@
 @echo off
 chcp 65001 >nul
-title UCM SmartHub — Inicializador
+title SmartHub — Inicializador
 
 :: ═══════════════════════════════════════════════════════════
-::   UCM SMARTHUB — SCRIPT DE INICIALIZAÇÃO DO SISTEMA
-::   Universidade Católica de Moçambique · Extensão de Tete
+::   SMARTHUB — SCRIPT DE INICIALIZAÇÃO DO SISTEMA
+::   Plataforma académica configurável
 :: ═══════════════════════════════════════════════════════════
 
 color 1F
@@ -12,8 +12,7 @@ cls
 
 echo.
 echo  ╔══════════════════════════════════════════════════════════╗
-echo  ║          UCM SmartHub — Sistema Académico               ║
-echo  ║       Universidade Católica de Moçambique               ║
+echo  ║               SmartHub — Plataforma Académica            ║
 echo  ╚══════════════════════════════════════════════════════════╝
 echo.
 
@@ -38,6 +37,13 @@ if not exist "ucm-smarthub-api\node_modules" (
     echo  [INSTALANDO] Dependências da API...
     cd ucm-smarthub-api
     call npm install --silent
+    if errorlevel 1 (
+        cd ..
+        color 4F
+        echo  [ERRO] Falha ao instalar dependencias da API.
+        pause
+        exit /b 1
+    )
     cd ..
     echo  [OK] Dependências da API instaladas
 ) else (
@@ -50,6 +56,13 @@ if not exist "ucm-smarthub-web\node_modules" (
     echo  [INSTALANDO] Dependências do frontend...
     cd ucm-smarthub-web
     call npm install --silent
+    if errorlevel 1 (
+        cd ..
+        color 4F
+        echo  [ERRO] Falha ao instalar dependencias do frontend.
+        pause
+        exit /b 1
+    )
     cd ..
     echo  [OK] Dependências do frontend instaladas
 ) else (
@@ -63,15 +76,15 @@ echo  ────────────────────────�
 echo.
 
 :: ─── Iniciar API em nova janela ───────────────────────────────
-start "UCM SmartHub — API (Porta 5000)" cmd /k ^
-    "color 2F && echo. && echo  UCM SmartHub — SERVIDOR API && echo  ─────────────────────────────────────── && echo. && cd /d %~dp0ucm-smarthub-api && node server.js"
+start "SmartHub — API (Porta 5000)" cmd /k ^
+    "color 2F && echo. && echo  SmartHub — SERVIDOR API && echo  ─────────────────────────────────────── && echo. && cd /d %~dp0ucm-smarthub-api && node server.js"
 
 :: Aguardar 2 segundos para a API arrancar
 timeout /t 2 /nobreak >nul
 
 :: ─── Iniciar Frontend em nova janela ─────────────────────────
-start "UCM SmartHub — Frontend (Porta 5173)" cmd /k ^
-    "color 3F && echo. && echo  UCM SmartHub — SERVIDOR WEB && echo  ─────────────────────────────────────── && echo. && cd /d %~dp0ucm-smarthub-web && npm run dev"
+start "SmartHub — Frontend (Porta 5173)" cmd /k ^
+    "color 3F && echo. && echo  SmartHub — SERVIDOR WEB && echo  ─────────────────────────────────────── && echo. && cd /d %~dp0ucm-smarthub-web && npm run dev"
 
 :: Aguardar 3 segundos e abrir o browser
 echo  [INFO] A aguardar o arranque do frontend...
