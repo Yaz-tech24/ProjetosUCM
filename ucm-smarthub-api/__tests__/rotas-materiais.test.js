@@ -1,0 +1,105 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import request from "supertest";
+import jwt from "jsonwebtoken";
+
+const db = require("../config/db");
+const { app } = require("../server");
+
+const JWT_SECRET = process.env.JWT_SECRET || "ucm_smarthub_dev_secret_mude_em_producao";
+const tokenEstudante = jwt.sign({ id: 1, papel: "estudante", nome: "Ana", curso: "Geral" }, JWT_SECRET, { expiresIn: "1h" });
+
+function mockSql(regrasPorOrdem) {
+  vi.spyOn(db, "query").mockImplementation((sql) => {
+    for (const [padrao, resultado] of regrasPorOrdem) {
+      if (padrao.test(sql)) return Promise.resolve(resultado);
+    }
+    return Promise.resolve([[]]);
+  });
+}
+
+describe("POST /api/materiais", () => {
+  beforeEach(() => { vi.restoreAllMocks(); });
+
+  it("rejeita pedidos sem autenticação", async () => {
+    const res = await request(app).post("/api/materiais").field("titulo", "T");
+    expect(res.status).toBe(401);
+  });
+
+  it("rejeita quando não há ficheiro anexado", async () => {
+    const res = await request(app)
+      .post("/api/materiais")
+      .set("Authorization", `Bearer ${tokenEstudante}`)
+      .field("titulo", "Título válido")
+      .field("cadeira", "Geral")
+      .field("tipo", "PDF");
+    expect(res.status).toBe(400);
+    expect(res.body.erro).toMatch(/anexe um ficheiro/);
+  });
+
+  it("rejeita título vazio e não deixa o ficheiro na pasta uploads", async () => {
+    const res = await request(app)
+      .post("/api/materiais")
+      .set("Authorization", `Bearer ${tokenEstudante}`)
+      .field("titulo", "")
+      .field("cadeira", "Geral")
+      .field("tipo", "PDF")
+      .attach("arquivo", Buffer.from("%PDF-1.4 conteúdo de teste"), { filename: "teste.pdf", contentType: "application/pdf" });
+    expect(res.status).toBe(400);
+    expect(res.body.erro).toMatch(/título/i);
+  });
+
+  it("rejeita tipo de material inválido", async () => {
+    const res = await request(app)
+      .post("/api/materiais")
+      .set("Authorization", `Bearer ${tokenEstudante}`)
+      .field("titulo", "Título válido")
+      .field("cadeira", "Geral")
+      .field("tipo", "EXE")
+      .attach("arquivo", Buffer.from("%PDF-1.4 conteúdo de teste"), { filename: "teste.pdf", contentType: "application/pdf" });
+    expect(res.status).toBe(400);
+  });
+
+  it("rejeita ficheiro de tipo MIME não permitido", async () => {
+    const res = await request(app)
+      .post("/api/materiais")
+      .set("Authorization", `Bearer ${tokenEstudante}`)
+      .field("titulo", "Título válido")
+      .field("cadeira", "Geral")
+      .field("tipo", "PDF")
+      .attach("arquivo", Buffer.from("conteúdo executável"), { filename: "malware.exe", contentType: "application/x-msdownload" });
+    expect(res.status).toBe(400);
+  });
+
+  it("rejeita disciplina que não existe na configuração actual", async () => {
+    mockSql([
+      [/FROM configuracoes/, [[{ tamanho_maximo_mb: 100, moderacao_ia_activada: false, tipos_ficheiro_permitidos: "pdf,mp4,webm,ogg,mov" }]]],
+      [/FROM cursos/, [[{ id: 1, nome: "Geral" }]]],
+    ]);
+    const res = await request(app)
+      .post("/api/materiais")
+      .set("Authorization", `Bearer ${tokenEstudante}`)
+      .field("titulo", "Título válido")
+      .field("cadeira", "Disciplina Inexistente")
+      .field("tipo", "PDF")
+      .attach("arquivo", Buffer.from("%PDF-1.4 conteúdo de teste"), { filename: "teste.pdf", contentType: "application/pdf" });
+    expect(res.status).toBe(400);
+    expect(res.body.erro).toMatch(/Disciplina inválida/);
+  });
+
+  it("aceita um material válido e grava-o como pendente", async () => {
+    mockSql([
+      [/FROM configuracoes/, [[{ tamanho_maximo_mb: 100, moderacao_ia_activada: false, descricao_proposito: "", tipos_ficheiro_permitidos: "pdf,mp4,webm,ogg,mov" }]]],
+      [/FROM cursos/, [[{ id: 1, nome: "Geral" }]]],
+      [/INSERT INTO materiais/, [{ insertId: 7 }]],
+    ]);
+    const res = await request(app)
+      .post("/api/materiais")
+      .set("Authorization", `Bearer ${tokenEstudante}`)
+      .field("titulo", "Título válido")
+      .field("cadeira", "Geral")
+      .field("tipo", "PDF")
+      .attach("arquivo", Buffer.from("%PDF-1.4 conteúdo de teste"), { filename: "teste.pdf", contentType: "application/pdf" });
+    expect(res.status).toBe(201);
+    expect(res.body.id_novo_material).toBe(7);
+  });
+});

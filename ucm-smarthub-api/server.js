@@ -4,11 +4,15 @@
 
 const express = require("express");
 const cors = require("cors");
+const helmet = require("helmet");
+const compression = require("compression");
+const { z } = require("zod");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
+const crypto = require("crypto");
 const util = require("util");
 const pdfParse = require("pdf-parse");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
@@ -16,7 +20,11 @@ const http = require("http");
 const socketIo = require("socket.io");
 require("dotenv").config();
 
+const swaggerUi = require("swagger-ui-express");
+
 const db = require("./config/db");
+const mailer = require("./services/email");
+const swaggerSpec = require("./swagger");
 
 const app = express();
 const server = http.createServer(app);
@@ -38,7 +46,20 @@ app.use(cors({
   origin: (origin, cb) => (!origin || CORS_ORIGINS.includes(origin) ? cb(null, true) : cb(new Error("Origem não permitida pelo CORS"))),
   credentials: true,
 }));
+app.use(helmet({
+  // CSP desligada de propósito: o frontend usa muito style={{...}} inline e blocos
+  // <style>{...}</style> para animações — uma CSP por defeito bloquearia isso. Os
+  // restantes cabeçalhos do helmet (X-Frame-Options, X-Content-Type-Options, HSTS, etc.)
+  // continuam activos.
+  contentSecurityPolicy: false,
+  // Desligada para não bloquear o carregamento de PDFs/vídeos/imagens de /uploads
+  // quando o frontend está numa origem diferente (ex.: outro domínio/porta).
+  crossOriginEmbedderPolicy: false,
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+}));
+app.use(compression());
 app.use(express.json());
+app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec, { customSiteTitle: "SmartHub API — Documentação" }));
 
 const readFile = util.promisify(fs.readFile);
 
@@ -88,8 +109,10 @@ function criarLimitadorTaxa({ janelaMs, maxTentativas }) {
 }
 const limitarLogin = criarLimitadorTaxa({ janelaMs: 15 * 60 * 1000, maxTentativas: 10 });
 const limitarRegisto = criarLimitadorTaxa({ janelaMs: 60 * 60 * 1000, maxTentativas: 8 });
-
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// Chat de IA — cada pedido custa dinheiro (API do Gemini); sem limite, um utilizador
+// autenticado podia esgotar a quota sozinho.
+const limitarChat = criarLimitadorTaxa({ janelaMs: 60 * 1000, maxTentativas: 15 });
+const limitarEsqueciSenha = criarLimitadorTaxa({ janelaMs: 60 * 60 * 1000, maxTentativas: 5 });
 
 // Instância Gemini criada uma vez ao arrancar o servidor
 const genAI = process.env.GEMINI_API_KEY
@@ -144,6 +167,78 @@ const MAPA_TIPOS_MIME = {
 // que é sempre aplicado depois, no handler da rota.
 const TAMANHO_MAXIMO_TECTO_MB = 500;
 
+// ─── Validação de entrada (zod) ────────────────────────────────────────────
+// Middleware genérico: valida req.body contra um schema e substitui req.body
+// pelos dados já convertidos/normalizados (trim, lowercase, coerção de tipos).
+function validar(schema) {
+  return (req, res, next) => {
+    const resultado = schema.safeParse(req.body);
+    if (!resultado.success) {
+      const primeiro = resultado.error.issues[0];
+      return res.status(400).json({ erro: primeiro?.message || "Dados inválidos." });
+    }
+    req.body = resultado.data;
+    next();
+  };
+}
+
+const schemaRegisto = z.object({
+  nome: z.string().trim().min(1, "Nome é obrigatório."),
+  email: z.string().trim().toLowerCase().pipe(z.email("Email inválido.")),
+  senha: z.string().min(6, "A palavra-passe deve ter pelo menos 6 caracteres."),
+  papel: z.enum(["estudante", "professor"]).catch("estudante"),
+  curso: z.string().trim().min(1, "Curso inválido."),
+});
+
+const schemaLogin = z.object({
+  email: z.string().trim().toLowerCase(),
+  senha: z.string().min(1, "Palavra-passe é obrigatória."),
+});
+
+const schemaMaterial = z.object({
+  titulo: z.string().trim().min(1, "O título é obrigatório."),
+  cadeira: z.string().trim().min(1, "Disciplina inválida."),
+  tipo: z.enum(["PDF", "Vídeo"], { message: "Tipo de material inválido." }),
+});
+
+const schemaConfig = z.object({
+  nome_plataforma: z.string().trim().min(1, "O nome da plataforma é obrigatório."),
+  tagline: z.string().trim().catch(""),
+  descricao_proposito: z.string().trim().catch(""),
+  cor_primaria: z.string().regex(HEX_COLOR_REGEX, "Cores inválidas — use o formato #rrggbb."),
+  cor_destaque: z.string().regex(HEX_COLOR_REGEX, "Cores inválidas — use o formato #rrggbb."),
+  contacto_email: z.string().trim().catch(""),
+  localizacao: z.string().trim().catch(""),
+  chat_activado: z.coerce.boolean(),
+  ia_activada: z.coerce.boolean(),
+  moderacao_ia_activada: z.coerce.boolean(),
+  tipos_ficheiro_permitidos: z.array(z.enum(TIPOS_FICHEIRO_VALIDOS))
+    .min(1, "Seleccione pelo menos um tipo de ficheiro permitido."),
+  tamanho_maximo_mb: z.coerce.number().int().min(1).max(TAMANHO_MAXIMO_TECTO_MB),
+});
+
+const schemaCurso = z.object({
+  nome: z.string().trim().min(1, "O nome do curso é obrigatório."),
+});
+
+const schemaPerfilNome = z.object({
+  nome: z.string().trim().min(1, "O nome é obrigatório."),
+});
+
+const schemaPerfilSenha = z.object({
+  senha_actual: z.string().min(1, "Indique a palavra-passe actual."),
+  nova_senha: z.string().min(6, "A nova palavra-passe deve ter pelo menos 6 caracteres."),
+});
+
+const schemaEsqueciSenha = z.object({
+  email: z.string().trim().toLowerCase(),
+});
+
+const schemaReporSenha = z.object({
+  token: z.string().min(1, "Token em falta."),
+  novaSenha: z.string().min(6, "A nova palavra-passe deve ter pelo menos 6 caracteres."),
+});
+
 async function getConfiguracoes() {
   const [[config]] = await db.query("SELECT * FROM configuracoes WHERE id = 1");
   return config || {};
@@ -180,8 +275,10 @@ async function getEstatisticas() {
 // Nunca bloqueia sozinha — apenas sinaliza para revisão humana no painel de admin.
 // Em caso de erro/resposta inesperada, falha "aberta" (não sinaliza), para nunca travar
 // uploads legítimos por uma falha da IA.
-async function verificarConformidadeIA(config, { titulo, cadeira, tipo }) {
-  if (!config.moderacao_ia_activada || !genAI) return { sinalizado: false, motivo: null };
+// `cliente` é injectável (por defeito o genAI real) para permitir testar esta
+// função com um cliente falso, sem depender de mocking do módulo do SDK.
+async function verificarConformidadeIA(config, { titulo, cadeira, tipo }, cliente = genAI) {
+  if (!config.moderacao_ia_activada || !cliente) return { sinalizado: false, motivo: null };
 
   const prompt = `Avalia se o material académico abaixo é compatível com o propósito desta plataforma.
 
@@ -198,7 +295,7 @@ ou, se não corresponder ao propósito:
 {"conforme": false, "motivo": "razão curta e específica em português"}`;
 
   try {
-    const model = genAI.getGenerativeModel({ model: GEMINI_MODELS[0] });
+    const model = cliente.getGenerativeModel({ model: GEMINI_MODELS[0] });
     const result = await model.generateContent(prompt);
     const texto = result.response.text().trim();
     const jsonMatch = texto.match(/\{[\s\S]*\}/);
@@ -251,43 +348,64 @@ const upload = multer({
 });
 
 // ─── Multer — logótipo da plataforma (imagens pequenas) ──────────────────────
+const TIPOS_IMAGEM = ["image/png", "image/jpeg", "image/svg+xml", "image/webp"];
+const filtroImagem = (req, file, cb) => {
+  if (TIPOS_IMAGEM.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error("Formato de imagem não suportado. Use PNG, JPG, SVG ou WebP."));
+  }
+};
+
 const uploadLogo = multer({
   storage: multer.diskStorage({
     destination: (req, file, cb) => cb(null, uploadsDir),
     filename: (req, file, cb) => cb(null, `logo-${Date.now()}${path.extname(file.originalname)}`),
   }),
   limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB é mais que suficiente para um logótipo
-  fileFilter: (req, file, cb) => {
-    const tiposImagem = ["image/png", "image/jpeg", "image/svg+xml", "image/webp"];
-    if (tiposImagem.includes(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error("Formato de imagem não suportado. Use PNG, JPG, SVG ou WebP."));
-    }
-  },
+  fileFilter: filtroImagem,
+});
+
+// ─── Multer — avatar de utilizador ────────────────────────────────────────
+const uploadAvatar = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, uploadsDir),
+    filename: (req, file, cb) => cb(null, `avatar-${Date.now()}${path.extname(file.originalname)}`),
+  }),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: filtroImagem,
 });
 
 // ==========================================
 // AUTENTICAÇÃO
 // ==========================================
-app.post("/api/register", limitarRegisto, async (req, res) => {
+/**
+ * @openapi
+ * /api/register:
+ *   post:
+ *     summary: Cria uma nova conta
+ *     tags: [Autenticação]
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [nome, email, senha, curso]
+ *             properties:
+ *               nome: { type: string }
+ *               email: { type: string }
+ *               senha: { type: string, minLength: 6 }
+ *               papel: { type: string, enum: [estudante, professor] }
+ *               curso: { type: string }
+ *     responses:
+ *       201: { description: Conta criada }
+ *       400: { description: Dados inválidos ou email já em uso, content: { application/json: { schema: { $ref: '#/components/schemas/Erro' } } } }
+ */
+app.post("/api/register", limitarRegisto, validar(schemaRegisto), async (req, res) => {
   try {
-    const nome  = (req.body.nome  || "").trim();
-    const email = (req.body.email || "").trim().toLowerCase();
-    const senha = req.body.senha  || "";
-    const papel = ["estudante", "professor"].includes(req.body.papel)
-      ? req.body.papel
-      : "estudante";
-
-    if (!nome || !email || !senha) {
-      return res.status(400).json({ erro: "Nome, email e senha são obrigatórios." });
-    }
-    if (!EMAIL_REGEX.test(email)) {
-      return res.status(400).json({ erro: "Email inválido." });
-    }
-    if (senha.length < 6) {
-      return res.status(400).json({ erro: "A palavra-passe deve ter pelo menos 6 caracteres." });
-    }
+    const { nome, email, senha, papel } = req.body;
 
     const cursos = await getCursos();
     const cursoValido = cursos.find(c => c.nome === req.body.curso)?.nome;
@@ -314,16 +432,54 @@ app.post("/api/register", limitarRegisto, async (req, res) => {
     );
 
     res.status(201).json({ mensagem: "Utilizador criado com sucesso!" });
+
+    // Email de boas-vindas — não bloqueia a resposta; falhas de envio já são
+    // engolidas dentro do próprio serviço de email.
+    getConfiguracoes().then(config => {
+      mailer.enviarBoasVindas({
+        to: email, nome, nomePlataforma: config.nome_plataforma,
+        corPrimaria: config.cor_primaria, corDestaque: config.cor_destaque,
+      });
+    }).catch(() => {});
   } catch (erro) {
     console.error("Erro no registo:", erro.message);
     res.status(500).json({ erro: "Erro interno ao registar utilizador." });
   }
 });
 
-app.post("/api/login", limitarLogin, async (req, res) => {
+/**
+ * @openapi
+ * /api/login:
+ *   post:
+ *     summary: Autentica um utilizador e devolve um token JWT
+ *     tags: [Autenticação]
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email, senha]
+ *             properties:
+ *               email: { type: string }
+ *               senha: { type: string }
+ *     responses:
+ *       200:
+ *         description: Login aprovado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 token: { type: string }
+ *                 utilizador: { $ref: '#/components/schemas/Utilizador' }
+ *       400: { description: Credenciais inválidas, content: { application/json: { schema: { $ref: '#/components/schemas/Erro' } } } }
+ *       429: { description: Demasiadas tentativas }
+ */
+app.post("/api/login", limitarLogin, validar(schemaLogin), async (req, res) => {
   try {
-    const email = (req.body.email || "").trim().toLowerCase();
-    const senha = req.body.senha || "";
+    const { email, senha } = req.body;
 
     const [utilizadores] = await db.query(
       "SELECT * FROM usuarios WHERE email = ?",
@@ -356,6 +512,7 @@ app.post("/api/login", limitarLogin, async (req, res) => {
         email: utilizador.email,
         papel: utilizador.papel,
         curso: utilizador.curso,
+        avatar_url: utilizador.avatar_url,
       },
     });
   } catch (erro) {
@@ -365,8 +522,282 @@ app.post("/api/login", limitarLogin, async (req, res) => {
 });
 
 // ==========================================
+// RECUPERAÇÃO DE PASSWORD
+// ==========================================
+/**
+ * @openapi
+ * /api/esqueci-senha:
+ *   post:
+ *     summary: Pede um link de recuperação de password por email
+ *     tags: [Autenticação]
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema: { type: object, required: [email], properties: { email: { type: string } } }
+ *     responses:
+ *       200: { description: "Resposta genérica (não revela se o email existe)" }
+ */
+app.post("/api/esqueci-senha", limitarEsqueciSenha, validar(schemaEsqueciSenha), async (req, res) => {
+  // Resposta sempre igual, quer o email exista ou não — evita confirmar a
+  // quem está a fazer o pedido se um dado email tem ou não conta na plataforma.
+  const respostaGenerica = { mensagem: "Se esse email existir, foi enviado um link de recuperação." };
+  try {
+    const { email } = req.body;
+    const [[utilizador]] = await db.query("SELECT id, nome FROM usuarios WHERE email = ?", [email]);
+    if (!utilizador) return res.json(respostaGenerica);
+
+    const tokenBruto = crypto.randomBytes(32).toString("hex");
+    const tokenHash = crypto.createHash("sha256").update(tokenBruto).digest("hex");
+    const expira = new Date(Date.now() + 30 * 60 * 1000); // 30 minutos
+
+    await db.query(
+      "UPDATE usuarios SET reset_token = ?, reset_token_expira = ? WHERE id = ?",
+      [tokenHash, expira, utilizador.id]
+    );
+
+    res.json(respostaGenerica);
+
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+    const config = await getConfiguracoes();
+    mailer.enviarRecuperacaoPassword({
+      to: email, nome: utilizador.nome,
+      link: `${frontendUrl}/repor-senha?token=${tokenBruto}`,
+      nomePlataforma: config.nome_plataforma, corPrimaria: config.cor_primaria, corDestaque: config.cor_destaque,
+    });
+  } catch (erro) {
+    console.error("Erro ao pedir recuperação de password:", erro.message);
+    res.json(respostaGenerica);
+  }
+});
+
+/**
+ * @openapi
+ * /api/repor-senha:
+ *   post:
+ *     summary: Repõe a password usando o token recebido por email
+ *     tags: [Autenticação]
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [token, novaSenha]
+ *             properties:
+ *               token: { type: string }
+ *               novaSenha: { type: string, minLength: 6 }
+ *     responses:
+ *       200: { description: Palavra-passe reposta }
+ *       400: { description: Token inválido ou expirado, content: { application/json: { schema: { $ref: '#/components/schemas/Erro' } } } }
+ */
+app.post("/api/repor-senha", validar(schemaReporSenha), async (req, res) => {
+  try {
+    const { token, novaSenha } = req.body;
+    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+
+    const [[utilizador]] = await db.query(
+      "SELECT id FROM usuarios WHERE reset_token = ? AND reset_token_expira > NOW()",
+      [tokenHash]
+    );
+    if (!utilizador) {
+      return res.status(400).json({ erro: "Link inválido ou expirado. Peça um novo." });
+    }
+
+    const senhaCriptografada = await bcrypt.hash(novaSenha, await bcrypt.genSalt(10));
+    await db.query(
+      "UPDATE usuarios SET senha = ?, reset_token = NULL, reset_token_expira = NULL WHERE id = ?",
+      [senhaCriptografada, utilizador.id]
+    );
+
+    res.json({ mensagem: "Palavra-passe reposta com sucesso. Já pode entrar." });
+  } catch (erro) {
+    console.error("Erro ao repor password:", erro.message);
+    res.status(500).json({ erro: "Erro ao repor a palavra-passe." });
+  }
+});
+
+// ==========================================
+// PERFIL DO UTILIZADOR
+// ==========================================
+/**
+ * @openapi
+ * /api/perfil:
+ *   put:
+ *     summary: Actualiza o nome do próprio perfil
+ *     tags: [Perfil]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema: { type: object, required: [nome], properties: { nome: { type: string } } }
+ *     responses:
+ *       200:
+ *         description: Perfil actualizado
+ *         content: { application/json: { schema: { type: object, properties: { utilizador: { $ref: '#/components/schemas/Utilizador' } } } } }
+ *       401: { description: Não autenticado }
+ */
+app.put("/api/perfil", autenticar, validar(schemaPerfilNome), async (req, res) => {
+  try {
+    await db.query("UPDATE usuarios SET nome = ? WHERE id = ?", [req.body.nome, req.utilizador.id]);
+    const [[utilizador]] = await db.query(
+      "SELECT id, nome, email, papel, curso, avatar_url FROM usuarios WHERE id = ?",
+      [req.utilizador.id]
+    );
+    res.json({ mensagem: "Perfil actualizado com sucesso!", utilizador });
+  } catch (erro) {
+    console.error("Erro ao actualizar perfil:", erro.message);
+    res.status(500).json({ erro: "Falha ao actualizar perfil." });
+  }
+});
+
+/**
+ * @openapi
+ * /api/perfil/senha:
+ *   put:
+ *     summary: Muda a palavra-passe do próprio utilizador
+ *     tags: [Perfil]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [senha_actual, nova_senha]
+ *             properties:
+ *               senha_actual: { type: string }
+ *               nova_senha: { type: string, minLength: 6 }
+ *     responses:
+ *       200: { description: Palavra-passe alterada }
+ *       400: { description: Palavra-passe actual incorrecta, content: { application/json: { schema: { $ref: '#/components/schemas/Erro' } } } }
+ */
+app.put("/api/perfil/senha", autenticar, validar(schemaPerfilSenha), async (req, res) => {
+  try {
+    const { senha_actual, nova_senha } = req.body;
+    const [[utilizador]] = await db.query("SELECT senha FROM usuarios WHERE id = ?", [req.utilizador.id]);
+    const senhaValida = await bcrypt.compare(senha_actual, utilizador.senha);
+    if (!senhaValida) {
+      return res.status(400).json({ erro: "Palavra-passe actual incorrecta." });
+    }
+    const senhaCriptografada = await bcrypt.hash(nova_senha, await bcrypt.genSalt(10));
+    await db.query("UPDATE usuarios SET senha = ? WHERE id = ?", [senhaCriptografada, req.utilizador.id]);
+    res.json({ mensagem: "Palavra-passe alterada com sucesso!" });
+  } catch (erro) {
+    console.error("Erro ao mudar password:", erro.message);
+    res.status(500).json({ erro: "Falha ao alterar a palavra-passe." });
+  }
+});
+
+/**
+ * @openapi
+ * /api/perfil/avatar:
+ *   post:
+ *     summary: Carrega/substitui o avatar do utilizador
+ *     tags: [Perfil]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema: { type: object, properties: { avatar: { type: string, format: binary } } }
+ *     responses:
+ *       200: { description: Avatar actualizado }
+ *   delete:
+ *     summary: Remove o avatar do utilizador
+ *     tags: [Perfil]
+ *     responses:
+ *       200: { description: Avatar removido }
+ */
+app.post("/api/perfil/avatar", autenticar, uploadAvatar.single("avatar"), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ erro: "Nenhuma imagem enviada." });
+
+    const [[actual]] = await db.query("SELECT avatar_url FROM usuarios WHERE id = ?", [req.utilizador.id]);
+    const baseUrl = process.env.API_URL || `http://localhost:${process.env.PORT || 5000}`;
+    const avatar_url = `${baseUrl}/uploads/${req.file.filename}`;
+    await db.query("UPDATE usuarios SET avatar_url = ? WHERE id = ?", [avatar_url, req.utilizador.id]);
+
+    if (actual?.avatar_url) {
+      fs.unlink(path.join(uploadsDir, path.basename(actual.avatar_url)), () => {});
+    }
+    res.json({ mensagem: "Avatar actualizado!", avatar_url });
+  } catch (erro) {
+    if (req.file) fs.unlink(req.file.path, () => {});
+    console.error("Erro ao gravar avatar:", erro.message);
+    res.status(500).json({ erro: "Falha ao actualizar avatar." });
+  }
+});
+
+app.delete("/api/perfil/avatar", autenticar, async (req, res) => {
+  try {
+    const [[actual]] = await db.query("SELECT avatar_url FROM usuarios WHERE id = ?", [req.utilizador.id]);
+    await db.query("UPDATE usuarios SET avatar_url = NULL WHERE id = ?", [req.utilizador.id]);
+    if (actual?.avatar_url) {
+      fs.unlink(path.join(uploadsDir, path.basename(actual.avatar_url)), () => {});
+    }
+    res.json({ mensagem: "Avatar removido." });
+  } catch (erro) {
+    console.error("Erro ao remover avatar:", erro.message);
+    res.status(500).json({ erro: "Falha ao remover avatar." });
+  }
+});
+
+// ==========================================
 // REPOSITÓRIO E MODERAÇÃO
 // ==========================================
+/**
+ * @openapi
+ * /api/materiais:
+ *   get:
+ *     summary: Lista materiais aprovados (paginado, com filtros)
+ *     tags: [Materiais]
+ *     security: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, default: 1 }
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 12 }
+ *       - in: query
+ *         name: busca
+ *         schema: { type: string }
+ *       - in: query
+ *         name: tipo
+ *         schema: { type: string, enum: [PDF, Vídeo] }
+ *       - in: query
+ *         name: cadeira
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Lista paginada
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 materiais: { type: array, items: { $ref: '#/components/schemas/Material' } }
+ *                 pagination: { type: object }
+ *   post:
+ *     summary: Submete um novo material para aprovação
+ *     tags: [Materiais]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [titulo, cadeira, tipo, arquivo]
+ *             properties:
+ *               titulo: { type: string }
+ *               cadeira: { type: string }
+ *               tipo: { type: string, enum: [PDF, Vídeo] }
+ *               arquivo: { type: string, format: binary }
+ *     responses:
+ *       201: { description: Enviado para aprovação }
+ *       400: { description: Dados ou ficheiro inválidos, content: { application/json: { schema: { $ref: '#/components/schemas/Erro' } } } }
+ */
 app.get("/api/materiais", async (req, res) => {
   try {
     const page   = Math.max(1, parseInt(req.query.page)  || 1);
@@ -408,6 +839,22 @@ app.get("/api/materiais", async (req, res) => {
   }
 });
 
+/**
+ * @openapi
+ * /api/materiais/{id}:
+ *   get:
+ *     summary: Obtém um material aprovado pelo ID
+ *     tags: [Materiais]
+ *     security: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200: { description: Material encontrado, content: { application/json: { schema: { $ref: '#/components/schemas/Material' } } } }
+ *       404: { description: Não encontrado, content: { application/json: { schema: { $ref: '#/components/schemas/Erro' } } } }
+ */
 app.get("/api/materiais/:id", async (req, res) => {
   try {
     const materialId = parseInt(req.params.id, 10);
@@ -429,6 +876,22 @@ app.get("/api/materiais/:id", async (req, res) => {
   }
 });
 
+/**
+ * @openapi
+ * /api/materiais/{id}/resumo:
+ *   get:
+ *     summary: Gera (ou devolve) o resumo por IA de um material
+ *     tags: [Materiais]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200: { description: Resumo gerado, content: { application/json: { schema: { type: object, properties: { resumo: { type: string } } } } } }
+ *       404: { description: Material não encontrado }
+ *       503: { description: IA desactivada pelo administrador }
+ */
 app.get("/api/materiais/:id/resumo", autenticar, async (req, res) => {
   try {
     const config = await getConfiguracoes();
@@ -590,17 +1053,16 @@ app.post("/api/materiais", autenticar, upload.single("arquivo"), async (req, res
   };
 
   try {
-    const titulo  = (req.body.titulo  || "").trim();
-    const cadeira = req.body.cadeira;
-    const tipo    = req.body.tipo;
-
     if (!req.file) {
       return res.status(400).json({ erro: "Por favor, anexe um ficheiro." });
     }
-    if (!titulo) {
+
+    const parsed = schemaMaterial.safeParse(req.body);
+    if (!parsed.success) {
       limparFicheiroOrfao();
-      return res.status(400).json({ erro: "O título é obrigatório." });
+      return res.status(400).json({ erro: parsed.error.issues[0]?.message || "Dados inválidos." });
     }
+    const { titulo, cadeira, tipo } = parsed.data;
 
     const config = await getConfiguracoes();
 
@@ -614,10 +1076,6 @@ app.post("/api/materiais", autenticar, upload.single("arquivo"), async (req, res
     if (!cursos.some(c => c.nome === cadeira)) {
       limparFicheiroOrfao();
       return res.status(400).json({ erro: "Disciplina inválida." });
-    }
-    if (!["PDF", "Vídeo"].includes(tipo)) {
-      limparFicheiroOrfao();
-      return res.status(400).json({ erro: "Tipo de material inválido." });
     }
 
     const { sinalizado, motivo } = await verificarConformidadeIA(config, { titulo, cadeira, tipo });
@@ -642,6 +1100,16 @@ app.post("/api/materiais", autenticar, upload.single("arquivo"), async (req, res
   }
 });
 
+/**
+ * @openapi
+ * /api/admin/pendentes:
+ *   get:
+ *     summary: Lista materiais à espera de aprovação (admin)
+ *     tags: [Admin]
+ *     responses:
+ *       200: { description: Lista de pendentes, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Material' } } } } }
+ *       403: { description: Acesso restrito a administradores }
+ */
 app.get("/api/admin/pendentes", autenticar, apenasAdmin, async (req, res) => {
   try {
     const [materiais] = await db.query(
@@ -658,6 +1126,24 @@ app.get("/api/admin/pendentes", autenticar, apenasAdmin, async (req, res) => {
 // ==========================================
 // CONFIGURAÇÃO DA PLATAFORMA — identidade, cores, funcionalidades, cursos
 // ==========================================
+/**
+ * @openapi
+ * /api/config:
+ *   get:
+ *     summary: Devolve a configuração pública da plataforma e a lista de cursos
+ *     tags: [Configuração]
+ *     security: []
+ *     responses:
+ *       200:
+ *         description: Configuração actual
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 configuracoes: { $ref: '#/components/schemas/Configuracao' }
+ *                 cursos: { type: array, items: { $ref: '#/components/schemas/Curso' } }
+ */
 app.get("/api/config", async (req, res) => {
   try {
     const [configuracoes, cursos] = await Promise.all([getConfiguracoes(), getCursos()]);
@@ -668,26 +1154,28 @@ app.get("/api/config", async (req, res) => {
   }
 });
 
-app.put("/api/admin/config", autenticar, apenasAdmin, async (req, res) => {
+/**
+ * @openapi
+ * /api/admin/config:
+ *   put:
+ *     summary: Actualiza a configuração da plataforma (admin)
+ *     tags: [Admin]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema: { $ref: '#/components/schemas/Configuracao' }
+ *     responses:
+ *       200: { description: Configuração actualizada }
+ *       400: { description: Dados inválidos, content: { application/json: { schema: { $ref: '#/components/schemas/Erro' } } } }
+ */
+app.put("/api/admin/config", autenticar, apenasAdmin, validar(schemaConfig), async (req, res) => {
   try {
     const {
       nome_plataforma, tagline, descricao_proposito, cor_primaria, cor_destaque,
       contacto_email, localizacao, chat_activado, ia_activada, moderacao_ia_activada,
       tipos_ficheiro_permitidos, tamanho_maximo_mb,
     } = req.body;
-
-    if (!nome_plataforma || !nome_plataforma.trim()) {
-      return res.status(400).json({ erro: "O nome da plataforma é obrigatório." });
-    }
-    if (!HEX_COLOR_REGEX.test(cor_primaria || "") || !HEX_COLOR_REGEX.test(cor_destaque || "")) {
-      return res.status(400).json({ erro: "Cores inválidas — use o formato #rrggbb." });
-    }
-    const tipos = Array.isArray(tipos_ficheiro_permitidos) ? tipos_ficheiro_permitidos : [];
-    const tiposValidos = tipos.filter(t => TIPOS_FICHEIRO_VALIDOS.includes(t));
-    if (tiposValidos.length === 0) {
-      return res.status(400).json({ erro: "Seleccione pelo menos um tipo de ficheiro permitido." });
-    }
-    const tamanho = Math.min(TAMANHO_MAXIMO_TECTO_MB, Math.max(1, parseInt(tamanho_maximo_mb, 10) || 100));
 
     await db.query(
       `UPDATE configuracoes SET
@@ -696,10 +1184,10 @@ app.put("/api/admin/config", autenticar, apenasAdmin, async (req, res) => {
          tipos_ficheiro_permitidos = ?, tamanho_maximo_mb = ?
        WHERE id = 1`,
       [
-        nome_plataforma.trim(), (tagline || "").trim(), (descricao_proposito || "").trim(),
-        cor_primaria, cor_destaque, (contacto_email || "").trim(), (localizacao || "").trim(),
-        !!chat_activado, !!ia_activada, !!moderacao_ia_activada,
-        tiposValidos.join(","), tamanho,
+        nome_plataforma, tagline, descricao_proposito,
+        cor_primaria, cor_destaque, contacto_email, localizacao,
+        chat_activado, ia_activada, moderacao_ia_activada,
+        tipos_ficheiro_permitidos.join(","), tamanho_maximo_mb,
       ]
     );
 
@@ -710,6 +1198,25 @@ app.put("/api/admin/config", autenticar, apenasAdmin, async (req, res) => {
   }
 });
 
+/**
+ * @openapi
+ * /api/admin/config/logo:
+ *   post:
+ *     summary: Carrega/substitui o logótipo da plataforma (admin)
+ *     tags: [Admin]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema: { type: object, properties: { logo: { type: string, format: binary } } }
+ *     responses:
+ *       200: { description: Logótipo actualizado }
+ *   delete:
+ *     summary: Remove o logótipo da plataforma (admin, volta ao ícone por defeito)
+ *     tags: [Admin]
+ *     responses:
+ *       200: { description: Logótipo removido }
+ */
 app.post("/api/admin/config/logo", autenticar, apenasAdmin, uploadLogo.single("logo"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ erro: "Nenhuma imagem enviada." });
@@ -744,10 +1251,50 @@ app.delete("/api/admin/config/logo", autenticar, apenasAdmin, async (req, res) =
   }
 });
 
-app.post("/api/admin/cursos", autenticar, apenasAdmin, async (req, res) => {
+/**
+ * @openapi
+ * /api/admin/cursos:
+ *   post:
+ *     summary: Adiciona um curso/disciplina (admin)
+ *     tags: [Admin]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema: { type: object, required: [nome], properties: { nome: { type: string } } }
+ *     responses:
+ *       201: { description: Curso adicionado }
+ *       400: { description: "Nome inválido ou já existe", content: { application/json: { schema: { $ref: '#/components/schemas/Erro' } } } }
+ * /api/admin/cursos/{id}:
+ *   put:
+ *     summary: Renomeia um curso (admin)
+ *     tags: [Admin]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema: { type: object, required: [nome], properties: { nome: { type: string } } }
+ *     responses:
+ *       200: { description: Curso actualizado }
+ *   delete:
+ *     summary: Remove um curso da lista (admin)
+ *     tags: [Admin]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200: { description: Curso removido }
+ */
+app.post("/api/admin/cursos", autenticar, apenasAdmin, validar(schemaCurso), async (req, res) => {
   try {
-    const nome = (req.body.nome || "").trim();
-    if (!nome) return res.status(400).json({ erro: "O nome do curso é obrigatório." });
+    const { nome } = req.body;
     await db.query("INSERT INTO cursos (nome) VALUES (?)", [nome]);
     res.status(201).json({ mensagem: "Curso adicionado.", cursos: await getCursos() });
   } catch (erro) {
@@ -759,10 +1306,9 @@ app.post("/api/admin/cursos", autenticar, apenasAdmin, async (req, res) => {
   }
 });
 
-app.put("/api/admin/cursos/:id", autenticar, apenasAdmin, async (req, res) => {
+app.put("/api/admin/cursos/:id", autenticar, apenasAdmin, validar(schemaCurso), async (req, res) => {
   try {
-    const nome = (req.body.nome || "").trim();
-    if (!nome) return res.status(400).json({ erro: "O nome do curso é obrigatório." });
+    const { nome } = req.body;
     await db.query("UPDATE cursos SET nome = ? WHERE id = ?", [nome, req.params.id]);
     res.json({ mensagem: "Curso actualizado.", cursos: await getCursos() });
   } catch (erro) {
@@ -787,6 +1333,22 @@ app.delete("/api/admin/cursos/:id", autenticar, apenasAdmin, async (req, res) =>
 // ==========================================
 // ESTATÍSTICAS GERAIS (dashboard)
 // ==========================================
+/**
+ * @openapi
+ * /api/stats:
+ *   get:
+ *     summary: Estatísticas gerais da plataforma (autenticado)
+ *     tags: [Estatísticas]
+ *     responses:
+ *       200: { description: Contagens agregadas }
+ * /api/stats/publicas:
+ *   get:
+ *     summary: Versão pública das estatísticas (sem autenticação)
+ *     tags: [Estatísticas]
+ *     security: []
+ *     responses:
+ *       200: { description: Contagens agregadas }
+ */
 app.get("/api/stats", autenticar, async (req, res) => {
   try {
     res.json(await getEstatisticas());
@@ -807,6 +1369,15 @@ app.get("/api/stats/publicas", async (req, res) => {
 });
 
 // Materiais enviados pelo próprio utilizador
+/**
+ * @openapi
+ * /api/meus-materiais:
+ *   get:
+ *     summary: Lista os materiais submetidos pelo próprio utilizador
+ *     tags: [Materiais]
+ *     responses:
+ *       200: { description: Lista de materiais, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Material' } } } } }
+ */
 app.get("/api/meus-materiais", autenticar, async (req, res) => {
   try {
     const [materiais] = await db.query(
@@ -824,24 +1395,63 @@ app.get("/api/meus-materiais", autenticar, async (req, res) => {
   }
 });
 
+/**
+ * @openapi
+ * /api/admin/materiais/{id}/status:
+ *   put:
+ *     summary: Aprova ou rejeita um material pendente (admin)
+ *     tags: [Admin]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema: { type: object, required: [acao], properties: { acao: { type: string, enum: [aprovar, rejeitar] } } }
+ *     responses:
+ *       200: { description: Material processado }
+ *       400: { description: Acção inválida, content: { application/json: { schema: { $ref: '#/components/schemas/Erro' } } } }
+ */
 app.put("/api/admin/materiais/:id/status", autenticar, apenasAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const { acao } = req.body;
 
+    if (acao !== "aprovar" && acao !== "rejeitar") {
+      return res.status(400).json({ erro: "Acção inválida. Use 'aprovar' ou 'rejeitar'." });
+    }
+
+    const [[material]] = await db.query(
+      `SELECT m.titulo, m.url_arquivo, u.email AS autor_email, u.nome AS autor_nome
+       FROM materiais m JOIN usuarios u ON m.autor_id = u.id
+       WHERE m.id = ?`,
+      [id]
+    );
+
     if (acao === "aprovar") {
       await db.query("UPDATE materiais SET status = 'aprovado' WHERE id = ?", [id]);
       res.json({ mensagem: "Material aprovado com sucesso!" });
-    } else if (acao === "rejeitar") {
-      const [[material]] = await db.query("SELECT url_arquivo FROM materiais WHERE id = ?", [id]);
+    } else {
       await db.query("DELETE FROM materiais WHERE id = ?", [id]);
       if (material?.url_arquivo) {
         const fileName = path.basename(material.url_arquivo);
         fs.unlink(path.join(uploadsDir, fileName), () => {});
       }
       res.json({ mensagem: "Material rejeitado e apagado." });
-    } else {
-      res.status(400).json({ erro: "Acção inválida. Use 'aprovar' ou 'rejeitar'." });
+    }
+
+    // Notifica o autor por email — não bloqueia a resposta nem falha a moderação.
+    if (material) {
+      getConfiguracoes().then(config => {
+        mailer.enviarModeracaoMaterial({
+          to: material.autor_email, nome: material.autor_nome, titulo: material.titulo,
+          aprovado: acao === "aprovar",
+          nomePlataforma: config.nome_plataforma, corPrimaria: config.cor_primaria, corDestaque: config.cor_destaque,
+        });
+      }).catch(() => {});
     }
   } catch (erro) {
     console.error("Erro na moderação:", erro.message);
@@ -852,7 +1462,23 @@ app.put("/api/admin/materiais/:id/status", autenticar, apenasAdmin, async (req, 
 // ==========================================
 // CHAT COM IA (GEMINI) — protegido por autenticação
 // ==========================================
-app.post("/api/chat", autenticar, async (req, res) => {
+/**
+ * @openapi
+ * /api/chat:
+ *   post:
+ *     summary: Envia uma pergunta ao assistente académico de IA
+ *     tags: [Chat IA]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema: { type: object, required: [mensagem], properties: { mensagem: { type: string } } }
+ *     responses:
+ *       200: { description: Resposta da IA, content: { application/json: { schema: { type: object, properties: { resposta: { type: string } } } } } }
+ *       429: { description: Demasiados pedidos }
+ *       503: { description: IA desactivada ou não configurada }
+ */
+app.post("/api/chat", autenticar, limitarChat, async (req, res) => {
   try {
     const { mensagem } = req.body;
     if (!mensagem || !mensagem.trim()) {
@@ -948,6 +1574,20 @@ io.on("connection", (socket) => {
   });
 });
 
+/**
+ * @openapi
+ * /api/chat/messages:
+ *   get:
+ *     summary: Histórico de mensagens de uma sala de curso
+ *     tags: [Chat]
+ *     security: []
+ *     parameters:
+ *       - in: query
+ *         name: curso
+ *         schema: { type: string, default: Geral }
+ *     responses:
+ *       200: { description: Últimas 60 mensagens da sala }
+ */
 app.get("/api/chat/messages", async (req, res) => {
   const curso = req.query.curso || "Geral";
   try {
@@ -986,6 +1626,31 @@ app.get("/api/chat/messages", async (req, res) => {
 // ==========================================
 
 /* Lista todas as mensagens (paginada, filtrável por curso) */
+/**
+ * @openapi
+ * /api/admin/mensagens:
+ *   get:
+ *     summary: Lista mensagens do chat para moderação (admin)
+ *     tags: [Admin]
+ *     parameters:
+ *       - in: query
+ *         name: curso
+ *         schema: { type: string }
+ *     responses:
+ *       200: { description: Até 80 mensagens, mais recentes primeiro }
+ * /api/admin/mensagens/{id}:
+ *   delete:
+ *     summary: Apaga uma mensagem do chat (admin)
+ *     tags: [Admin]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200: { description: Mensagem apagada }
+ *       404: { description: Mensagem não encontrada }
+ */
 app.get("/api/admin/mensagens", autenticar, apenasAdmin, async (req, res) => {
   const curso = req.query.curso || null;
   const limit = 80;
@@ -1032,6 +1697,16 @@ app.delete("/api/admin/mensagens/:id", autenticar, apenasAdmin, async (req, res)
 // ==========================================
 // STATUS
 // ==========================================
+/**
+ * @openapi
+ * /api/status:
+ *   get:
+ *     summary: Verificação de saúde do servidor (health check)
+ *     tags: [Sistema]
+ *     security: []
+ *     responses:
+ *       200: { description: Servidor operacional }
+ */
 app.get("/api/status", (req, res) => {
   res.json({ mensagem: "Servidor Operacional", status: "ONLINE" });
 });
@@ -1042,8 +1717,11 @@ app.get("/api/status", (req, res) => {
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
   const status = err.status || err.statusCode || 400;
-  const mensagem = err.message || "Erro interno do servidor.";
-  console.error(`[ERRO ${status}] ${mensagem}`);
+  console.error(`[ERRO ${status}] ${err.message}`);
+  // Em produção, erros 500 inesperados não expõem detalhes internos ao cliente.
+  // Mensagens de negócio (400/401/403/404, já explícitas nas rotas) continuam iguais.
+  const expoe = status < 500 || process.env.NODE_ENV !== "production";
+  const mensagem = expoe ? (err.message || "Erro interno do servidor.") : "Erro interno do servidor.";
   res.status(status).json({ erro: mensagem });
 });
 
@@ -1064,6 +1742,22 @@ async function runMigrations() {
   }
   try {
     await db.query(`ALTER TABLE materiais ADD COLUMN ia_motivo TEXT NULL`);
+  } catch {
+    // Coluna já existe — ignorar
+  }
+
+  try {
+    await db.query(`ALTER TABLE usuarios ADD COLUMN avatar_url VARCHAR(255) NULL`);
+  } catch {
+    // Coluna já existe — ignorar
+  }
+  try {
+    await db.query(`ALTER TABLE usuarios ADD COLUMN reset_token VARCHAR(255) NULL`);
+  } catch {
+    // Coluna já existe — ignorar
+  }
+  try {
+    await db.query(`ALTER TABLE usuarios ADD COLUMN reset_token_expira DATETIME NULL`);
   } catch {
     // Coluna já existe — ignorar
   }
@@ -1121,7 +1815,43 @@ async function iniciar() {
   });
 }
 
-iniciar().catch(erro => {
-  console.error("Falha fatal ao iniciar o servidor:", erro.message);
-  process.exit(1);
-});
+// ─── Paragem graciosa ───────────────────────────────────────────────────────
+// Importante em containers Docker: o orquestrador manda SIGTERM e espera o
+// processo sair sozinho; sem isto, ligações activas e o pool da BD são
+// cortados abruptamente em vez de fechados de forma limpa.
+let aEncerrar = false;
+async function encerrar(sinal) {
+  if (aEncerrar) return;
+  aEncerrar = true;
+  console.log(`\n[SmartHub] Sinal ${sinal} recebido — a encerrar graciosamente...`);
+  await new Promise((resolve) => io.close(() => resolve()));
+  console.log("[SmartHub] Servidor HTTP e Socket.IO fechados.");
+  try {
+    await db.end();
+    console.log("[SmartHub] Pool de BD fechado.");
+  } catch (erro) {
+    console.error("[SmartHub] Erro ao fechar o pool da BD:", erro.message);
+  }
+  process.exit(0);
+}
+
+// Só arranca o servidor de facto quando este ficheiro é corrido directamente
+// (node server.js) — não quando é importado por testes (require/import), que
+// só precisam do `app` do Express para usar com supertest, sem abrir portas
+// nem ligar à BD/Gemini reais.
+if (require.main === module) {
+  iniciar().catch(erro => {
+    console.error("Falha fatal ao iniciar o servidor:", erro.message);
+    process.exit(1);
+  });
+  process.on("SIGTERM", () => encerrar("SIGTERM"));
+  process.on("SIGINT", () => encerrar("SIGINT"));
+}
+
+module.exports = {
+  app,
+  validar,
+  schemaRegisto, schemaLogin, schemaMaterial, schemaConfig, schemaCurso,
+  schemaPerfilNome, schemaPerfilSenha, schemaEsqueciSenha, schemaReporSenha,
+  verificarConformidadeIA,
+};
