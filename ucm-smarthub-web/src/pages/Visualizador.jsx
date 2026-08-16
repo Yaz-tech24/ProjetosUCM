@@ -119,7 +119,7 @@ const Visualizador = () => {
     return (
       <div className="h-full flex flex-col items-center justify-center p-8 gap-4">
         <div className="w-12 h-12 rounded-full border-4 animate-spin" style={{ borderColor: "rgba(var(--color-navy-mid-rgb),0.12)", borderTopColor: "var(--color-gold)" }} />
-        <p style={{ fontSize: 14, fontWeight: 600, color: "#64748b" }}>A carregar o material...</p>
+        <p style={{ fontSize: 14, fontWeight: 600, color: "var(--text-muted)" }}>A carregar o material...</p>
       </div>
     );
   }
@@ -130,8 +130,8 @@ const Visualizador = () => {
         <div className="w-24 h-24 rounded-[28px] grid place-items-center" style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.18)" }}>
           <DownloadCloud size={38} style={{ color: "#ef4444" }} />
         </div>
-        <h2 style={{ fontSize: 26, fontWeight: 900, color: "var(--color-navy-deep)" }}>Material não encontrado</h2>
-        <p style={{ fontSize: 14, color: "#64748b" }}>Este recurso não existe no repositório.</p>
+        <h2 style={{ fontSize: 26, fontWeight: 900, color: "var(--text-heading)" }}>Material não encontrado</h2>
+        <p style={{ fontSize: 14, color: "var(--text-muted)" }}>Este recurso não existe no repositório.</p>
         <button
           onClick={() => navigate('/repositorio')}
           className="inline-flex items-center gap-2 rounded-2xl px-6 py-3 text-sm font-bold text-white transition-all duration-200 mt-2"
@@ -159,9 +159,9 @@ const Visualizador = () => {
           <button
             onClick={() => navigate("/repositorio")}
             className="inline-flex items-center gap-2 rounded-2xl px-5 py-2.5 text-sm font-bold transition-all duration-200"
-            style={{ background: "#fff", border: "1.5px solid rgba(var(--color-navy-mid-rgb),0.10)", color: "var(--color-navy-mid)", boxShadow: "0 2px 10px rgba(var(--color-navy-mid-rgb),0.06)" }}
+            style={{ background: "var(--surface-card)", border: "1.5px solid var(--border-subtle-strong)", color: "var(--color-navy-mid)", boxShadow: "0 2px 10px rgba(var(--color-navy-mid-rgb),0.06)" }}
             onMouseEnter={e => (e.currentTarget.style.background = "var(--color-navy-mid)", e.currentTarget.style.color = "#fff")}
-            onMouseLeave={e => (e.currentTarget.style.background = "#fff", e.currentTarget.style.color = "var(--color-navy-mid)")}
+            onMouseLeave={e => (e.currentTarget.style.background = "var(--surface-card)", e.currentTarget.style.color = "var(--color-navy-mid)")}
           >
             <ArrowLeft size={17} /> Voltar
           </button>
@@ -173,7 +173,7 @@ const Visualizador = () => {
               className="inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-bold transition-all duration-200"
               style={fav
                 ? { background: "rgba(239,68,68,0.09)", border: "1.5px solid rgba(239,68,68,0.28)", color: "#dc2626" }
-                : { background: "#fff", border: "1.5px solid rgba(var(--color-navy-mid-rgb),0.10)", color: "#64748b", boxShadow: "0 2px 10px rgba(var(--color-navy-mid-rgb),0.06)" }
+                : { background: "var(--surface-card)", border: "1.5px solid var(--border-subtle-strong)", color: "var(--text-muted)", boxShadow: "0 2px 10px rgba(var(--color-navy-mid-rgb),0.06)" }
               }
               title={fav ? "Remover dos favoritos" : "Adicionar aos favoritos"}
             >
@@ -185,7 +185,7 @@ const Visualizador = () => {
             <button
               onClick={handleCopiarLink}
               className="inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-bold transition-all duration-200"
-              style={{ background: "#fff", border: "1.5px solid rgba(var(--color-navy-mid-rgb),0.10)", color: "#64748b", boxShadow: "0 2px 10px rgba(var(--color-navy-mid-rgb),0.06)" }}
+              style={{ background: "var(--surface-card)", border: "1.5px solid var(--border-subtle-strong)", color: "var(--text-muted)", boxShadow: "0 2px 10px rgba(var(--color-navy-mid-rgb),0.06)" }}
             >
               <Share2 size={16} />
               {copiado ? "Copiado!" : "Partilhar"}
@@ -251,13 +251,13 @@ const Visualizador = () => {
         </div>
 
         {/* Info do material */}
-        <div className="rounded-[28px] p-7" style={{ background: "#fff", border: "1px solid rgba(var(--color-navy-mid-rgb),0.08)", boxShadow: "0 4px 28px rgba(var(--color-navy-mid-rgb),0.07)" }}>
-          <h1 style={{ fontSize: 22, fontWeight: 900, color: "var(--color-navy-deep)", marginBottom: 16, lineHeight: 1.3 }}>{material.titulo}</h1>
+        <div className="rounded-[28px] p-7" style={{ background: "var(--surface-card)", border: "1px solid var(--border-subtle)", boxShadow: "0 4px 28px rgba(var(--color-navy-mid-rgb),0.07)" }}>
+          <h1 style={{ fontSize: 22, fontWeight: 900, color: "var(--text-heading)", marginBottom: 16, lineHeight: 1.3 }}>{material.titulo}</h1>
           <div className="flex flex-wrap gap-3">
             {[
-              { label: `📚 ${material.cadeira}`, bg: "var(--color-ice)",              border: "rgba(var(--color-navy-mid-rgb),0.10)", color: "#475569" },
+              { label: `📚 ${material.cadeira}`, bg: "var(--surface-hover)",              border: "var(--border-subtle-strong)", color: "var(--text-body)" },
               { label: `👤 ${material.autor}`,   bg: "rgba(var(--color-navy-mid-rgb),0.06)", border: "rgba(var(--color-navy-mid-rgb),0.12)", color: "var(--color-navy-mid)" },
-              { label: `📅 ${new Date(material.data_upload).toLocaleDateString("pt-PT")}`, bg: "var(--color-ice)", border: "rgba(var(--color-navy-mid-rgb),0.10)", color: "#64748b" },
+              { label: `📅 ${new Date(material.data_upload).toLocaleDateString("pt-PT")}`, bg: "var(--surface-hover)", border: "var(--border-subtle-strong)", color: "var(--text-muted)" },
               { label: material.tipo === 'Vídeo' ? '🎬 Vídeo' : '📄 PDF',    bg: material.tipo === 'Vídeo' ? "#eff6ff" : "#fff1f2", border: material.tipo === 'Vídeo' ? "#bfdbfe" : "#fecdd3", color: material.tipo === 'Vídeo' ? "var(--color-navy-mid)" : "#be123c" },
             ].map(({ label, bg, border, color }) => (
               <span key={label} className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold" style={{ background: bg, border: `1px solid ${border}`, color }}>

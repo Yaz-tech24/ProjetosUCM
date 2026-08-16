@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { BookOpen, Home, Library, ShieldCheck, Search, MessageCircle, LogOut, Bell, X, FileText, PlayCircle } from 'lucide-react';
+import { BookOpen, Home, Library, ShieldCheck, Search, MessageCircle, LogOut, Bell, X, FileText, PlayCircle, Sun, Moon } from 'lucide-react';
 import Chatbot from './Chatbot';
 import api from '../services/api';
 import { useConfig } from '../context/ConfigContext';
+import { useTheme } from '../context/ThemeContext';
 
 const NAV_ITEMS = [
   { label: 'Painel Inicial',  icon: Home,          path: '/dashboard'   },
@@ -13,6 +14,7 @@ const NAV_ITEMS = [
 
 const Layout = ({ usuarioLogado, onLogout }) => {
   const { config } = useConfig();
+  const { tema, alternarTema } = useTheme();
   const navigate  = useNavigate();
   const location  = useLocation();
   const [searchTerm,   setSearchTerm]   = useState('');
@@ -52,7 +54,7 @@ const Layout = ({ usuarioLogado, onLogout }) => {
 
   if (!usuarioLogado) {
     return (
-      <div className="h-screen flex items-center justify-center" style={{ background: "var(--color-ice)" }}>
+      <div className="h-screen flex items-center justify-center" style={{ background: "var(--surface-page)" }}>
         <div className="flex flex-col items-center gap-3">
           <div
             className="w-12 h-12 rounded-full border-4 animate-spin"
@@ -72,9 +74,9 @@ const Layout = ({ usuarioLogado, onLogout }) => {
         radial-gradient(ellipse at 8%  8%,  rgba(var(--color-gold-rgb),.08)    0%, transparent 36%),
         radial-gradient(ellipse at 92% 92%, rgba(0,51,102,.08)     0%, transparent 36%),
         radial-gradient(ellipse at 55% 45%, rgba(var(--color-blue-sky-rgb),.06)  0%, transparent 54%),
-        var(--color-ice)
+        var(--surface-page)
       `,
-      color: "#0f172a",
+      color: "var(--text-body)",
     }}>
 
       {/* ═══ SIDEBAR ══════════════════════════════════════════════ */}
@@ -193,15 +195,21 @@ const Layout = ({ usuarioLogado, onLogout }) => {
 
         {/* Card de utilizador + logout */}
         <div className="relative px-5 pb-7 pt-4 space-y-3 shrink-0" style={{ borderTop: "1px solid rgba(255,255,255,0.07)" }}>
-          <div
-            className="flex items-center gap-3 rounded-2xl p-4"
-            style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.09)" }}
+          <button
+            onClick={() => navigate('/perfil')}
+            className="w-full flex items-center gap-3 rounded-2xl p-4 text-left transition-all duration-200"
+            style={{ background: isActive('/perfil') ? "rgba(255,255,255,0.13)" : "rgba(255,255,255,0.07)", border: `1px solid ${isActive('/perfil') ? "rgba(var(--color-gold-rgb),0.35)" : "rgba(255,255,255,0.09)"}` }}
+            onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.13)")}
+            onMouseLeave={e => (e.currentTarget.style.background = isActive('/perfil') ? "rgba(255,255,255,0.13)" : "rgba(255,255,255,0.07)")}
+            title="Ver perfil"
           >
             <div
-              className="w-11 h-11 rounded-2xl grid place-items-center text-base font-black shrink-0"
+              className="w-11 h-11 rounded-2xl grid place-items-center text-base font-black shrink-0 overflow-hidden"
               style={{ background: "linear-gradient(135deg, var(--color-gold-dark), var(--color-gold), var(--color-gold-light))", color: "var(--color-navy-deep)", boxShadow: "0 4px 14px rgba(var(--color-gold-rgb),0.40)" }}
             >
-              {usuarioLogado.nome?.charAt(0).toUpperCase() || 'U'}
+              {usuarioLogado.avatar_url
+                ? <img src={usuarioLogado.avatar_url} alt={usuarioLogado.nome} className="w-full h-full object-cover" />
+                : usuarioLogado.nome?.charAt(0).toUpperCase() || 'U'}
             </div>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-bold" style={{ color: "#fff" }}>{usuarioLogado.nome}</p>
@@ -210,7 +218,7 @@ const Layout = ({ usuarioLogado, onLogout }) => {
               </p>
             </div>
             <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: "#34d399", boxShadow: "0 0 8px rgba(52,211,153,0.80)" }} />
-          </div>
+          </button>
 
           <button
             onClick={handleLogout}
@@ -231,21 +239,21 @@ const Layout = ({ usuarioLogado, onLogout }) => {
         <header
           className="sticky top-0 z-20 px-8 py-5"
           style={{
-            background: "rgba(var(--color-ice-rgb),0.88)",
+            background: "var(--surface-card-glass)",
             backdropFilter: "blur(28px) saturate(180%)",
             WebkitBackdropFilter: "blur(28px) saturate(180%)",
-            borderBottom: "1px solid rgba(var(--color-navy-mid-rgb),0.08)",
+            borderBottom: "1px solid var(--border-subtle)",
             boxShadow: "0 1px 24px rgba(var(--color-navy-mid-rgb),0.06)",
           }}
         >
           <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
             <div>
-              <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.38em", color: "#94a3b8", textTransform: "uppercase" }}>
+              <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.38em", color: "var(--text-faint)", textTransform: "uppercase" }}>
                 {config.nome_plataforma}
               </p>
-              <h2 className="mt-1.5 leading-tight" style={{ fontSize: 26, fontWeight: 900, color: "var(--color-navy-deep)", letterSpacing: "-0.02em" }}>
+              <h2 className="mt-1.5 leading-tight" style={{ fontSize: 26, fontWeight: 900, color: "var(--text-heading)", letterSpacing: "-0.02em" }}>
                 Bem-vindo,{' '}
-                <span style={{ background: "linear-gradient(135deg, var(--color-navy-deep), var(--color-navy-mid))", WebkitBackgroundClip: "text", backgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+                <span style={{ background: "var(--gradient-accent-text)", WebkitBackgroundClip: "text", backgroundClip: "text", WebkitTextFillColor: "transparent" }}>
                   {usuarioLogado?.nome?.split(' ')[0]}
                 </span>
               </h2>
@@ -256,28 +264,40 @@ const Layout = ({ usuarioLogado, onLogout }) => {
               <form onSubmit={handleSearch} className="flex items-center">
                 <div
                   className="flex items-center gap-3 rounded-2xl px-4 py-3 w-full max-w-sm transition-all duration-200"
-                  style={{ background: "rgba(255,255,255,0.80)", border: "1.5px solid rgba(var(--color-navy-mid-rgb),0.10)", boxShadow: "0 2px 12px rgba(var(--color-navy-mid-rgb),0.05)" }}
+                  style={{ background: "var(--surface-card-glass)", border: "1.5px solid var(--border-subtle-strong)", boxShadow: "0 2px 12px rgba(var(--color-navy-mid-rgb),0.05)" }}
                 >
-                  <Search size={17} style={{ color: "#94a3b8", flexShrink: 0 }} />
+                  <Search size={17} style={{ color: "var(--text-faint)", flexShrink: 0 }} />
                   <input
                     type="text"
                     value={searchTerm}
                     onChange={e => setSearchTerm(e.target.value)}
                     placeholder="Pesquisar materiais... (Enter)"
                     className="bg-transparent outline-none text-sm w-full"
-                    style={{ color: "#0f172a" }}
+                    style={{ color: "var(--text-heading)" }}
                   />
                 </div>
               </form>
+
+              {/* Alternar modo claro/escuro */}
+              <button
+                onClick={alternarTema}
+                className="relative w-11 h-11 rounded-2xl grid place-items-center transition-all duration-200"
+                style={{ background: "var(--surface-card-glass)", border: "1.5px solid var(--border-subtle-strong)", boxShadow: "0 2px 12px rgba(var(--color-navy-mid-rgb),0.05)", color: "var(--text-muted)" }}
+                onMouseEnter={e => (e.currentTarget.style.background = "var(--color-navy-mid)", e.currentTarget.style.color = "var(--color-gold)")}
+                onMouseLeave={e => (e.currentTarget.style.background = "var(--surface-card-glass)", e.currentTarget.style.color = "var(--text-muted)")}
+                title={tema === 'escuro' ? 'Mudar para modo claro' : 'Mudar para modo escuro'}
+              >
+                {tema === 'escuro' ? <Sun size={18} /> : <Moon size={18} />}
+              </button>
 
               {/* Notificações — dropdown com materiais recentes */}
               <div className="relative" ref={notifRef}>
                 <button
                   onClick={loadNotifs}
                   className="relative w-11 h-11 rounded-2xl grid place-items-center transition-all duration-200"
-                  style={{ background: notifOpen ? "var(--color-navy-mid)" : "rgba(255,255,255,0.80)", border: "1.5px solid rgba(var(--color-navy-mid-rgb),0.10)", boxShadow: "0 2px 12px rgba(var(--color-navy-mid-rgb),0.05)", color: notifOpen ? "var(--color-gold)" : "#64748b" }}
+                  style={{ background: notifOpen ? "var(--color-navy-mid)" : "var(--surface-card-glass)", border: "1.5px solid var(--border-subtle-strong)", boxShadow: "0 2px 12px rgba(var(--color-navy-mid-rgb),0.05)", color: notifOpen ? "var(--color-gold)" : "var(--text-muted)" }}
                   onMouseEnter={e => (e.currentTarget.style.background = "var(--color-navy-mid)", e.currentTarget.style.color = "var(--color-gold)")}
-                  onMouseLeave={e => !notifOpen && (e.currentTarget.style.background = "rgba(255,255,255,0.80)", e.currentTarget.style.color = "#64748b")}
+                  onMouseLeave={e => !notifOpen && (e.currentTarget.style.background = "var(--surface-card-glass)", e.currentTarget.style.color = "var(--text-muted)")}
                   title="Materiais recentes"
                 >
                   <Bell size={18} />
@@ -285,7 +305,7 @@ const Layout = ({ usuarioLogado, onLogout }) => {
 
                 {notifOpen && (
                   <div className="absolute right-0 top-14 z-50 w-80 rounded-[20px] overflow-hidden animate-scale-in"
-                    style={{ background: "#fff", border: "1px solid rgba(var(--color-navy-mid-rgb),0.10)", boxShadow: "0 20px 60px rgba(var(--color-navy-mid-rgb),0.18)" }}>
+                    style={{ background: "var(--surface-card)", border: "1px solid var(--border-subtle-strong)", boxShadow: "0 20px 60px rgba(var(--color-navy-mid-rgb),0.18)" }}>
                     {/* Header */}
                     <div className="flex items-center justify-between px-5 py-4"
                       style={{ borderBottom: "1px solid rgba(var(--color-navy-mid-rgb),0.07)", background: "linear-gradient(135deg,var(--color-navy-deep),var(--color-navy-mid))" }}>
@@ -301,12 +321,12 @@ const Layout = ({ usuarioLogado, onLogout }) => {
                           <div className="w-6 h-6 rounded-full border-[3px] animate-spin" style={{ borderColor: "rgba(var(--color-navy-mid-rgb),0.10)", borderTopColor: "var(--color-navy-mid)" }} />
                         </div>
                       ) : notifMats.length === 0 ? (
-                        <p className="text-center py-6 text-sm" style={{ color: "#94a3b8" }}>Nenhum material disponível.</p>
+                        <p className="text-center py-6 text-sm" style={{ color: "var(--text-faint)" }}>Nenhum material disponível.</p>
                       ) : notifMats.map(m => (
                         <button key={m.id} onClick={() => { navigate(`/video/${m.id}`); setNotifOpen(false); }}
                           className="w-full flex items-center gap-3 px-4 py-3 text-left transition-all"
                           style={{ background: "transparent" }}
-                          onMouseEnter={e => e.currentTarget.style.background = "var(--color-ice)"}
+                          onMouseEnter={e => e.currentTarget.style.background = "var(--surface-hover)"}
                           onMouseLeave={e => e.currentTarget.style.background = "transparent"}
                         >
                           <div style={{ width: 34, height: 34, borderRadius: 10, flexShrink: 0, display: "grid", placeItems: "center",
@@ -315,18 +335,18 @@ const Layout = ({ usuarioLogado, onLogout }) => {
                             {m.tipo === 'Vídeo' ? <PlayCircle size={15} style={{ color: "var(--color-navy-mid)" }} /> : <FileText size={15} style={{ color: "#be123c" }} />}
                           </div>
                           <div className="min-w-0 flex-1">
-                            <p className="truncate" style={{ fontSize: 13, fontWeight: 700, color: "var(--color-navy-deep)" }}>{m.titulo}</p>
-                            <p style={{ fontSize: 11, color: "#94a3b8" }}>{m.cadeira}</p>
+                            <p className="truncate" style={{ fontSize: 13, fontWeight: 700, color: "var(--text-heading)" }}>{m.titulo}</p>
+                            <p style={{ fontSize: 11, color: "var(--text-faint)" }}>{m.cadeira}</p>
                           </div>
                         </button>
                       ))}
                     </div>
-                    <div className="px-4 py-3" style={{ borderTop: "1px solid rgba(var(--color-navy-mid-rgb),0.07)" }}>
+                    <div className="px-4 py-3" style={{ borderTop: "1px solid var(--border-subtle)" }}>
                       <button onClick={() => { navigate('/repositorio'); setNotifOpen(false); }}
                         className="w-full rounded-xl py-2 text-xs font-bold transition-all"
-                        style={{ background: "var(--color-ice)", color: "var(--color-navy-mid)" }}
+                        style={{ background: "var(--surface-hover)", color: "var(--color-navy-mid)" }}
                         onMouseEnter={e => e.currentTarget.style.background = "var(--color-ice-mid)"}
-                        onMouseLeave={e => e.currentTarget.style.background = "var(--color-ice)"}
+                        onMouseLeave={e => e.currentTarget.style.background = "var(--surface-hover)"}
                       >
                         Ver todos no Repositório →
                       </button>

@@ -17,28 +17,25 @@ const TIPOS_FICHEIRO_OPCOES = [
 /* Toast de notificação */
 const Toast = ({ message, type, onClose }) => {
   if (!message) return null;
-  const styles = {
-    success: { bg: "rgba(16,185,129,0.09)", border: "rgba(16,185,129,0.28)", color: "#065f46" },
-    error:   { bg: "rgba(239,68,68,0.09)",  border: "rgba(239,68,68,0.28)",  color: "#b91c1c" },
-    warn:    { bg: "rgba(245,158,11,0.09)",  border: "rgba(245,158,11,0.28)", color: "#92400e" },
-  };
-  const s = styles[type] || styles.warn;
+  const cor = type === 'error' ? "#ef4444" : type === 'warn' ? "#f59e0b" : "#10b981";
   return (
     <div
       className="fixed top-6 right-6 z-50 flex items-center gap-3 rounded-2xl px-5 py-4 animate-fade-in"
       style={{
-        background: s.bg,
-        border: `1px solid ${s.border}`,
-        color: s.color,
-        boxShadow: "0 10px 40px rgba(0,0,0,0.12)",
+        background: "var(--surface-card)",
+        border: "1px solid var(--border-subtle-strong)",
+        borderLeftWidth: 3,
+        borderLeftColor: cor,
+        color: "var(--text-heading)",
+        boxShadow: "0 10px 40px rgba(0,0,0,0.16)",
       }}
     >
       {type === 'success'
         ? <CheckCircle size={18} style={{ color: "#10b981", flexShrink: 0 }} />
-        : <AlertTriangle size={18} style={{ color: "#ef4444", flexShrink: 0 }} />
+        : <AlertTriangle size={18} style={{ color: type === 'warn' ? "#f59e0b" : "#ef4444", flexShrink: 0 }} />
       }
       <span style={{ fontSize: 14, fontWeight: 600 }}>{message}</span>
-      <button onClick={onClose} style={{ opacity: 0.45, marginLeft: 8 }} className="hover:opacity-80 transition-opacity">
+      <button onClick={onClose} style={{ opacity: 0.45, marginLeft: 8, color: "var(--text-heading)" }} className="hover:opacity-80 transition-opacity">
         <X size={15} />
       </button>
     </div>
@@ -56,8 +53,8 @@ const ConfirmModal = ({ message, onConfirm, onCancel }) => {
       <div
         className="w-full max-w-sm rounded-[28px] p-8 animate-scale-in"
         style={{
-          background: "#fff",
-          border: "1px solid rgba(var(--color-navy-mid-rgb),0.08)",
+          background: "var(--surface-card)",
+          border: "1px solid var(--border-subtle)",
           boxShadow: "0 30px 90px rgba(var(--color-navy-deep-rgb),0.30)",
         }}
       >
@@ -67,19 +64,19 @@ const ConfirmModal = ({ message, onConfirm, onCancel }) => {
         >
           <AlertTriangle size={30} style={{ color: "#ef4444" }} />
         </div>
-        <h3 style={{ fontSize: 18, fontWeight: 900, color: "var(--color-navy-deep)", textAlign: "center", marginBottom: 8 }}>
+        <h3 style={{ fontSize: 18, fontWeight: 900, color: "var(--text-heading)", textAlign: "center", marginBottom: 8 }}>
           Confirmar acção
         </h3>
-        <p style={{ fontSize: 14, color: "#64748b", textAlign: "center", lineHeight: 1.65, marginBottom: 28 }}>
+        <p style={{ fontSize: 14, color: "var(--text-muted)", textAlign: "center", lineHeight: 1.65, marginBottom: 28 }}>
           {message}
         </p>
         <div className="grid grid-cols-2 gap-3">
           <button
             onClick={onCancel}
             className="rounded-2xl px-5 py-3 text-sm font-bold transition-all duration-200"
-            style={{ background: "var(--color-ice)", border: "1.5px solid rgba(var(--color-navy-mid-rgb),0.10)", color: "#475569" }}
+            style={{ background: "var(--surface-hover)", border: "1.5px solid var(--border-subtle-strong)", color: "var(--text-body)" }}
             onMouseEnter={e => (e.currentTarget.style.background = "var(--color-ice-mid)")}
-            onMouseLeave={e => (e.currentTarget.style.background = "var(--color-ice)")}
+            onMouseLeave={e => (e.currentTarget.style.background = "var(--surface-hover)")}
           >
             Cancelar
           </button>
@@ -176,8 +173,8 @@ const Admin = ({ usuarioLogado }) => {
         >
           <ShieldCheck size={44} style={{ color: "#ef4444" }} />
         </div>
-        <h2 style={{ fontSize: 30, fontWeight: 900, color: "var(--color-navy-deep)", marginBottom: 12 }}>Acesso Negado</h2>
-        <p style={{ fontSize: 15, color: "#64748b", maxWidth: 400, lineHeight: 1.65 }}>
+        <h2 style={{ fontSize: 30, fontWeight: 900, color: "var(--text-heading)", marginBottom: 12 }}>Acesso Negado</h2>
+        <p style={{ fontSize: 15, color: "var(--text-muted)", maxWidth: 400, lineHeight: 1.65 }}>
           Esta área é reservada a administradores da {config.nome_plataforma}.
           O seu perfil actual é de <strong style={{ color: "var(--color-navy-mid)" }}>{usuarioLogado?.papel}</strong>.
         </p>
@@ -397,9 +394,9 @@ const Admin = ({ usuarioLogado }) => {
                 color: "#fff",
                 boxShadow: "0 6px 24px rgba(var(--color-navy-deep-rgb),0.30)",
               } : {
-                background: "rgba(255,255,255,0.85)",
-                border: "1.5px solid rgba(var(--color-navy-mid-rgb),0.10)",
-                color: "#475569",
+                background: "var(--surface-card-glass)",
+                border: "1.5px solid var(--border-subtle-strong)",
+                color: "var(--text-body)",
               }}
             >
               <Icon size={16} />
@@ -421,19 +418,19 @@ const Admin = ({ usuarioLogado }) => {
         <section
           className="rounded-[28px] overflow-hidden"
           style={{
-            background: "#fff",
-            border: "1px solid rgba(var(--color-navy-mid-rgb),0.08)",
+            background: "var(--surface-card)",
+            border: "1px solid var(--border-subtle)",
             boxShadow: "0 4px 32px rgba(var(--color-navy-mid-rgb),0.07)",
           }}
         >
           {/* Cabeçalho da secção */}
           <div
             className="flex items-center justify-between gap-4 px-7 py-5"
-            style={{ borderBottom: "1px solid rgba(var(--color-navy-mid-rgb),0.06)" }}
+            style={{ borderBottom: "1px solid var(--border-subtle)" }}
           >
             <h2
               className="flex items-center gap-2.5"
-              style={{ fontSize: 18, fontWeight: 900, color: "var(--color-navy-deep)" }}
+              style={{ fontSize: 18, fontWeight: 900, color: "var(--text-heading)" }}
             >
               <Clock size={19} style={{ color: "var(--color-navy-mid)" }} />
               Fila de Aprovação
@@ -458,7 +455,7 @@ const Admin = ({ usuarioLogado }) => {
                   className="w-12 h-12 rounded-full border-4 animate-spin mx-auto mb-4"
                   style={{ borderColor: "rgba(var(--color-navy-mid-rgb),0.10)", borderTopColor: "var(--color-navy-mid)" }}
                 />
-                <p style={{ color: "#64748b", fontWeight: 600 }}>Carregando materiais pendentes...</p>
+                <p style={{ color: "var(--text-muted)", fontWeight: 600 }}>Carregando materiais pendentes...</p>
               </div>
             ) : pendentes.length === 0 ? (
               <div
@@ -478,8 +475,8 @@ const Admin = ({ usuarioLogado }) => {
                 >
                   <CheckCircle size={32} style={{ color: "#10b981" }} />
                 </div>
-                <p style={{ fontSize: 18, fontWeight: 900, color: "#065f46" }}>Tudo em dia!</p>
-                <p style={{ fontSize: 14, color: "rgba(6,95,70,0.65)", marginTop: 6 }}>
+                <p style={{ fontSize: 18, fontWeight: 900, color: "var(--status-success-text)" }}>Tudo em dia!</p>
+                <p style={{ fontSize: 14, color: "var(--text-muted)", marginTop: 6 }}>
                   Não há nenhum material aguardando aprovação.
                 </p>
               </div>
@@ -490,8 +487,8 @@ const Admin = ({ usuarioLogado }) => {
                     key={m.id}
                     className="group flex flex-col gap-5 rounded-[24px] p-6 transition-all duration-250"
                     style={{
-                      border: "1px solid rgba(var(--color-navy-mid-rgb),0.08)",
-                      background: "#fff",
+                      border: "1px solid var(--border-subtle)",
+                      background: "var(--surface-card)",
                       boxShadow: "0 2px 14px rgba(var(--color-navy-mid-rgb),0.05)",
                     }}
                     onMouseEnter={e => (e.currentTarget.style.transform = "translateY(-2px)", e.currentTarget.style.boxShadow = "0 10px 36px rgba(var(--color-navy-mid-rgb),0.12)")}
@@ -499,7 +496,7 @@ const Admin = ({ usuarioLogado }) => {
                   >
                     <div>
                       <h3
-                        style={{ fontSize: 20, fontWeight: 900, color: "var(--color-navy-deep)", marginBottom: 12 }}
+                        style={{ fontSize: 20, fontWeight: 900, color: "var(--text-heading)", marginBottom: 12 }}
                         className="group-hover:text-[var(--color-navy-mid)] transition-colors"
                       >
                         {m.titulo}
@@ -519,7 +516,7 @@ const Admin = ({ usuarioLogado }) => {
 
                       <div className="flex flex-wrap gap-2">
                         {[
-                          { label: `👤 ${m.autor}`,   bg: "var(--color-ice)", border: "rgba(var(--color-navy-mid-rgb),0.10)", color: "#475569" },
+                          { label: `👤 ${m.autor}`,   bg: "var(--surface-hover)", border: "var(--border-subtle-strong)", color: "var(--text-body)" },
                           { label: `📚 ${m.cadeira}`, bg: "#eff6ff", border: "#bfdbfe",             color: "var(--color-navy-mid)" },
                           {
                             label: m.tipo === 'Vídeo' ? `▶ ${m.tipo}` : `📄 ${m.tipo}`,
@@ -529,7 +526,7 @@ const Admin = ({ usuarioLogado }) => {
                           },
                           {
                             label: `📅 ${new Date(m.data_upload).toLocaleDateString("pt-PT")}`,
-                            bg: "var(--color-ice)", border: "rgba(var(--color-navy-mid-rgb),0.10)", color: "#64748b",
+                            bg: "var(--surface-hover)", border: "var(--border-subtle-strong)", color: "var(--text-muted)",
                           },
                         ].map(({ label, bg, border, color }) => (
                           <span
@@ -545,7 +542,7 @@ const Admin = ({ usuarioLogado }) => {
 
                     <div
                       className="grid gap-3 sm:grid-cols-2 pt-1"
-                      style={{ borderTop: "1px solid rgba(var(--color-navy-mid-rgb),0.06)" }}
+                      style={{ borderTop: "1px solid var(--border-subtle)" }}
                     >
                       {/* Botão Rejeitar */}
                       <button
@@ -588,13 +585,13 @@ const Admin = ({ usuarioLogado }) => {
         {aba === 'chat' && (
           <section
             className="rounded-[28px] overflow-hidden"
-            style={{ background: "#fff", border: "1px solid rgba(var(--color-navy-mid-rgb),0.08)", boxShadow: "0 4px 32px rgba(var(--color-navy-mid-rgb),0.07)" }}
+            style={{ background: "var(--surface-card)", border: "1px solid var(--border-subtle)", boxShadow: "0 4px 32px rgba(var(--color-navy-mid-rgb),0.07)" }}
           >
             {/* Cabeçalho + filtro */}
             <div className="flex flex-wrap items-center justify-between gap-4 px-7 py-5"
-              style={{ borderBottom: "1px solid rgba(var(--color-navy-mid-rgb),0.06)" }}>
+              style={{ borderBottom: "1px solid var(--border-subtle)" }}>
               <h2 className="flex items-center gap-2.5"
-                style={{ fontSize: 18, fontWeight: 900, color: "var(--color-navy-deep)" }}>
+                style={{ fontSize: 18, fontWeight: 900, color: "var(--text-heading)" }}>
                 <MessageCircle size={19} style={{ color: "var(--color-navy-mid)" }} />
                 Mensagens do Chat
               </h2>
@@ -603,7 +600,7 @@ const Admin = ({ usuarioLogado }) => {
                   value={cursoChatFiltro}
                   onChange={e => setCursoChatFiltro(e.target.value)}
                   className="rounded-2xl px-4 py-2.5 text-sm outline-none appearance-none"
-                  style={{ background: "var(--color-ice)", border: "1.5px solid rgba(var(--color-navy-mid-rgb),0.09)", color: "#334155", minWidth: 180 }}
+                  style={{ background: "var(--surface-input)", border: "1.5px solid var(--border-subtle-strong)", color: "var(--text-body)", minWidth: 180 }}
                 >
                   <option value="">Todos os cursos</option>
                   {cursos.map(c => <option key={c.id} value={c.nome}>{c.nome}</option>)}
@@ -611,7 +608,7 @@ const Admin = ({ usuarioLogado }) => {
                 <button
                   onClick={() => fetchMensagens(cursoChatFiltro)}
                   className="rounded-2xl px-4 py-2.5 text-sm font-bold transition-all"
-                  style={{ background: "var(--color-ice)", border: "1.5px solid rgba(var(--color-navy-mid-rgb),0.09)", color: "var(--color-navy-mid)" }}
+                  style={{ background: "var(--surface-hover)", border: "1.5px solid var(--border-subtle-strong)", color: "var(--color-navy-mid)" }}
                 >
                   Actualizar
                 </button>
@@ -623,13 +620,13 @@ const Admin = ({ usuarioLogado }) => {
                 <div className="text-center p-12">
                   <div className="w-10 h-10 rounded-full border-4 animate-spin mx-auto mb-3"
                     style={{ borderColor: "rgba(var(--color-navy-mid-rgb),0.10)", borderTopColor: "var(--color-navy-mid)" }} />
-                  <p style={{ color: "#64748b", fontWeight: 600 }}>A carregar mensagens...</p>
+                  <p style={{ color: "var(--text-muted)", fontWeight: 600 }}>A carregar mensagens...</p>
                 </div>
               ) : mensagens.length === 0 ? (
                 <div className="text-center rounded-[24px] p-12"
-                  style={{ border: "2px dashed rgba(var(--color-navy-mid-rgb),0.10)", background: "#f8faff" }}>
-                  <MessageCircle size={32} style={{ color: "#cbd5e1", margin: "0 auto 12px" }} />
-                  <p style={{ fontSize: 16, fontWeight: 900, color: "#94a3b8" }}>Nenhuma mensagem encontrada.</p>
+                  style={{ border: "2px dashed var(--border-subtle-strong)", background: "var(--surface-hover)" }}>
+                  <MessageCircle size={32} style={{ color: "var(--text-faint)", margin: "0 auto 12px" }} />
+                  <p style={{ fontSize: 16, fontWeight: 900, color: "var(--text-faint)" }}>Nenhuma mensagem encontrada.</p>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -637,9 +634,9 @@ const Admin = ({ usuarioLogado }) => {
                     <div
                       key={msg.id}
                       className="group flex items-start gap-4 rounded-[18px] px-5 py-4 transition-all"
-                      style={{ background: "#f8faff", border: "1px solid rgba(var(--color-navy-mid-rgb),0.06)" }}
-                      onMouseEnter={e => e.currentTarget.style.borderColor = "rgba(var(--color-navy-mid-rgb),0.14)"}
-                      onMouseLeave={e => e.currentTarget.style.borderColor = "rgba(var(--color-navy-mid-rgb),0.06)"}
+                      style={{ background: "var(--surface-hover)", border: "1px solid var(--border-subtle)" }}
+                      onMouseEnter={e => e.currentTarget.style.borderColor = "var(--border-subtle-strong)"}
+                      onMouseLeave={e => e.currentTarget.style.borderColor = "var(--border-subtle)"}
                     >
                       {/* Avatar */}
                       <div style={{
@@ -654,16 +651,16 @@ const Admin = ({ usuarioLogado }) => {
                       {/* Conteúdo */}
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-wrap items-center gap-2 mb-1">
-                          <span style={{ fontSize: 13, fontWeight: 800, color: "var(--color-navy-deep)" }}>{msg.userName}</span>
+                          <span style={{ fontSize: 13, fontWeight: 800, color: "var(--text-heading)" }}>{msg.userName}</span>
                           <span className="rounded-full px-2.5 py-0.5 text-[10px] font-bold"
                             style={{ background: "#eff6ff", border: "1px solid #bfdbfe", color: "var(--color-navy-mid)", letterSpacing: "0.15em" }}>
                             {msg.curso}
                           </span>
-                          <span style={{ fontSize: 11, color: "#94a3b8" }}>
+                          <span style={{ fontSize: 11, color: "var(--text-faint)" }}>
                             {new Date(msg.timestamp).toLocaleString("pt-PT")}
                           </span>
                         </div>
-                        <p style={{ fontSize: 14, color: "#334155", lineHeight: 1.55 }}>{msg.message}</p>
+                        <p style={{ fontSize: 14, color: "var(--text-body)", lineHeight: 1.55 }}>{msg.message}</p>
                       </div>
 
                       {/* Botão apagar */}
@@ -690,11 +687,11 @@ const Admin = ({ usuarioLogado }) => {
             <form onSubmit={handleSalvarConfig}>
               <section
                 className="rounded-[28px] overflow-hidden"
-                style={{ background: "#fff", border: "1px solid rgba(var(--color-navy-mid-rgb),0.08)", boxShadow: "0 4px 32px rgba(var(--color-navy-mid-rgb),0.07)" }}
+                style={{ background: "var(--surface-card)", border: "1px solid var(--border-subtle)", boxShadow: "0 4px 32px rgba(var(--color-navy-mid-rgb),0.07)" }}
               >
-                <div className="flex items-center gap-2.5 px-7 py-5" style={{ borderBottom: "1px solid rgba(var(--color-navy-mid-rgb),0.06)" }}>
+                <div className="flex items-center gap-2.5 px-7 py-5" style={{ borderBottom: "1px solid var(--border-subtle)" }}>
                   <Settings size={19} style={{ color: "var(--color-navy-mid)" }} />
-                  <h2 style={{ fontSize: 18, fontWeight: 900, color: "var(--color-navy-deep)" }}>Identidade e Funcionalidades</h2>
+                  <h2 style={{ fontSize: 18, fontWeight: 900, color: "var(--text-heading)" }}>Identidade e Funcionalidades</h2>
                 </div>
 
                 <div className="p-7 space-y-6">
@@ -702,8 +699,8 @@ const Admin = ({ usuarioLogado }) => {
                   <div className="flex items-center gap-5">
                     <div style={{
                       width: 72, height: 72, borderRadius: 20, display: "grid", placeItems: "center",
-                      background: configForm.logo_url ? "var(--color-ice)" : "linear-gradient(135deg,var(--color-gold-dark),var(--color-gold))",
-                      border: "1px solid rgba(var(--color-navy-mid-rgb),0.10)", overflow: "hidden", flexShrink: 0,
+                      background: configForm.logo_url ? "var(--surface-hover)" : "linear-gradient(135deg,var(--color-gold-dark),var(--color-gold))",
+                      border: "1px solid var(--border-subtle-strong)", overflow: "hidden", flexShrink: 0,
                     }}>
                       {configForm.logo_url
                         ? <img src={configForm.logo_url} alt="Logótipo" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
@@ -712,7 +709,7 @@ const Admin = ({ usuarioLogado }) => {
                     <div className="flex flex-col gap-2 items-start">
                       <label
                         className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold cursor-pointer transition-all"
-                        style={{ background: "var(--color-ice)", border: "1.5px solid rgba(var(--color-navy-mid-rgb),0.10)", color: "var(--color-navy-mid)" }}
+                        style={{ background: "var(--surface-input)", border: "1.5px solid var(--border-subtle-strong)", color: "var(--color-navy-mid)" }}
                       >
                         <Upload size={15} /> {logoUploading ? "A enviar..." : "Carregar logótipo"}
                         <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" onChange={handleLogoUpload} disabled={logoUploading} className="hidden" />
@@ -727,52 +724,52 @@ const Admin = ({ usuarioLogado }) => {
 
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div>
-                      <label style={{ display: "block", marginBottom: 8, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.22em", color: "#64748b" }}>Nome da plataforma</label>
+                      <label style={{ display: "block", marginBottom: 8, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.22em", color: "var(--text-muted)" }}>Nome da plataforma</label>
                       <input required value={configForm.nome_plataforma}
                         onChange={e => setConfigForm(f => ({ ...f, nome_plataforma: e.target.value }))}
                         className="w-full rounded-2xl px-5 py-3.5 text-sm outline-none"
-                        style={{ background: "var(--color-ice)", border: "1.5px solid rgba(var(--color-navy-mid-rgb),0.10)", color: "#0f172a" }} />
+                        style={{ background: "var(--surface-input)", border: "1.5px solid var(--border-subtle-strong)", color: "var(--text-heading)" }} />
                     </div>
                     <div>
-                      <label style={{ display: "block", marginBottom: 8, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.22em", color: "#64748b" }}>Tagline</label>
+                      <label style={{ display: "block", marginBottom: 8, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.22em", color: "var(--text-muted)" }}>Tagline</label>
                       <input value={configForm.tagline}
                         onChange={e => setConfigForm(f => ({ ...f, tagline: e.target.value }))}
                         className="w-full rounded-2xl px-5 py-3.5 text-sm outline-none"
-                        style={{ background: "var(--color-ice)", border: "1.5px solid rgba(var(--color-navy-mid-rgb),0.10)", color: "#0f172a" }} />
+                        style={{ background: "var(--surface-input)", border: "1.5px solid var(--border-subtle-strong)", color: "var(--text-heading)" }} />
                     </div>
                   </div>
 
                   <div>
-                    <label style={{ display: "block", marginBottom: 8, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.22em", color: "#64748b" }}>Propósito da plataforma</label>
+                    <label style={{ display: "block", marginBottom: 8, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.22em", color: "var(--text-muted)" }}>Propósito da plataforma</label>
                     <textarea rows={3} value={configForm.descricao_proposito || ''}
                       onChange={e => setConfigForm(f => ({ ...f, descricao_proposito: e.target.value }))}
                       className="w-full rounded-2xl px-5 py-3.5 text-sm outline-none resize-none"
-                      style={{ background: "var(--color-ice)", border: "1.5px solid rgba(var(--color-navy-mid-rgb),0.10)", color: "#0f172a" }} />
-                    <p style={{ fontSize: 11, color: "#94a3b8", marginTop: 6, lineHeight: 1.5 }}>
+                      style={{ background: "var(--surface-input)", border: "1.5px solid var(--border-subtle-strong)", color: "var(--text-heading)" }} />
+                    <p style={{ fontSize: 11, color: "var(--text-faint)", marginTop: 6, lineHeight: 1.5 }}>
                       Mostrado publicamente e usado pela IA para avaliar se os materiais submetidos correspondem ao propósito da plataforma.
                     </p>
                   </div>
 
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div>
-                      <label style={{ display: "block", marginBottom: 8, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.22em", color: "#64748b" }}>Email de contacto</label>
+                      <label style={{ display: "block", marginBottom: 8, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.22em", color: "var(--text-muted)" }}>Email de contacto</label>
                       <input type="email" value={configForm.contacto_email || ''}
                         onChange={e => setConfigForm(f => ({ ...f, contacto_email: e.target.value }))}
                         className="w-full rounded-2xl px-5 py-3.5 text-sm outline-none"
-                        style={{ background: "var(--color-ice)", border: "1.5px solid rgba(var(--color-navy-mid-rgb),0.10)", color: "#0f172a" }} />
+                        style={{ background: "var(--surface-input)", border: "1.5px solid var(--border-subtle-strong)", color: "var(--text-heading)" }} />
                     </div>
                     <div>
-                      <label style={{ display: "block", marginBottom: 8, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.22em", color: "#64748b" }}>Localização</label>
+                      <label style={{ display: "block", marginBottom: 8, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.22em", color: "var(--text-muted)" }}>Localização</label>
                       <input value={configForm.localizacao || ''}
                         onChange={e => setConfigForm(f => ({ ...f, localizacao: e.target.value }))}
                         className="w-full rounded-2xl px-5 py-3.5 text-sm outline-none"
-                        style={{ background: "var(--color-ice)", border: "1.5px solid rgba(var(--color-navy-mid-rgb),0.10)", color: "#0f172a" }} />
+                        style={{ background: "var(--surface-input)", border: "1.5px solid var(--border-subtle-strong)", color: "var(--text-heading)" }} />
                     </div>
                   </div>
 
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div>
-                      <label style={{ display: "block", marginBottom: 8, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.22em", color: "#64748b" }}>Cor primária</label>
+                      <label style={{ display: "block", marginBottom: 8, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.22em", color: "var(--text-muted)" }}>Cor primária</label>
                       <div className="flex items-center gap-3">
                         <input type="color" value={configForm.cor_primaria}
                           onChange={e => setConfigForm(f => ({ ...f, cor_primaria: e.target.value }))}
@@ -780,11 +777,11 @@ const Admin = ({ usuarioLogado }) => {
                         <input type="text" value={configForm.cor_primaria}
                           onChange={e => setConfigForm(f => ({ ...f, cor_primaria: e.target.value }))}
                           className="flex-1 rounded-2xl px-4 py-3 text-sm outline-none font-mono"
-                          style={{ background: "var(--color-ice)", border: "1.5px solid rgba(var(--color-navy-mid-rgb),0.10)", color: "#0f172a" }} />
+                          style={{ background: "var(--surface-input)", border: "1.5px solid var(--border-subtle-strong)", color: "var(--text-heading)" }} />
                       </div>
                     </div>
                     <div>
-                      <label style={{ display: "block", marginBottom: 8, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.22em", color: "#64748b" }}>Cor de destaque</label>
+                      <label style={{ display: "block", marginBottom: 8, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.22em", color: "var(--text-muted)" }}>Cor de destaque</label>
                       <div className="flex items-center gap-3">
                         <input type="color" value={configForm.cor_destaque}
                           onChange={e => setConfigForm(f => ({ ...f, cor_destaque: e.target.value }))}
@@ -792,14 +789,14 @@ const Admin = ({ usuarioLogado }) => {
                         <input type="text" value={configForm.cor_destaque}
                           onChange={e => setConfigForm(f => ({ ...f, cor_destaque: e.target.value }))}
                           className="flex-1 rounded-2xl px-4 py-3 text-sm outline-none font-mono"
-                          style={{ background: "var(--color-ice)", border: "1.5px solid rgba(var(--color-navy-mid-rgb),0.10)", color: "#0f172a" }} />
+                          style={{ background: "var(--surface-input)", border: "1.5px solid var(--border-subtle-strong)", color: "var(--text-heading)" }} />
                       </div>
                     </div>
                   </div>
 
                   {/* Toggles de funcionalidades */}
                   <div>
-                    <label style={{ display: "block", marginBottom: 10, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.22em", color: "#64748b" }}>Funcionalidades</label>
+                    <label style={{ display: "block", marginBottom: 10, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.22em", color: "var(--text-muted)" }}>Funcionalidades</label>
                     <div className="grid gap-3 sm:grid-cols-3">
                       {[
                         { key: 'chat_activado',          label: 'Chat entre estudantes' },
@@ -810,7 +807,7 @@ const Admin = ({ usuarioLogado }) => {
                           className="flex items-center justify-between gap-3 rounded-2xl px-4 py-3.5 text-sm font-bold transition-all"
                           style={configForm[key]
                             ? { background: "rgba(16,185,129,0.08)", border: "1.5px solid rgba(16,185,129,0.30)", color: "#065f46" }
-                            : { background: "var(--color-ice)", border: "1.5px solid rgba(var(--color-navy-mid-rgb),0.10)", color: "#64748b" }}
+                            : { background: "var(--surface-input)", border: "1.5px solid var(--border-subtle-strong)", color: "var(--text-muted)" }}
                         >
                           {label}
                           <span style={{ width: 34, height: 20, borderRadius: 99, background: configForm[key] ? "#10b981" : "#cbd5e1", position: "relative", flexShrink: 0, transition: "background .2s" }}>
@@ -823,7 +820,7 @@ const Admin = ({ usuarioLogado }) => {
 
                   {/* Tipos de ficheiro */}
                   <div>
-                    <label style={{ display: "block", marginBottom: 10, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.22em", color: "#64748b" }}>Tipos de ficheiro permitidos</label>
+                    <label style={{ display: "block", marginBottom: 10, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.22em", color: "var(--text-muted)" }}>Tipos de ficheiro permitidos</label>
                     <div className="flex flex-wrap gap-2">
                       {TIPOS_FICHEIRO_OPCOES.map(({ valor, label }) => {
                         const activo = configForm.tipos_ficheiro_permitidos.includes(valor);
@@ -832,7 +829,7 @@ const Admin = ({ usuarioLogado }) => {
                             className="rounded-xl px-4 py-2.5 text-xs font-bold transition-all"
                             style={activo
                               ? { background: "linear-gradient(135deg,var(--color-navy-deep),var(--color-navy-mid))", color: "#fff" }
-                              : { background: "var(--color-ice)", border: "1.5px solid rgba(var(--color-navy-mid-rgb),0.10)", color: "#64748b" }}
+                              : { background: "var(--surface-input)", border: "1.5px solid var(--border-subtle-strong)", color: "var(--text-muted)" }}
                           >
                             {label}
                           </button>
@@ -842,11 +839,11 @@ const Admin = ({ usuarioLogado }) => {
                   </div>
 
                   <div className="max-w-xs">
-                    <label style={{ display: "block", marginBottom: 8, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.22em", color: "#64748b" }}>Tamanho máximo por ficheiro (MB)</label>
+                    <label style={{ display: "block", marginBottom: 8, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.22em", color: "var(--text-muted)" }}>Tamanho máximo por ficheiro (MB)</label>
                     <input type="number" min={1} max={500} value={configForm.tamanho_maximo_mb}
                       onChange={e => setConfigForm(f => ({ ...f, tamanho_maximo_mb: e.target.value }))}
                       className="w-full rounded-2xl px-5 py-3.5 text-sm outline-none"
-                      style={{ background: "var(--color-ice)", border: "1.5px solid rgba(var(--color-navy-mid-rgb),0.10)", color: "#0f172a" }} />
+                      style={{ background: "var(--surface-input)", border: "1.5px solid var(--border-subtle-strong)", color: "var(--text-heading)" }} />
                   </div>
 
                   <button type="submit" disabled={savingConfig}
@@ -862,17 +859,17 @@ const Admin = ({ usuarioLogado }) => {
             {/* Cursos / Disciplinas */}
             <section
               className="rounded-[28px] overflow-hidden"
-              style={{ background: "#fff", border: "1px solid rgba(var(--color-navy-mid-rgb),0.08)", boxShadow: "0 4px 32px rgba(var(--color-navy-mid-rgb),0.07)" }}
+              style={{ background: "var(--surface-card)", border: "1px solid var(--border-subtle)", boxShadow: "0 4px 32px rgba(var(--color-navy-mid-rgb),0.07)" }}
             >
-              <div className="flex items-center gap-2.5 px-7 py-5" style={{ borderBottom: "1px solid rgba(var(--color-navy-mid-rgb),0.06)" }}>
+              <div className="flex items-center gap-2.5 px-7 py-5" style={{ borderBottom: "1px solid var(--border-subtle)" }}>
                 <ShieldCheck size={19} style={{ color: "var(--color-navy-mid)" }} />
-                <h2 style={{ fontSize: 18, fontWeight: 900, color: "var(--color-navy-deep)" }}>Cursos / Disciplinas</h2>
+                <h2 style={{ fontSize: 18, fontWeight: 900, color: "var(--text-heading)" }}>Cursos / Disciplinas</h2>
               </div>
               <div className="p-7">
                 <form onSubmit={handleAdicionarCurso} className="flex gap-3 mb-6">
                   <input value={novoCurso} onChange={e => setNovoCurso(e.target.value)} placeholder="Nome do novo curso"
                     className="flex-1 rounded-2xl px-5 py-3.5 text-sm outline-none"
-                    style={{ background: "var(--color-ice)", border: "1.5px solid rgba(var(--color-navy-mid-rgb),0.10)", color: "#0f172a" }} />
+                    style={{ background: "var(--surface-input)", border: "1.5px solid var(--border-subtle-strong)", color: "var(--text-heading)" }} />
                   <button type="submit"
                     className="inline-flex items-center gap-2 rounded-2xl px-5 py-3.5 text-sm font-bold text-white shrink-0 transition-all"
                     style={{ background: "linear-gradient(135deg,var(--color-navy-deep),var(--color-navy-mid))" }}>
@@ -881,17 +878,17 @@ const Admin = ({ usuarioLogado }) => {
                 </form>
                 <div className="flex flex-wrap gap-2">
                   {cursos.length === 0 && (
-                    <p style={{ fontSize: 13, color: "#94a3b8" }}>Nenhum curso configurado ainda.</p>
+                    <p style={{ fontSize: 13, color: "var(--text-faint)" }}>Nenhum curso configurado ainda.</p>
                   )}
                   {cursos.map(c => (
                     <span key={c.id}
                       className="inline-flex items-center gap-2 rounded-full pl-4 pr-2 py-2 text-sm font-semibold"
-                      style={{ background: "var(--color-ice)", border: "1px solid rgba(var(--color-navy-mid-rgb),0.10)", color: "#334155" }}
+                      style={{ background: "var(--surface-hover)", border: "1px solid var(--border-subtle-strong)", color: "var(--text-body)" }}
                     >
                       {c.nome}
                       <button type="button" onClick={() => handleRemoverCurso(c.id)}
                         className="rounded-full p-1 transition-colors"
-                        style={{ color: "#94a3b8" }}
+                        style={{ color: "var(--text-faint)" }}
                         title="Remover curso"
                       >
                         <X size={13} />

@@ -116,11 +116,11 @@ const Chat = ({ usuarioLogado }) => {
   if (!config.chat_activado) {
     return (
       <div className="h-full flex flex-col items-center justify-center p-8 text-center gap-4 animate-fade-in">
-        <div className="w-20 h-20 rounded-[28px] grid place-items-center" style={{ background: "var(--color-ice)", border: "1px solid rgba(var(--color-navy-mid-rgb),0.08)" }}>
-          <Users size={32} style={{ color: "#94a3b8" }} />
+        <div className="w-20 h-20 rounded-[28px] grid place-items-center" style={{ background: "var(--surface-hover)", border: "1px solid var(--border-subtle)" }}>
+          <Users size={32} style={{ color: "var(--text-faint)" }} />
         </div>
-        <h2 style={{ fontSize: 22, fontWeight: 900, color: "var(--color-navy-deep)" }}>Chat desactivado</h2>
-        <p style={{ fontSize: 14, color: "#64748b", maxWidth: 360 }}>
+        <h2 style={{ fontSize: 22, fontWeight: 900, color: "var(--text-heading)" }}>Chat desactivado</h2>
+        <p style={{ fontSize: 14, color: "var(--text-muted)", maxWidth: 360 }}>
           O chat entre estudantes foi desactivado pelo administrador.
         </p>
       </div>
@@ -134,21 +134,21 @@ const Chat = ({ usuarioLogado }) => {
       <div className="fixed inset-0 z-50 flex items-center justify-center px-4"
         style={{ background: "rgba(var(--color-navy-abyss-rgb),0.55)", backdropFilter: "blur(8px)" }}>
         <div className="w-full max-w-sm rounded-[28px] p-8 animate-scale-in"
-          style={{ background: "#fff", boxShadow: "0 30px 90px rgba(var(--color-navy-deep-rgb),0.30)" }}>
+          style={{ background: "var(--surface-card)", boxShadow: "0 30px 90px rgba(var(--color-navy-deep-rgb),0.30)" }}>
           <div className="w-14 h-14 rounded-[18px] grid place-items-center mx-auto mb-5"
             style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.20)" }}>
             <Trash2 size={26} style={{ color: "#ef4444" }} />
           </div>
-          <h3 style={{ fontSize: 17, fontWeight: 900, color: "var(--color-navy-deep)", textAlign: "center", marginBottom: 8 }}>
+          <h3 style={{ fontSize: 17, fontWeight: 900, color: "var(--text-heading)", textAlign: "center", marginBottom: 8 }}>
             Apagar mensagem?
           </h3>
-          <p style={{ fontSize: 13, color: "#64748b", textAlign: "center", lineHeight: 1.6, marginBottom: 24 }}>
+          <p style={{ fontSize: 13, color: "var(--text-muted)", textAlign: "center", lineHeight: 1.6, marginBottom: 24 }}>
             Esta acção é permanente e remove a mensagem para todos os utilizadores.
           </p>
           <div className="grid grid-cols-2 gap-3">
             <button onClick={() => setConfirmDelete(null)}
               className="rounded-2xl px-4 py-3 text-sm font-bold transition-all"
-              style={{ background: "var(--color-ice)", border: "1.5px solid rgba(var(--color-navy-mid-rgb),0.10)", color: "#475569" }}>
+              style={{ background: "var(--surface-hover)", border: "1.5px solid var(--border-subtle-strong)", color: "var(--text-body)" }}>
               Cancelar
             </button>
             <button onClick={() => apagarMensagem(confirmDelete)}
@@ -165,8 +165,8 @@ const Chat = ({ usuarioLogado }) => {
       className="flex h-[calc(100vh-160px)] flex-col overflow-hidden animate-fade-in"
       style={{
         borderRadius: 32,
-        border: "1px solid rgba(var(--color-navy-mid-rgb),0.08)",
-        background: "#fff",
+        border: "1px solid var(--border-subtle)",
+        background: "var(--surface-card)",
         boxShadow: "0 10px 56px rgba(var(--color-navy-mid-rgb),0.12)",
       }}
     >
@@ -235,7 +235,7 @@ const Chat = ({ usuarioLogado }) => {
                 className="shrink-0 px-4 py-2.5 rounded-t-xl text-xs font-bold transition-all duration-200"
                 style={active
                   ? {
-                      background: "#fff",
+                      background: "var(--surface-card)",
                       color: "var(--color-navy-mid)",
                       borderBottom: "3px solid var(--color-gold)",
                       boxShadow: "0 -2px 12px rgba(var(--color-gold-rgb),0.15)",
@@ -264,7 +264,7 @@ const Chat = ({ usuarioLogado }) => {
             radial-gradient(ellipse at 20% 25%, rgba(var(--color-blue-accent-rgb),.06)  0%, transparent 50%),
             radial-gradient(ellipse at 80% 75%, rgba(var(--color-blue-sky-rgb),.05) 0%, transparent 50%),
             radial-gradient(ellipse at 50% 50%, rgba(var(--color-gold-rgb),.025) 0%, transparent 55%),
-            var(--color-ice)
+            var(--surface-page)
           `
         }}
       >
@@ -280,14 +280,14 @@ const Chat = ({ usuarioLogado }) => {
             <div
               className="w-16 h-16 rounded-2xl grid place-items-center"
               style={{
-                background: "var(--color-ice)",
-                border: "1px solid rgba(var(--color-navy-mid-rgb),0.08)",
+                background: "var(--surface-card)",
+                border: "1px solid var(--border-subtle)",
               }}
             >
-              <Users size={26} style={{ color: "#94a3b8" }} />
+              <Users size={26} style={{ color: "var(--text-faint)" }} />
             </div>
-            <p style={{ fontWeight: 800, color: "#475569", fontSize: 16 }}>Sala {cursoActivo} vazia</p>
-            <p style={{ fontSize: 14, color: "#94a3b8" }}>Seja o primeiro a iniciar a conversa neste curso!</p>
+            <p style={{ fontWeight: 800, color: "var(--text-body)", fontSize: 16 }}>Sala {cursoActivo} vazia</p>
+            <p style={{ fontSize: 14, color: "var(--text-faint)" }}>Seja o primeiro a iniciar a conversa neste curso!</p>
           </div>
         ) : (
           messages.map((msg, index) => {
@@ -329,9 +329,9 @@ const Chat = ({ usuarioLogado }) => {
                     borderBottomRightRadius: 6,
                     boxShadow: "0 6px 20px rgba(var(--color-gold-rgb),0.35)",
                   } : {
-                    background: "#fff",
-                    color: "#334155",
-                    border: "1px solid rgba(var(--color-navy-mid-rgb),0.08)",
+                    background: "var(--surface-card)",
+                    color: "var(--text-body)",
+                    border: "1px solid var(--border-subtle)",
                     borderBottomLeftRadius: 6,
                     boxShadow: "0 2px 10px rgba(var(--color-navy-mid-rgb),0.06)",
                   }}
@@ -340,7 +340,7 @@ const Chat = ({ usuarioLogado }) => {
                     style={{
                       fontSize: 10, fontWeight: 700, textTransform: "uppercase",
                       letterSpacing: "0.2em", marginBottom: 6,
-                      color: isOwn ? "rgba(var(--color-navy-deep-rgb),0.50)" : "rgba(var(--color-navy-mid-rgb),0.55)",
+                      color: isOwn ? "rgba(var(--color-navy-deep-rgb),0.50)" : "var(--text-faint)",
                     }}
                   >
                     {msg.userName}
@@ -349,7 +349,7 @@ const Chat = ({ usuarioLogado }) => {
                   <div
                     style={{
                       fontSize: 10, marginTop: 6,
-                      color: isOwn ? "rgba(var(--color-navy-deep-rgb),0.38)" : "#94a3b8",
+                      color: isOwn ? "rgba(var(--color-navy-deep-rgb),0.38)" : "var(--text-faint)",
                     }}
                   >
                     {new Date(msg.timestamp).toLocaleTimeString("pt-PT")}
@@ -393,9 +393,9 @@ const Chat = ({ usuarioLogado }) => {
         <div
           className="mx-6 mb-0 mt-3 flex items-center gap-3 rounded-2xl px-4 py-3 animate-fade-in shrink-0"
           style={{
-            background: "rgba(239,68,68,0.08)",
-            border: "1px solid rgba(239,68,68,0.28)",
-            color: "#b91c1c",
+            background: "var(--status-danger-bg)",
+            border: "1px solid var(--status-danger-border)",
+            color: "var(--status-danger-text)",
           }}
         >
           <ShieldAlert size={16} style={{ flexShrink: 0, color: "#ef4444" }} />
@@ -407,8 +407,8 @@ const Chat = ({ usuarioLogado }) => {
       <footer
         className="px-6 py-5 shrink-0"
         style={{
-          borderTop: "1px solid rgba(var(--color-navy-mid-rgb),0.08)",
-          background: "#fff",
+          borderTop: "1px solid var(--border-subtle)",
+          background: "var(--surface-card)",
         }}
       >
         <form onSubmit={sendMessage} className="flex flex-col gap-3 sm:flex-row">
@@ -420,18 +420,18 @@ const Chat = ({ usuarioLogado }) => {
               placeholder={`Mensagem em ${cursoActivo}...`}
               className="w-full rounded-2xl px-5 py-4 text-sm outline-none transition-all duration-200"
               style={{
-                background: "var(--color-ice)",
-                border: `1.5px solid ${newMessage.length >= 480 ? "rgba(245,158,11,0.50)" : "rgba(var(--color-navy-mid-rgb),0.09)"}`,
-                color: "#0f172a",
+                background: "var(--surface-input)",
+                border: `1.5px solid ${newMessage.length >= 480 ? "rgba(245,158,11,0.50)" : "var(--border-subtle-strong)"}`,
+                color: "var(--text-heading)",
                 paddingRight: newMessage.length > 400 ? "4rem" : undefined,
               }}
-              onFocus={e => (e.target.style.borderColor = "var(--color-navy-mid)", e.target.style.background = "#fff", e.target.style.boxShadow = "0 0 0 4px rgba(var(--color-navy-mid-rgb),0.07)")}
-              onBlur={e => (e.target.style.borderColor = newMessage.length >= 480 ? "rgba(245,158,11,0.50)" : "rgba(var(--color-navy-mid-rgb),0.09)", e.target.style.background = "var(--color-ice)", e.target.style.boxShadow = "")}
+              onFocus={e => (e.target.style.borderColor = "var(--color-navy-mid)", e.target.style.background = "var(--surface-card)", e.target.style.boxShadow = "0 0 0 4px rgba(var(--color-navy-mid-rgb),0.07)")}
+              onBlur={e => (e.target.style.borderColor = newMessage.length >= 480 ? "rgba(245,158,11,0.50)" : "var(--border-subtle-strong)", e.target.style.background = "var(--surface-input)", e.target.style.boxShadow = "")}
               required
             />
             {newMessage.length > 400 && (
               <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-semibold pointer-events-none"
-                style={{ color: newMessage.length >= 480 ? "#f59e0b" : "#94a3b8" }}>
+                style={{ color: newMessage.length >= 480 ? "#f59e0b" : "var(--text-faint)" }}>
                 {500 - newMessage.length}
               </span>
             )}

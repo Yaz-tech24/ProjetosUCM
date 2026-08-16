@@ -44,15 +44,15 @@ const FloatCard = ({ icon: Icon, label, value, delay, style }) => (
 /* ── Input reutilizável — DEVE estar fora do Login para não re-montar a cada render ── */
 const InputField = ({ icon, ...props }) => (
   <div className="relative">
-    <div className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2" style={{ color: "#94a3b8" }}>
+    <div className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2" style={{ color: "var(--text-faint)" }}>
       {icon}
     </div>
     <input
       {...props}
-      className="w-full rounded-2xl py-4 pl-12 pr-4 text-sm text-slate-800 outline-none transition-all duration-200 placeholder:text-slate-400"
-      style={{ background: "rgba(var(--color-ice-rgb),.65)", border: "1.5px solid rgba(var(--color-navy-mid-rgb),.11)", boxShadow: "0 2px 8px rgba(var(--color-navy-mid-rgb),.04)" }}
-      onFocus={e => { e.target.style.borderColor = "var(--color-navy-mid)"; e.target.style.background = "#fff"; e.target.style.boxShadow = "0 0 0 4px rgba(var(--color-navy-mid-rgb),.08)"; }}
-      onBlur={e  => { e.target.style.borderColor = "rgba(var(--color-navy-mid-rgb),.11)"; e.target.style.background = "rgba(var(--color-ice-rgb),.65)"; e.target.style.boxShadow = "0 2px 8px rgba(var(--color-navy-mid-rgb),.04)"; }}
+      className="w-full rounded-2xl py-4 pl-12 pr-4 text-sm outline-none transition-all duration-200"
+      style={{ background: "var(--surface-input)", border: "1.5px solid var(--border-subtle-strong)", boxShadow: "0 2px 8px rgba(var(--color-navy-mid-rgb),.04)", color: "var(--text-heading)" }}
+      onFocus={e => { e.target.style.borderColor = "var(--color-navy-mid)"; e.target.style.background = "var(--surface-card)"; e.target.style.boxShadow = "0 0 0 4px rgba(var(--color-navy-mid-rgb),.08)"; }}
+      onBlur={e  => { e.target.style.borderColor = "var(--border-subtle-strong)"; e.target.style.background = "var(--surface-input)"; e.target.style.boxShadow = "0 2px 8px rgba(var(--color-navy-mid-rgb),.04)"; }}
     />
   </div>
 );
@@ -66,6 +66,7 @@ const Login = ({ onLogin }) => {
 
   /* form state */
   const [isRegistering,    setIsRegistering]    = useState(false);
+  const [esqueciSenha,     setEsqueciSenha]     = useState(false);
   const [loading,          setLoading]          = useState(false);
   const [mensagem,         setMensagem]         = useState({ texto: "", tipo: "" });
   const [nome,             setNome]             = useState("");
@@ -74,6 +75,7 @@ const Login = ({ onLogin }) => {
   const [papel,            setPapel]            = useState("estudante");
   const [curso,            setCurso]            = useState("");
   const [stats,            setStats]            = useState(null);
+  const [emailRecuperacao, setEmailRecuperacao] = useState("");
 
   /* navbar mobile */
   const [mobileMenu, setMobileMenu] = useState(false);
@@ -134,6 +136,24 @@ const Login = ({ onLogin }) => {
     setMensagem({ texto: "", tipo: "" });
     setPapel("estudante");
     setCurso(cursos[0]?.nome || "");
+  };
+
+  const handleEsqueciSenha = async (e) => {
+    e.preventDefault();
+    setMensagem({ texto: "", tipo: "" });
+    setLoading(true);
+    try {
+      await api.post("/esqueci-senha", { email: emailRecuperacao });
+      setMensagem({ texto: "Se esse email existir, foi enviado um link de recuperação.", tipo: "sucesso" });
+    } catch (err) {
+      setMensagem({ texto: err.response?.data?.erro || "Erro ao pedir recuperação de password.", tipo: "erro" });
+    } finally { setLoading(false); }
+  };
+
+  const abrirEsqueciSenha = () => {
+    setEsqueciSenha(true);
+    setMensagem({ texto: "", tipo: "" });
+    setEmailRecuperacao(email);
   };
 
   return (
@@ -394,7 +414,7 @@ const Login = ({ onLogin }) => {
             className="flex flex-col justify-center items-center w-full lg:w-[490px] xl:w-[530px] shrink-0 overflow-y-auto"
             style={{
               padding:"2.5rem 3.5rem",
-              background:"#ffffff",
+              background:"var(--surface-card)",
               boxShadow:"-28px 0 90px rgba(var(--color-navy-deep-rgb),.14)",
               position:"relative", zIndex:15,
             }}
@@ -408,7 +428,7 @@ const Login = ({ onLogin }) => {
                   ? <img src={config.logo_url} alt={config.nome_plataforma} style={{ width: "100%", height: "100%", objectFit: "contain", borderRadius: 14 }} />
                   : <BookOpen size={21} />}
               </div>
-              <span style={{ fontSize:20, fontWeight:900, color:"var(--color-navy-mid)" }}>{config.nome_plataforma}</span>
+              <span style={{ fontSize:20, fontWeight:900, color:"var(--text-heading)" }}>{config.nome_plataforma}</span>
             </div>
 
             <div className="w-full max-w-[370px]">
@@ -416,18 +436,20 @@ const Login = ({ onLogin }) => {
               {/* badge de estado */}
               <div className="mb-9">
                 <div className="inline-flex items-center gap-2 rounded-full px-4 py-2 mb-5"
-                  style={{ background:"rgba(var(--color-navy-mid-rgb),.06)", border:"1px solid rgba(var(--color-navy-mid-rgb),.10)" }}>
+                  style={{ background:"var(--surface-hover)", border:"1px solid var(--border-subtle-strong)" }}>
                   <div className="w-2 h-2 rounded-full" style={{ background:"#10b981", boxShadow:"0 0 6px rgba(16,185,129,.80)" }} />
-                  <span style={{ fontSize:10, fontWeight:700, letterSpacing:".4em", color:"rgba(var(--color-navy-mid-rgb),.60)", textTransform:"uppercase" }}>
-                    {isRegistering ? "Novo acesso" : "Acesso seguro"}
+                  <span style={{ fontSize:10, fontWeight:700, letterSpacing:".4em", color:"var(--text-muted)", textTransform:"uppercase" }}>
+                    {esqueciSenha ? "Recuperação" : isRegistering ? "Novo acesso" : "Acesso seguro"}
                   </span>
                 </div>
                 <h2 className="leading-tight mb-2"
-                  style={{ fontSize:"2.1rem", fontWeight:900, color:"var(--color-navy-deep)", letterSpacing:"-.025em" }}>
-                  {isRegistering ? "Criar conta" : "Bem‑vindo\nde volta"}
+                  style={{ fontSize:"2.1rem", fontWeight:900, color:"var(--text-heading)", letterSpacing:"-.025em" }}>
+                  {esqueciSenha ? "Recuperar acesso" : isRegistering ? "Criar conta" : "Bem‑vindo\nde volta"}
                 </h2>
-                <p style={{ fontSize:14, color:"#94a3b8", lineHeight:1.65 }}>
-                  {isRegistering
+                <p style={{ fontSize:14, color:"var(--text-faint)", lineHeight:1.65 }}>
+                  {esqueciSenha
+                    ? "Indique o seu email e enviamos um link para repor a palavra-passe."
+                    : isRegistering
                     ? "Junte-se à nossa comunidade académica."
                     : "Aceda ao seu espaço de aprendizagem."}
                 </p>
@@ -437,9 +459,9 @@ const Login = ({ onLogin }) => {
               {mensagem.texto && (
                 <div className="flex items-start gap-3 rounded-2xl px-4 py-3.5 mb-5 text-sm"
                   style={{
-                    background: mensagem.tipo === "erro" ? "rgba(239,68,68,.07)" : "rgba(16,185,129,.07)",
-                    border:     mensagem.tipo === "erro" ? "1px solid rgba(239,68,68,.25)" : "1px solid rgba(16,185,129,.25)",
-                    color:      mensagem.tipo === "erro" ? "#b91c1c" : "#065f46",
+                    background: mensagem.tipo === "erro" ? "var(--status-danger-bg)" : "var(--status-success-bg)",
+                    border:     mensagem.tipo === "erro" ? "1px solid var(--status-danger-border)" : "1px solid var(--status-success-border)",
+                    color:      mensagem.tipo === "erro" ? "var(--status-danger-text)" : "var(--status-success-text)",
                   }}>
                   {mensagem.tipo === "erro"
                     ? <AlertCircle size={16} className="shrink-0 mt-0.5" />
@@ -448,19 +470,48 @@ const Login = ({ onLogin }) => {
                 </div>
               )}
 
+              {esqueciSenha ? (
+                <form onSubmit={handleEsqueciSenha} className="space-y-4">
+                  <InputField icon={<Mail size={17} />}
+                    type="email" placeholder="Email institucional" required
+                    value={emailRecuperacao} onChange={e => setEmailRecuperacao(e.target.value)} />
+
+                  <button
+                    disabled={loading}
+                    className="w-full flex items-center justify-center gap-2.5 rounded-2xl py-[14px] text-sm font-black uppercase tracking-[.10em] transition-all duration-250 disabled:opacity-60 mt-1"
+                    style={{
+                      background:"linear-gradient(135deg,var(--color-navy-deep) 0%,var(--color-navy-mid) 60%,var(--color-navy-bright) 100%)",
+                      color:"#fff",
+                      boxShadow:"0 8px 32px rgba(var(--color-navy-deep-rgb),.38), inset 0 1px 0 rgba(255,255,255,.08)",
+                    }}
+                  >
+                    {loading
+                      ? <div className="w-5 h-5 rounded-full border-2 border-white/25 border-t-white animate-spin" />
+                      : <>Enviar link de recuperação<ArrowRight size={17} /></>
+                    }
+                  </button>
+
+                  <button type="button" onClick={() => setEsqueciSenha(false)}
+                    className="w-full text-center text-xs font-semibold pt-1 transition-colors hover:text-[var(--color-navy-mid)]"
+                    style={{ color:"var(--text-faint)" }}>
+                    ← Voltar ao início de sessão
+                  </button>
+                </form>
+              ) : (
+              <>
               <form onSubmit={isRegistering ? handleRegister : handleLogin} className="space-y-4">
 
                 {isRegistering && (
                   <>
                     {/* toggle aluno / docente */}
                     <div className="grid grid-cols-2 gap-2 p-1.5 rounded-2xl"
-                      style={{ background:"var(--color-ice)", border:"1px solid rgba(var(--color-navy-mid-rgb),.09)" }}>
+                      style={{ background:"var(--surface-hover)", border:"1px solid var(--border-subtle-strong)" }}>
                       {[["estudante","Aluno"],["professor","Docente"]].map(([v, lbl]) => (
                         <button key={v} type="button" onClick={() => setPapel(v)}
                           className="rounded-xl py-2.5 text-sm font-bold transition-all duration-200"
                           style={papel === v
                             ? { background:"linear-gradient(135deg,var(--color-navy-deep),var(--color-navy-mid))", color:"#fff", boxShadow:"0 4px 16px rgba(var(--color-navy-deep-rgb),.30)" }
-                            : { color:"#64748b" }}>
+                            : { color:"var(--text-muted)" }}>
                           {v === "estudante" ? "🎓" : "👨‍🏫"} {lbl}
                         </button>
                       ))}
@@ -471,12 +522,12 @@ const Login = ({ onLogin }) => {
                       value={nome} onChange={e => setNome(e.target.value)} />
 
                     <div className="relative">
-                      <div className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2" style={{ color:"#94a3b8" }}>
+                      <div className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2" style={{ color:"var(--text-faint)" }}>
                         <GraduationCap size={17} />
                       </div>
                       <select value={curso} onChange={e => setCurso(e.target.value)}
                         className="w-full rounded-2xl py-4 pl-12 pr-4 text-sm outline-none transition-all duration-200 appearance-none"
-                        style={{ background:"rgba(var(--color-ice-rgb),.65)", border:"1.5px solid rgba(var(--color-navy-mid-rgb),.11)", color:"#0f172a" }}>
+                        style={{ background:"var(--surface-input)", border:"1.5px solid var(--border-subtle-strong)", color:"var(--text-heading)" }}>
                         {cursos.map(c => <option key={c.id} value={c.nome}>{c.nome}</option>)}
                       </select>
                     </div>
@@ -493,8 +544,8 @@ const Login = ({ onLogin }) => {
 
                 {!isRegistering && (
                   <div className="flex justify-end -mt-1">
-                    <button type="button" className="text-xs font-semibold transition-colors hover:text-[var(--color-navy-mid)]"
-                      style={{ color:"#94a3b8" }}>
+                    <button type="button" onClick={abrirEsqueciSenha} className="text-xs font-semibold transition-colors hover:text-[var(--color-navy-mid)]"
+                      style={{ color:"var(--text-faint)" }}>
                       Esqueceu a senha?
                     </button>
                   </div>
@@ -521,9 +572,9 @@ const Login = ({ onLogin }) => {
 
               {/* divisor */}
               <div className="relative my-6">
-                <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-px" style={{ background:"var(--color-ice-mid)" }} />
+                <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-px" style={{ background:"var(--border-subtle-strong)" }} />
                 <div className="relative flex justify-center">
-                  <span className="px-4 text-xs" style={{ background:"#fff", color:"#94a3b8", fontWeight:500 }}>
+                  <span className="px-4 text-xs" style={{ background:"var(--surface-card)", color:"var(--text-faint)", fontWeight:500 }}>
                     {isRegistering ? "Já tem conta?" : "Ainda não tem acesso?"}
                   </span>
                 </div>
@@ -531,13 +582,14 @@ const Login = ({ onLogin }) => {
 
               <button onClick={switchMode}
                 className="w-full rounded-2xl py-3.5 text-sm font-bold transition-all duration-200"
-                style={{ background:"rgba(var(--color-navy-mid-rgb),.05)", border:"1.5px solid rgba(var(--color-navy-mid-rgb),.10)", color:"var(--color-navy-mid)" }}
-                onMouseEnter={e => (e.currentTarget.style.background="rgba(var(--color-navy-mid-rgb),.09)", e.currentTarget.style.borderColor="rgba(var(--color-navy-mid-rgb),.20)")}
-                onMouseLeave={e => (e.currentTarget.style.background="rgba(var(--color-navy-mid-rgb),.05)", e.currentTarget.style.borderColor="rgba(var(--color-navy-mid-rgb),.10)")}
+                style={{ background:"var(--surface-hover)", border:"1.5px solid var(--border-subtle-strong)", color:"var(--color-navy-mid)" }}
+                onMouseEnter={e => (e.currentTarget.style.background="var(--color-ice-mid)", e.currentTarget.style.borderColor="var(--border-subtle-strong)")}
+                onMouseLeave={e => (e.currentTarget.style.background="var(--surface-hover)", e.currentTarget.style.borderColor="var(--border-subtle-strong)")}
               >
                 {isRegistering ? "Entrar na minha conta →" : "Criar conta gratuita →"}
               </button>
-
+              </>
+              )}
             </div>
           </div>
         </div>

@@ -1,0 +1,271 @@
+import React, { useState } from "react";
+import api from "../services/api";
+import {
+  User, Mail, GraduationCap, ShieldCheck, Lock, Upload, Trash2,
+  Save, CheckCircle, AlertTriangle, X, KeyRound,
+} from "lucide-react";
+import { useConfig } from "../context/ConfigContext";
+
+/* Toast de notificação — mesmo padrão usado em Admin.jsx */
+const Toast = ({ message, type, onClose }) => {
+  if (!message) return null;
+  const cor = type === 'error' ? "#ef4444" : "#10b981";
+  return (
+    <div
+      className="fixed top-6 right-6 z-50 flex items-center gap-3 rounded-2xl px-5 py-4 animate-fade-in"
+      style={{ background: "var(--surface-card)", borderLeft: `3px solid ${cor}`, border: `1px solid var(--border-subtle-strong)`, borderLeftWidth: 3, borderLeftColor: cor, color: "var(--text-heading)", boxShadow: "0 10px 40px rgba(0,0,0,0.16)" }}
+    >
+      {type === 'error'
+        ? <AlertTriangle size={18} style={{ color: "#ef4444", flexShrink: 0 }} />
+        : <CheckCircle size={18} style={{ color: "#10b981", flexShrink: 0 }} />}
+      <span style={{ fontSize: 14, fontWeight: 600 }}>{message}</span>
+      <button onClick={onClose} style={{ opacity: 0.45, marginLeft: 8, color: "var(--text-heading)" }} className="hover:opacity-80 transition-opacity">
+        <X size={15} />
+      </button>
+    </div>
+  );
+};
+
+/* Cartão base reutilizado nas 3 secções */
+const Cartao = ({ icon: Icon, titulo, subtitulo, children }) => (
+  <section
+    className="rounded-[28px] p-7 animate-fade-in"
+    style={{ background: "var(--surface-card)", border: "1px solid var(--border-subtle)", boxShadow: "0 4px 24px rgba(var(--color-navy-mid-rgb),0.06)" }}
+  >
+    <div className="flex items-center gap-3 mb-6">
+      <div className="w-11 h-11 rounded-2xl grid place-items-center shrink-0"
+        style={{ background: "rgba(var(--color-navy-mid-rgb),0.07)", border: "1px solid var(--border-subtle-strong)" }}>
+        <Icon size={19} style={{ color: "var(--color-navy-mid)" }} />
+      </div>
+      <div>
+        <h3 style={{ fontSize: 16, fontWeight: 900, color: "var(--text-heading)" }}>{titulo}</h3>
+        {subtitulo && <p style={{ fontSize: 12.5, color: "var(--text-faint)" }}>{subtitulo}</p>}
+      </div>
+    </div>
+    {children}
+  </section>
+);
+
+const Campo = ({ label, icon, ...props }) => (
+  <label className="block">
+    <span className="block mb-2 text-xs font-bold uppercase" style={{ letterSpacing: "0.10em", color: "var(--text-muted)" }}>{label}</span>
+    <div className="relative">
+      {icon && (
+        <div className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2" style={{ color: "var(--text-faint)" }}>{icon}</div>
+      )}
+      <input
+        {...props}
+        className={`w-full rounded-2xl py-3.5 ${icon ? 'pl-12' : 'pl-4'} pr-4 text-sm outline-none transition-all duration-200`}
+        style={{ background: "var(--surface-input)", border: "1.5px solid var(--border-subtle-strong)", color: "var(--text-heading)", opacity: props.disabled ? 0.6 : 1 }}
+        onFocus={e => !props.disabled && (e.target.style.borderColor = "var(--color-navy-mid)", e.target.style.boxShadow = "0 0 0 4px rgba(var(--color-navy-mid-rgb),0.08)")}
+        onBlur={e => (e.target.style.borderColor = "var(--border-subtle-strong)", e.target.style.boxShadow = "")}
+      />
+    </div>
+  </label>
+);
+
+const BotaoPrimario = ({ loading, children, ...props }) => (
+  <button
+    {...props}
+    disabled={loading || props.disabled}
+    className="inline-flex items-center justify-center gap-2 rounded-2xl px-6 py-3.5 text-sm font-bold text-white transition-all duration-200 disabled:opacity-60"
+    style={{ background: "linear-gradient(135deg,var(--color-navy-deep),var(--color-navy-mid))", boxShadow: "0 6px 24px rgba(var(--color-navy-deep-rgb),0.30)" }}
+    onMouseEnter={e => !loading && (e.currentTarget.style.transform = "translateY(-1px)")}
+    onMouseLeave={e => (e.currentTarget.style.transform = "")}
+  >
+    {loading ? <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" /> : children}
+  </button>
+);
+
+const Perfil = ({ usuarioLogado, onUpdateUsuario }) => {
+  const { config } = useConfig();
+
+  const [nome, setNome]           = useState(usuarioLogado?.nome || "");
+  const [savingNome, setSavingNome] = useState(false);
+
+  const [senhaActual, setSenhaActual] = useState("");
+  const [novaSenha, setNovaSenha]     = useState("");
+  const [savingSenha, setSavingSenha] = useState(false);
+
+  const [avatarUploading, setAvatarUploading] = useState(false);
+
+  const [toast, setToast] = useState({ message: "", type: "" });
+  const showToast = (message, type = "success") => setToast({ message, type });
+
+  const handleSalvarNome = async (e) => {
+    e.preventDefault();
+    if (!nome.trim()) return;
+    setSavingNome(true);
+    try {
+      const res = await api.put("/perfil", { nome: nome.trim() });
+      onUpdateUsuario(res.data.utilizador);
+      showToast("Nome actualizado com sucesso!");
+    } catch (err) {
+      showToast(err.response?.data?.erro || "Erro ao actualizar nome.", "error");
+    } finally {
+      setSavingNome(false);
+    }
+  };
+
+  const handleMudarSenha = async (e) => {
+    e.preventDefault();
+    setSavingSenha(true);
+    try {
+      await api.put("/perfil/senha", { senha_actual: senhaActual, nova_senha: novaSenha });
+      setSenhaActual("");
+      setNovaSenha("");
+      showToast("Palavra-passe alterada com sucesso!");
+    } catch (err) {
+      showToast(err.response?.data?.erro || "Erro ao alterar a palavra-passe.", "error");
+    } finally {
+      setSavingSenha(false);
+    }
+  };
+
+  const handleAvatarUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setAvatarUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("avatar", file);
+      const res = await api.post("/perfil/avatar", formData, { headers: { "Content-Type": "multipart/form-data" } });
+      onUpdateUsuario({ ...usuarioLogado, avatar_url: res.data.avatar_url });
+      showToast("Avatar actualizado!");
+    } catch (err) {
+      showToast(err.response?.data?.erro || "Erro ao enviar avatar.", "error");
+    } finally {
+      setAvatarUploading(false);
+      e.target.value = "";
+    }
+  };
+
+  const handleRemoverAvatar = async () => {
+    try {
+      await api.delete("/perfil/avatar");
+      onUpdateUsuario({ ...usuarioLogado, avatar_url: null });
+      showToast("Avatar removido.");
+    } catch {
+      showToast("Erro ao remover avatar.", "error");
+    }
+  };
+
+  return (
+    <>
+      <Toast message={toast.message} type={toast.type} onClose={() => setToast({ message: "", type: "" })} />
+
+      <div className="space-y-8 animate-fade-in max-w-3xl">
+
+        {/* ═══ HEADER HERO ═══════════════════════════════════ */}
+        <section
+          className="relative overflow-hidden rounded-[32px] text-white"
+          style={{
+            background: "linear-gradient(-45deg, var(--color-navy-abyss), var(--color-navy-deep), var(--color-navy), var(--color-navy-mid))",
+            backgroundSize: "400% 400%",
+            animation: "aurora-perfil 10s ease infinite",
+            boxShadow: "0 24px 80px rgba(var(--color-navy-abyss-rgb),0.50)",
+            padding: "2.8rem",
+          }}
+        >
+          <style>{`
+            @keyframes aurora-perfil {
+              0%,100% { background-position: 0%   50%; }
+              50%      { background-position: 100% 50%; }
+            }
+          `}</style>
+          <div className="absolute inset-0 pointer-events-none" style={{
+            backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.045) 1px, transparent 1px)",
+            backgroundSize: "28px 28px",
+          }} />
+
+          <div className="relative flex items-center gap-6">
+            <div className="relative shrink-0">
+              <div
+                className="w-24 h-24 rounded-[28px] grid place-items-center overflow-hidden text-3xl font-black"
+                style={{
+                  background: usuarioLogado.avatar_url ? "rgba(255,255,255,0.08)" : "linear-gradient(135deg,var(--color-gold-dark),var(--color-gold),var(--color-gold-light))",
+                  color: "var(--color-navy-deep)",
+                  border: "1px solid rgba(255,255,255,0.14)",
+                  boxShadow: "0 10px 36px rgba(0,0,0,0.30)",
+                }}
+              >
+                {usuarioLogado.avatar_url
+                  ? <img src={usuarioLogado.avatar_url} alt={usuarioLogado.nome} className="w-full h-full object-cover" />
+                  : usuarioLogado.nome?.charAt(0).toUpperCase() || 'U'}
+              </div>
+              <label
+                className="absolute -bottom-2 -right-2 w-9 h-9 rounded-xl grid place-items-center cursor-pointer transition-transform duration-200"
+                style={{ background: "var(--color-gold)", color: "var(--color-navy-deep)", boxShadow: "0 4px 14px rgba(0,0,0,0.35)" }}
+                title="Alterar avatar"
+                onMouseEnter={e => (e.currentTarget.style.transform = "scale(1.10)")}
+                onMouseLeave={e => (e.currentTarget.style.transform = "")}
+              >
+                {avatarUploading
+                  ? <div className="w-4 h-4 rounded-full border-2 border-navy-900/30 border-t-transparent animate-spin" />
+                  : <Upload size={15} />}
+                <input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleAvatarUpload} disabled={avatarUploading} className="hidden" />
+              </label>
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <p className="mb-1.5 text-[11px] font-bold uppercase" style={{ letterSpacing: "0.4em", color: "rgba(var(--color-gold-rgb),0.65)" }}>
+                O meu perfil
+              </p>
+              <h1 className="truncate" style={{ fontSize: 28, fontWeight: 900, letterSpacing: "-0.02em" }}>{usuarioLogado.nome}</h1>
+              <div className="flex flex-wrap items-center gap-2 mt-3">
+                <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold"
+                  style={{ background: "rgba(255,255,255,0.10)", border: "1px solid rgba(255,255,255,0.14)" }}>
+                  <ShieldCheck size={13} /> {usuarioLogado.papel}
+                </span>
+                {usuarioLogado.curso && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold"
+                    style={{ background: "rgba(255,255,255,0.10)", border: "1px solid rgba(255,255,255,0.14)" }}>
+                    <GraduationCap size={13} /> {usuarioLogado.curso}
+                  </span>
+                )}
+              </div>
+              {usuarioLogado.avatar_url && (
+                <button onClick={handleRemoverAvatar} className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold transition-colors"
+                  style={{ color: "rgba(255,255,255,0.55)" }}
+                  onMouseEnter={e => (e.currentTarget.style.color = "#fca5a5")}
+                  onMouseLeave={e => (e.currentTarget.style.color = "rgba(255,255,255,0.55)")}
+                >
+                  <Trash2 size={12} /> Remover avatar
+                </button>
+              )}
+            </div>
+          </div>
+        </section>
+
+        {/* ═══ INFORMAÇÕES PESSOAIS ══════════════════════════ */}
+        <Cartao icon={User} titulo="Informações pessoais" subtitulo={`A gerir a conta em ${config.nome_plataforma}`}>
+          <form onSubmit={handleSalvarNome} className="space-y-4">
+            <Campo label="Nome completo" icon={<User size={16} />} type="text" value={nome} onChange={e => setNome(e.target.value)} required />
+            <Campo label="Email" icon={<Mail size={16} />} type="email" value={usuarioLogado.email} disabled readOnly />
+            <div className="flex justify-end">
+              <BotaoPrimario type="submit" loading={savingNome}>
+                <Save size={16} /> Guardar alterações
+              </BotaoPrimario>
+            </div>
+          </form>
+        </Cartao>
+
+        {/* ═══ SEGURANÇA ══════════════════════════════════════ */}
+        <Cartao icon={Lock} titulo="Segurança" subtitulo="Altere a sua palavra-passe periodicamente">
+          <form onSubmit={handleMudarSenha} className="space-y-4">
+            <Campo label="Palavra-passe actual" icon={<KeyRound size={16} />} type="password" value={senhaActual} onChange={e => setSenhaActual(e.target.value)} required />
+            <Campo label="Nova palavra-passe" icon={<Lock size={16} />} type="password" value={novaSenha} onChange={e => setNovaSenha(e.target.value)} minLength={6} required />
+            <div className="flex justify-end">
+              <BotaoPrimario type="submit" loading={savingSenha}>
+                <Lock size={16} /> Alterar palavra-passe
+              </BotaoPrimario>
+            </div>
+          </form>
+        </Cartao>
+
+      </div>
+    </>
+  );
+};
+
+export default Perfil;

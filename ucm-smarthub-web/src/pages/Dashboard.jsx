@@ -38,10 +38,10 @@ const MiniCard = ({ m, onClick }) => (
     onClick={onClick}
     className="group flex items-center gap-4 rounded-[20px] p-4 cursor-pointer transition-all duration-250"
     style={{
-      background: "rgba(255,255,255,0.85)",
+      background: "var(--surface-card-glass)",
       backdropFilter: "blur(12px)",
       WebkitBackdropFilter: "blur(12px)",
-      border: "1px solid rgba(var(--color-navy-mid-rgb),0.08)",
+      border: "1px solid var(--border-subtle)",
       boxShadow: "0 2px 14px rgba(var(--color-navy-mid-rgb),0.06)",
     }}
     onMouseEnter={e => (e.currentTarget.style.transform = "translateY(-3px)", e.currentTarget.style.boxShadow = "0 10px 36px rgba(var(--color-navy-mid-rgb),0.14), 0 0 0 1px rgba(var(--color-gold-rgb),0.12)")}
@@ -59,12 +59,12 @@ const MiniCard = ({ m, onClick }) => (
         : <FileText   size={20} style={{ color: "#be123c" }} />}
     </div>
     <div className="min-w-0 flex-1">
-      <p className="text-sm font-bold truncate transition-colors group-hover:text-[var(--color-navy-mid)]" style={{ color: "#0f172a" }}>
+      <p className="text-sm font-bold truncate transition-colors group-hover:text-[var(--color-navy-mid)]" style={{ color: "var(--text-heading)" }}>
         {m.titulo}
       </p>
-      <p style={{ fontSize: 12, color: "#94a3b8" }}>{m.cadeira} · {m.tipo}</p>
+      <p style={{ fontSize: 12, color: "var(--text-faint)" }}>{m.cadeira} · {m.tipo}</p>
     </div>
-    <ChevronRight size={16} className="shrink-0 transition-transform group-hover:translate-x-1" style={{ color: "#cbd5e1" }} />
+    <ChevronRight size={16} className="shrink-0 transition-transform group-hover:translate-x-1" style={{ color: "var(--text-faint)" }} />
   </article>
 );
 
@@ -224,10 +224,10 @@ const Dashboard = ({ usuarioLogado }) => {
             key={label} onClick={() => navigate(path)}
             className="group flex items-center gap-4 rounded-[24px] p-5 text-left transition-all duration-300"
             style={{
-              background: "rgba(255,255,255,0.85)",
+              background: "var(--surface-card-glass)",
               backdropFilter: "blur(12px)",
               WebkitBackdropFilter: "blur(12px)",
-              border: "1px solid rgba(var(--color-navy-mid-rgb),0.08)",
+              border: "1px solid var(--border-subtle)",
               boxShadow: "0 4px 24px rgba(var(--color-navy-mid-rgb),0.06)",
             }}
             onMouseEnter={e => (e.currentTarget.style.transform = "translateY(-3px)", e.currentTarget.style.boxShadow = `0 12px 40px ${glow}`)}
@@ -237,10 +237,10 @@ const Dashboard = ({ usuarioLogado }) => {
               <Icon size={22} style={{ color: "var(--color-gold)" }} />
             </div>
             <div className="min-w-0">
-              <p style={{ fontSize: 15, fontWeight: 800, color: "var(--color-navy-deep)" }}>{label}</p>
-              <p style={{ fontSize: 12, color: "#94a3b8" }}>{desc}</p>
+              <p style={{ fontSize: 15, fontWeight: 800, color: "var(--text-heading)" }}>{label}</p>
+              <p style={{ fontSize: 12, color: "var(--text-faint)" }}>{desc}</p>
             </div>
-            <ChevronRight size={18} className="ml-auto transition-all group-hover:translate-x-1" style={{ color: "#cbd5e1" }} />
+            <ChevronRight size={18} className="ml-auto transition-all group-hover:translate-x-1" style={{ color: "var(--text-faint)" }} />
           </button>
         ))}
       </section>
@@ -268,9 +268,9 @@ const Dashboard = ({ usuarioLogado }) => {
           <div className="space-y-4">
             <SectionHeader title="Favoritos" icon={Heart} color="#be123c" small />
             {favMateriais.length === 0 ? (
-              <div className="rounded-[20px] p-5 text-center" style={{ background: "#fff", border: "1px solid rgba(var(--color-navy-mid-rgb),0.07)" }}>
-                <Heart size={24} style={{ color: "#e2e8f0", margin: "0 auto 8px" }} />
-                <p style={{ fontSize: 13, color: "#94a3b8" }}>Guarde materiais com ❤️ no repositório</p>
+              <div className="rounded-[20px] p-5 text-center" style={{ background: "var(--surface-card)", border: "1px solid var(--border-subtle)" }}>
+                <Heart size={24} style={{ color: "var(--text-faint)", margin: "0 auto 8px" }} />
+                <p style={{ fontSize: 13, color: "var(--text-faint)" }}>Guarde materiais com ❤️ no repositório</p>
               </div>
             ) : (
               <div className="space-y-2">
@@ -285,9 +285,9 @@ const Dashboard = ({ usuarioLogado }) => {
           <div className="space-y-4">
             <SectionHeader title="Meus Uploads" icon={Upload} color="#7c3aed" small />
             {meusMateriais.length === 0 ? (
-              <div className="rounded-[20px] p-5 text-center" style={{ background: "#fff", border: "1px solid rgba(var(--color-navy-mid-rgb),0.07)" }}>
-                <BookOpen size={24} style={{ color: "#e2e8f0", margin: "0 auto 8px" }} />
-                <p style={{ fontSize: 13, color: "#94a3b8" }}>Ainda não submeteu nenhum material</p>
+              <div className="rounded-[20px] p-5 text-center" style={{ background: "var(--surface-card)", border: "1px solid var(--border-subtle)" }}>
+                <BookOpen size={24} style={{ color: "var(--text-faint)", margin: "0 auto 8px" }} />
+                <p style={{ fontSize: 13, color: "var(--text-faint)" }}>Ainda não submeteu nenhum material</p>
               </div>
             ) : (
               <div className="space-y-2">
@@ -295,19 +295,19 @@ const Dashboard = ({ usuarioLogado }) => {
                   <div
                     key={m.id}
                     className="flex items-center gap-3 rounded-[18px] p-3.5"
-                    style={{ background: "#fff", border: "1px solid rgba(var(--color-navy-mid-rgb),0.07)" }}
+                    style={{ background: "var(--surface-card)", border: "1px solid var(--border-subtle)" }}
                   >
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-bold truncate" style={{ color: "#0f172a" }}>{m.titulo}</p>
-                      <p style={{ fontSize: 11, color: "#94a3b8" }}>{m.cadeira}</p>
+                      <p className="text-sm font-bold truncate" style={{ color: "var(--text-heading)" }}>{m.titulo}</p>
+                      <p style={{ fontSize: 11, color: "var(--text-faint)" }}>{m.cadeira}</p>
                     </div>
                     <span
                       className="rounded-full px-2.5 py-1 text-[10px] font-bold uppercase shrink-0"
                       style={m.status === 'aprovado'
-                        ? { background: "rgba(16,185,129,0.09)", border: "1px solid rgba(16,185,129,0.25)", color: "#065f46" }
+                        ? { background: "var(--status-success-bg)", border: "1px solid var(--status-success-border)", color: "var(--status-success-text)" }
                         : m.status === 'pendente'
-                        ? { background: "rgba(245,158,11,0.09)", border: "1px solid rgba(245,158,11,0.25)", color: "#92400e" }
-                        : { background: "rgba(239,68,68,0.09)", border: "1px solid rgba(239,68,68,0.25)", color: "#b91c1c" }
+                        ? { background: "var(--status-warning-bg)", border: "1px solid var(--status-warning-border)", color: "var(--status-warning-text)" }
+                        : { background: "var(--status-danger-bg)", border: "1px solid var(--status-danger-border)", color: "var(--status-danger-text)" }
                       }
                     >
                       {m.status}
@@ -328,7 +328,7 @@ const SectionHeader = ({ title, icon: Icon, color = "var(--color-navy-mid)", onM
   <div className="flex items-center justify-between">
     <h2
       className="flex items-center gap-2"
-      style={{ fontSize: small ? 16 : 20, fontWeight: 900, color: "var(--color-navy-deep)", letterSpacing: "-0.01em" }}
+      style={{ fontSize: small ? 16 : 20, fontWeight: 900, color: "var(--text-heading)", letterSpacing: "-0.01em" }}
     >
       <Icon size={small ? 17 : 20} style={{ color }} /> {title}
     </h2>
@@ -347,9 +347,9 @@ const SectionHeader = ({ title, icon: Icon, color = "var(--color-navy-mid)", onM
 const EmptyState = ({ text }) => (
   <div
     className="rounded-[20px] p-10 text-center"
-    style={{ border: "2px dashed rgba(var(--color-navy-mid-rgb),0.10)", background: "#fff" }}
+    style={{ border: "2px dashed var(--border-subtle-strong)", background: "var(--surface-card)" }}
   >
-    <p style={{ fontSize: 14, color: "#94a3b8" }}>{text}</p>
+    <p style={{ fontSize: 14, color: "var(--text-faint)" }}>{text}</p>
   </div>
 );
 

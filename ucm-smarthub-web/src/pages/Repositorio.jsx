@@ -14,10 +14,10 @@ const MaterialCard = ({ m, onClick, favs, onToggleFav }) => {
     <article
       className="group relative overflow-hidden rounded-[28px] cursor-pointer transition-all duration-350"
       style={{
-        background: "rgba(255,255,255,0.88)",
+        background: "var(--surface-card-glass)",
         backdropFilter: "blur(14px)",
         WebkitBackdropFilter: "blur(14px)",
-        border: "1px solid rgba(var(--color-navy-mid-rgb),0.08)",
+        border: "1px solid var(--border-subtle)",
         boxShadow: "0 4px 28px rgba(var(--color-navy-mid-rgb),0.07)",
       }}
       onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-5px)"; e.currentTarget.style.boxShadow = "0 18px 56px rgba(var(--color-navy-mid-rgb),0.16), 0 0 0 1px rgba(var(--color-gold-rgb),0.14)"; }}
@@ -47,10 +47,10 @@ const MaterialCard = ({ m, onClick, favs, onToggleFav }) => {
             className="w-9 h-9 rounded-xl grid place-items-center transition-all duration-200"
             style={isFav
               ? { background: "rgba(239,68,68,0.10)", border: "1px solid rgba(239,68,68,0.25)", color: "#ef4444" }
-              : { background: "var(--color-ice)", border: "1px solid rgba(var(--color-navy-mid-rgb),0.09)", color: "#cbd5e1" }
+              : { background: "var(--surface-hover)", border: "1px solid var(--border-subtle-strong)", color: "var(--text-faint)" }
             }
             onMouseEnter={e => !isFav && (e.currentTarget.style.color = "#ef4444", e.currentTarget.style.borderColor = "rgba(239,68,68,0.25)")}
-            onMouseLeave={e => !isFav && (e.currentTarget.style.color = "#cbd5e1", e.currentTarget.style.borderColor = "rgba(var(--color-navy-mid-rgb),0.09)")}
+            onMouseLeave={e => !isFav && (e.currentTarget.style.color = "var(--text-faint)", e.currentTarget.style.borderColor = "var(--border-subtle-strong)")}
             title={isFav ? "Remover dos favoritos" : "Adicionar aos favoritos"}
           >
             <Heart size={15} fill={isFav ? "#ef4444" : "none"} />
@@ -60,21 +60,21 @@ const MaterialCard = ({ m, onClick, favs, onToggleFav }) => {
         <h3
           onClick={onClick}
           className="text-lg font-bold mb-1 leading-snug transition-colors group-hover:text-[var(--color-navy-mid)]"
-          style={{ color: "#0f172a" }}
+          style={{ color: "var(--text-heading)" }}
         >
           {m.titulo}
         </h3>
-        <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.25em", color: "#94a3b8", marginBottom: 12 }}>
+        <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.25em", color: "var(--text-faint)", marginBottom: 12 }}>
           {m.cadeira}
         </p>
-        <p style={{ fontSize: 13, color: "#94a3b8", marginBottom: 20 }}>
+        <p style={{ fontSize: 13, color: "var(--text-faint)", marginBottom: 20 }}>
           {m.autor} · {new Date(m.data_upload).toLocaleDateString("pt-PT")}
         </p>
 
         <div
           onClick={onClick}
           className="flex items-center justify-between cursor-pointer"
-          style={{ borderTop: "1px solid #f1f5f9", paddingTop: 14 }}
+          style={{ borderTop: "1px solid var(--border-subtle)", paddingTop: 14 }}
         >
           <span style={{ fontSize: 11, fontWeight: 700, color: "var(--color-navy-mid)", textTransform: "uppercase", letterSpacing: "0.2em" }}>
             Ver mais
@@ -200,7 +200,7 @@ const Repositorio = () => {
       {/* Toast de upload enviado */}
       {uploadSucesso && (
         <div className="fixed top-6 right-6 z-50 flex items-center gap-3 rounded-2xl px-5 py-4 animate-fade-in"
-          style={{ background: "rgba(16,185,129,0.10)", border: "1px solid rgba(16,185,129,0.30)", color: "#065f46", boxShadow: "0 10px 40px rgba(0,0,0,0.12)" }}>
+          style={{ background: "var(--surface-card)", borderLeft: "3px solid #10b981", border: "1px solid var(--border-subtle-strong)", borderLeftWidth: 3, borderLeftColor: "#10b981", color: "var(--text-heading)", boxShadow: "0 10px 40px rgba(0,0,0,0.16)" }}>
           <CheckCircle size={18} style={{ color: "#10b981", flexShrink: 0 }} />
           <div>
             <p style={{ fontSize: 14, fontWeight: 700 }}>Material enviado para aprovação!</p>
@@ -251,29 +251,29 @@ const Repositorio = () => {
       {/* ═══ FILTROS ═══════════════════════════════════════════════ */}
       <section
         className="rounded-[28px] p-6 space-y-5"
-        style={{ background: "#fff", border: "1px solid rgba(var(--color-navy-mid-rgb),0.07)", boxShadow: "0 4px 28px rgba(var(--color-navy-mid-rgb),0.06)" }}
+        style={{ background: "var(--surface-card)", border: "1px solid var(--border-subtle)", boxShadow: "0 4px 28px rgba(var(--color-navy-mid-rgb),0.06)" }}
       >
         {/* Linha 1: busca + cadeira */}
         <div className="flex flex-col gap-4 md:flex-row md:items-center">
           <div className="relative flex-1">
-            <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2" size={17} style={{ color: "#94a3b8" }} />
+            <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2" size={17} style={{ color: "var(--text-faint)" }} />
             <input
               type="text"
               placeholder="Buscar por título..."
               value={buscaTermo}
               onChange={e => setBuscaTermo(e.target.value)}
               className="w-full rounded-2xl py-3.5 pl-12 pr-4 text-sm outline-none transition-all duration-200"
-              style={{ background: "var(--color-ice)", border: "1.5px solid rgba(var(--color-navy-mid-rgb),0.09)", color: "#0f172a" }}
-              onFocus={e => (e.target.style.borderColor = "var(--color-navy-mid)", e.target.style.background = "#fff", e.target.style.boxShadow = "0 0 0 4px rgba(var(--color-navy-mid-rgb),0.07)")}
-              onBlur={e => (e.target.style.borderColor = "rgba(var(--color-navy-mid-rgb),0.09)", e.target.style.background = "var(--color-ice)", e.target.style.boxShadow = "")}
+              style={{ background: "var(--surface-input)", border: "1.5px solid var(--border-subtle-strong)", color: "var(--text-heading)" }}
+              onFocus={e => (e.target.style.borderColor = "var(--color-navy-mid)", e.target.style.background = "var(--surface-card)", e.target.style.boxShadow = "0 0 0 4px rgba(var(--color-navy-mid-rgb),0.07)")}
+              onBlur={e => (e.target.style.borderColor = "var(--border-subtle-strong)", e.target.style.background = "var(--surface-input)", e.target.style.boxShadow = "")}
             />
           </div>
 
           <div className="relative">
-            <Filter className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2" size={16} style={{ color: "#94a3b8" }} />
+            <Filter className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2" size={16} style={{ color: "var(--text-faint)" }} />
             <select
               className="rounded-2xl py-3.5 pl-11 pr-8 text-sm outline-none transition-all duration-200 appearance-none"
-              style={{ background: "var(--color-ice)", border: "1.5px solid rgba(var(--color-navy-mid-rgb),0.09)", color: "#334155", minWidth: 200 }}
+              style={{ background: "var(--surface-input)", border: "1.5px solid var(--border-subtle-strong)", color: "var(--text-body)", minWidth: 200 }}
               value={filtroCadeira}
               onChange={e => setFiltroCadeira(e.target.value)}
             >
@@ -288,7 +288,7 @@ const Repositorio = () => {
           {/* Toggle PDF/Vídeo/Todos */}
           <div
             className="inline-flex rounded-2xl p-1.5"
-            style={{ background: "var(--color-ice)", border: "1.5px solid rgba(var(--color-navy-mid-rgb),0.09)" }}
+            style={{ background: "var(--surface-hover)", border: "1.5px solid var(--border-subtle-strong)" }}
           >
             {TIPOS.map(t => (
               <button
@@ -297,7 +297,7 @@ const Repositorio = () => {
                 className="rounded-xl px-4 py-2 text-xs font-bold transition-all duration-200"
                 style={filtroTipo === t
                   ? { background: "linear-gradient(135deg,var(--color-navy-deep),var(--color-navy-mid))", color: "#fff", boxShadow: "0 3px 12px rgba(var(--color-navy-deep-rgb),0.28)" }
-                  : { color: "#64748b" }
+                  : { color: "var(--text-muted)" }
                 }
               >
                 {t}
@@ -307,7 +307,7 @@ const Repositorio = () => {
 
           {/* Stats */}
           <div className="flex items-center gap-4">
-            <span style={{ fontSize: 13, color: "#94a3b8", fontWeight: 600 }}>
+            <span style={{ fontSize: 13, color: "var(--text-faint)", fontWeight: 600 }}>
               {totalResultados} resultado{totalResultados !== 1 ? 's' : ''} · Pág. {currentPage}/{totalPages}
             </span>
           </div>
@@ -318,13 +318,13 @@ const Repositorio = () => {
       <section>
         <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
           {loading ? (
-            <div className="col-span-full rounded-[28px] p-14 text-center" style={{ background: "#fff", border: "1px solid rgba(var(--color-navy-mid-rgb),0.07)" }}>
+            <div className="col-span-full rounded-[28px] p-14 text-center" style={{ background: "var(--surface-card)", border: "1px solid var(--border-subtle)" }}>
               <div className="w-10 h-10 rounded-full border-4 animate-spin mx-auto mb-4" style={{ borderColor: "rgba(var(--color-navy-mid-rgb),0.10)", borderTopColor: "var(--color-navy-mid)" }} />
-              <p style={{ color: "#94a3b8", fontWeight: 600 }}>Carregando materiais...</p>
+              <p style={{ color: "var(--text-faint)", fontWeight: 600 }}>Carregando materiais...</p>
             </div>
           ) : materiaisFiltrados.length === 0 ? (
-            <div className="col-span-full rounded-[28px] p-14 text-center" style={{ border: "2px dashed rgba(var(--color-navy-mid-rgb),0.12)", background: "#fff" }}>
-              <p style={{ fontSize: 16, fontWeight: 900, color: "#94a3b8" }}>Nenhum material encontrado.</p>
+            <div className="col-span-full rounded-[28px] p-14 text-center" style={{ border: "2px dashed var(--border-subtle-strong)", background: "var(--surface-card)" }}>
+              <p style={{ fontSize: 16, fontWeight: 900, color: "var(--text-faint)" }}>Nenhum material encontrado.</p>
               {buscaTermo && (
                 <button onClick={() => setBuscaTermo('')} className="mt-3 text-sm font-semibold" style={{ color: "var(--color-navy-mid)" }}>
                   Limpar pesquisa
@@ -349,26 +349,26 @@ const Repositorio = () => {
       {totalPages > 1 && (
         <div
           className="flex flex-wrap items-center justify-center gap-3 rounded-[28px] p-5"
-          style={{ background: "#fff", border: "1px solid rgba(var(--color-navy-mid-rgb),0.07)", boxShadow: "0 4px 20px rgba(var(--color-navy-mid-rgb),0.05)" }}
+          style={{ background: "var(--surface-card)", border: "1px solid var(--border-subtle)", boxShadow: "0 4px 20px rgba(var(--color-navy-mid-rgb),0.05)" }}
         >
           <button
             onClick={() => fetchMateriais(currentPage - 1)}
             disabled={currentPage === 1}
             className="inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
-            style={{ border: "1.5px solid rgba(var(--color-navy-mid-rgb),0.12)", background: "var(--color-ice)", color: "#334155" }}
+            style={{ border: "1.5px solid var(--border-subtle-strong)", background: "var(--surface-hover)", color: "var(--text-body)" }}
             onMouseEnter={e => currentPage > 1 && (e.currentTarget.style.background = "var(--color-navy-mid)", e.currentTarget.style.color = "#fff")}
-            onMouseLeave={e => currentPage > 1 && (e.currentTarget.style.background = "var(--color-ice)", e.currentTarget.style.color = "#334155")}
+            onMouseLeave={e => currentPage > 1 && (e.currentTarget.style.background = "var(--surface-hover)", e.currentTarget.style.color = "var(--text-body)")}
           >
             <ChevronLeft size={15} /> Anterior
           </button>
-          <span style={{ fontSize: 14, fontWeight: 600, color: "#64748b" }}>Página {currentPage} de {totalPages}</span>
+          <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text-muted)" }}>Página {currentPage} de {totalPages}</span>
           <button
             onClick={() => fetchMateriais(currentPage + 1)}
             disabled={currentPage === totalPages}
             className="inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
-            style={{ border: "1.5px solid rgba(var(--color-navy-mid-rgb),0.12)", background: "var(--color-ice)", color: "#334155" }}
+            style={{ border: "1.5px solid var(--border-subtle-strong)", background: "var(--surface-hover)", color: "var(--text-body)" }}
             onMouseEnter={e => currentPage < totalPages && (e.currentTarget.style.background = "var(--color-navy-mid)", e.currentTarget.style.color = "#fff")}
-            onMouseLeave={e => currentPage < totalPages && (e.currentTarget.style.background = "var(--color-ice)", e.currentTarget.style.color = "#334155")}
+            onMouseLeave={e => currentPage < totalPages && (e.currentTarget.style.background = "var(--surface-hover)", e.currentTarget.style.color = "var(--text-body)")}
           >
             Próximo <ChevronRight size={15} />
           </button>
@@ -378,7 +378,7 @@ const Repositorio = () => {
       {/* ═══ MODAL UPLOAD ══════════════════════════════════════════ */}
       {showUploadModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6" style={{ background: "rgba(var(--color-navy-abyss-rgb),0.60)", backdropFilter: "blur(8px)" }}>
-          <div className="w-full max-w-2xl overflow-hidden rounded-[36px] animate-scale-in" style={{ background: "#fff", boxShadow: "0 40px 120px rgba(var(--color-navy-abyss-rgb),0.50)" }}>
+          <div className="w-full max-w-2xl overflow-hidden rounded-[36px] animate-scale-in" style={{ background: "var(--surface-card)", boxShadow: "0 40px 120px rgba(var(--color-navy-abyss-rgb),0.50)" }}>
             <div className="relative flex items-center justify-between gap-4 px-8 py-7 text-white" style={{ background: "linear-gradient(135deg,var(--color-navy-deep),var(--color-navy-mid),var(--color-navy-bright))" }}>
               <div className="absolute top-0 inset-x-0" style={{ height: 3, background: "linear-gradient(90deg, transparent, var(--color-gold-dark), var(--color-gold), var(--color-gold-light), transparent)", opacity: 0.85 }} />
               <div>
@@ -407,13 +407,13 @@ const Repositorio = () => {
                 { label: "Título", type: "text", value: newMaterial.titulo, onChange: e => setNewMaterial({...newMaterial, titulo: e.target.value}) },
               ].map(({ label, ...props }) => (
                 <div key={label}>
-                  <label style={{ display: "block", marginBottom: 10, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.28em", color: "#64748b" }}>{label}</label>
+                  <label style={{ display: "block", marginBottom: 10, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.28em", color: "var(--text-muted)" }}>{label}</label>
                   <input
                     required
                     className="w-full rounded-2xl px-5 py-4 text-sm outline-none transition-all duration-200"
-                    style={{ background: "var(--color-ice)", border: "1.5px solid rgba(var(--color-navy-mid-rgb),0.10)", color: "#0f172a" }}
-                    onFocus={e => (e.target.style.borderColor = "var(--color-navy-mid)", e.target.style.background = "#fff", e.target.style.boxShadow = "0 0 0 4px rgba(var(--color-navy-mid-rgb),0.07)")}
-                    onBlur={e => (e.target.style.borderColor = "rgba(var(--color-navy-mid-rgb),0.10)", e.target.style.background = "var(--color-ice)", e.target.style.boxShadow = "")}
+                    style={{ background: "var(--surface-input)", border: "1.5px solid var(--border-subtle-strong)", color: "var(--text-heading)" }}
+                    onFocus={e => (e.target.style.borderColor = "var(--color-navy-mid)", e.target.style.background = "var(--surface-card)", e.target.style.boxShadow = "0 0 0 4px rgba(var(--color-navy-mid-rgb),0.07)")}
+                    onBlur={e => (e.target.style.borderColor = "var(--border-subtle-strong)", e.target.style.background = "var(--surface-input)", e.target.style.boxShadow = "")}
                     {...props}
                   />
                 </div>
@@ -421,18 +421,18 @@ const Repositorio = () => {
 
               <div className="grid gap-4 lg:grid-cols-2">
                 <div>
-                  <label style={{ display: "block", marginBottom: 10, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.28em", color: "#64748b" }}>Disciplina</label>
+                  <label style={{ display: "block", marginBottom: 10, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.28em", color: "var(--text-muted)" }}>Disciplina</label>
                   <select
                     value={newMaterial.cadeira}
                     onChange={e => setNewMaterial({...newMaterial, cadeira: e.target.value})}
                     className="w-full rounded-2xl px-5 py-4 text-sm outline-none appearance-none"
-                    style={{ background: "var(--color-ice)", border: "1.5px solid rgba(var(--color-navy-mid-rgb),0.10)", color: "#334155" }}
+                    style={{ background: "var(--surface-input)", border: "1.5px solid var(--border-subtle-strong)", color: "var(--text-body)" }}
                   >
                     {cursos.map(c => <option key={c.id} value={c.nome}>{c.nome}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label style={{ display: "block", marginBottom: 10, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.28em", color: "#64748b" }}>Tipo</label>
+                  <label style={{ display: "block", marginBottom: 10, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.28em", color: "var(--text-muted)" }}>Tipo</label>
                   <div className="grid grid-cols-2 gap-3">
                     {TIPOS_MATERIAL_DISPONIVEIS.map(tipo => (
                       <button
@@ -441,7 +441,7 @@ const Repositorio = () => {
                         className="rounded-2xl px-4 py-4 text-sm font-bold transition-all duration-200"
                         style={newMaterial.tipo === tipo
                           ? { background: "linear-gradient(135deg,var(--color-navy-deep),var(--color-navy-mid))", color: "#fff", boxShadow: "0 6px 20px rgba(var(--color-navy-deep-rgb),0.32)" }
-                          : { background: "var(--color-ice)", border: "1.5px solid rgba(var(--color-navy-mid-rgb),0.10)", color: "#475569" }
+                          : { background: "var(--surface-input)", border: "1.5px solid var(--border-subtle-strong)", color: "var(--text-body)" }
                         }
                       >
                         {tipo}
@@ -452,16 +452,16 @@ const Repositorio = () => {
               </div>
 
               <div>
-                <label style={{ display: "block", marginBottom: 10, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.28em", color: "#64748b" }}>Ficheiro</label>
+                <label style={{ display: "block", marginBottom: 10, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.28em", color: "var(--text-muted)" }}>Ficheiro</label>
                 <input
                   type="file"
                   accept={newMaterial.tipo === 'PDF' ? '.pdf' : 'video/mp4,video/x-m4v,video/*'}
                   onChange={e => setArquivoReal(e.target.files[0])}
                   required
                   className="w-full rounded-2xl px-4 py-5 text-sm cursor-pointer transition-all duration-200"
-                  style={{ background: "var(--color-ice)", border: "2px dashed rgba(var(--color-navy-mid-rgb),0.18)", color: "#64748b" }}
+                  style={{ background: "var(--surface-input)", border: "2px dashed var(--border-subtle-strong)", color: "var(--text-muted)" }}
                 />
-                <p style={{ fontSize: 11, color: "#94a3b8", marginTop: 8 }}>Tamanho máximo: {config.tamanho_maximo_mb} MB</p>
+                <p style={{ fontSize: 11, color: "var(--text-faint)", marginTop: 8 }}>Tamanho máximo: {config.tamanho_maximo_mb} MB</p>
               </div>
 
               <button

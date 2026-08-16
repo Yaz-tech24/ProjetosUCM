@@ -14,6 +14,8 @@ const Repositorio = lazy(() => import("./pages/Repositorio"));
 const Visualizador= lazy(() => import("./pages/Visualizador"));
 const Admin       = lazy(() => import("./pages/Admin"));
 const Chat        = lazy(() => import("./pages/Chat"));
+const Perfil      = lazy(() => import("./pages/Perfil"));
+const ReporSenha  = lazy(() => import("./pages/ReporSenha"));
 
 // ─── Fallback de carregamento entre páginas ───────────────────
 const PageLoader = () => (
@@ -73,16 +75,20 @@ const App = () => {
     setLoggedIn(true);
   };
 
+  const handleUpdateUsuario = useCallback((dados) => {
+    setUsuario(atual => {
+      const actualizado = { ...atual, ...dados };
+      localStorage.setItem('usuarioLogado', JSON.stringify(actualizado));
+      return actualizado;
+    });
+  }, []);
+
   // ─── Splash screen (só para utilizadores novos / não autenticados) ───
+  // Nota: não força navegação para "/" ao terminar — as próprias rotas já
+  // tratam do redireccionamento de utilizadores não autenticados, e forçar
+  // aqui destruía deep links públicos como /repor-senha?token=...
   if (splash) {
-    return (
-      <SplashScreen
-        onDone={() => {
-          setSplash(false);
-          if (!isLoggedIn) navigate("/");
-        }}
-      />
-    );
+    return <SplashScreen onDone={() => setSplash(false)} />;
   }
 
   // ─── Transição token→perfil ───────────────────────────────
@@ -112,6 +118,14 @@ const App = () => {
           path="/login"
           element={<Navigate to="/" replace />}
         />
+        <Route
+          path="/repor-senha"
+          element={
+            !isLoggedIn
+              ? <ReporSenha />
+              : <Navigate to="/dashboard" replace />
+          }
+        />
 
         {/* ─── PRIVADAS (Layout sem path, guarda de auth) ─── */}
         <Route
@@ -126,6 +140,7 @@ const App = () => {
           <Route path="video/:id"   element={<Visualizador usuarioLogado={usuarioLogado} />} />
           <Route path="admin"       element={<Admin       usuarioLogado={usuarioLogado} />} />
           <Route path="chat"        element={<Chat        usuarioLogado={usuarioLogado} />} />
+          <Route path="perfil"      element={<Perfil      usuarioLogado={usuarioLogado} onUpdateUsuario={handleUpdateUsuario} />} />
         </Route>
 
         {/* ─── 404 ────────────────────────────────────────── */}

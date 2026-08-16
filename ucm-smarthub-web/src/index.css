@@ -35,7 +35,77 @@
   /* ── Brancos/Ices (derivados da cor primária) ── */
   --color-ice:             #f0f5ff;  --color-ice-rgb:             240,245,255;
   --color-ice-mid:         #e8effc;  --color-ice-mid-rgb:         232,239,252;
+
+  /*
+   * ── Tokens semânticos (modo claro/escuro) ──
+   * Independentes da marca (navy/dourado) — essas mantêm-se fixas nos dois
+   * temas porque compõem o "chrome" (sidebar, heroes, botões dourados). Estes
+   * tokens é que mudam: superfícies de conteúdo (cartões, painéis) e texto.
+   */
+  --surface-page:          var(--color-ice);
+  --surface-card:          #ffffff;
+  --surface-card-glass:    rgba(255,255,255,0.85);
+  --surface-hover:         var(--color-ice);
+  --surface-input:         rgba(var(--color-ice-rgb),0.65);
+  --text-heading:          var(--color-navy-deep);
+  --text-body:             #334155;
+  --text-muted:            #64748b;
+  --text-faint:            #94a3b8;
+  --border-subtle:         rgba(var(--color-navy-mid-rgb),0.08);
+  --border-subtle-strong:  rgba(var(--color-navy-mid-rgb),0.14);
+  --gradient-accent-text:  linear-gradient(135deg, var(--color-navy-deep), var(--color-navy-mid));
+
+  /* ── Estados (aprovado/pendente/rejeitado, toasts, alertas) ── */
+  --status-success-bg:     rgba(16,185,129,0.09);  --status-success-text: #065f46; --status-success-border: rgba(16,185,129,0.25);
+  --status-warning-bg:     rgba(245,158,11,0.09);  --status-warning-text: #92400e; --status-warning-border: rgba(245,158,11,0.25);
+  --status-danger-bg:      rgba(239,68,68,0.09);   --status-danger-text:  #b91c1c; --status-danger-border:  rgba(239,68,68,0.25);
 }
+
+/* Segue a preferência do sistema quando o utilizador não escolheu explicitamente */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --surface-page:          #0a0f1c;
+    --surface-card:          #131b2e;
+    --surface-card-glass:    rgba(19,27,46,0.85);
+    --surface-hover:         #1b2438;
+    --surface-input:         #0f1728;
+    --text-heading:          #f1f5f9;
+    --text-body:             #cbd5e1;
+    --text-muted:            #94a3b8;
+    --text-faint:            #64748b;
+    --border-subtle:         rgba(255,255,255,0.08);
+    --border-subtle-strong:  rgba(255,255,255,0.14);
+    --gradient-accent-text:  linear-gradient(135deg, #eaf2ff, var(--color-blue-sky));
+
+    --status-success-bg:     rgba(16,185,129,0.16);  --status-success-text: #6ee7b7; --status-success-border: rgba(16,185,129,0.35);
+    --status-warning-bg:     rgba(245,158,11,0.16);  --status-warning-text: #fcd34d; --status-warning-border: rgba(245,158,11,0.35);
+    --status-danger-bg:      rgba(239,68,68,0.16);   --status-danger-text:  #fca5a5; --status-danger-border:  rgba(239,68,68,0.35);
+  }
+}
+
+/* Escolha explícita do utilizador (toggle), sobrepõe a preferência do sistema nos dois sentidos */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface-page:          #0a0f1c;
+  --surface-card:          #131b2e;
+  --surface-card-glass:    rgba(19,27,46,0.85);
+  --surface-hover:         #1b2438;
+  --surface-input:         #0f1728;
+  --text-heading:          #f1f5f9;
+  --text-body:             #cbd5e1;
+  --text-muted:            #94a3b8;
+  --text-faint:            #64748b;
+  --border-subtle:         rgba(255,255,255,0.08);
+  --border-subtle-strong:  rgba(255,255,255,0.14);
+  --gradient-accent-text:  linear-gradient(135deg, #eaf2ff, var(--color-blue-sky));
+
+  --status-success-bg:     rgba(16,185,129,0.16);  --status-success-text: #6ee7b7; --status-success-border: rgba(16,185,129,0.35);
+  --status-warning-bg:     rgba(245,158,11,0.16);  --status-warning-text: #fcd34d; --status-warning-border: rgba(245,158,11,0.35);
+  --status-danger-bg:      rgba(239,68,68,0.16);   --status-danger-text:  #fca5a5; --status-danger-border:  rgba(239,68,68,0.35);
+}
+
+:root[data-theme="light"] { color-scheme: light; }
 
 html { min-height: 100%; }
 
@@ -45,23 +115,27 @@ body {
     radial-gradient(ellipse at 8% 5%,  rgba(var(--color-gold-rgb),0.10)  0%, transparent 38%),
     radial-gradient(ellipse at 92% 95%, rgba(0, 51,102,0.10) 0%, transparent 38%),
     radial-gradient(ellipse at 55% 45%, rgba(var(--color-blue-sky-rgb),0.07) 0%, transparent 55%),
-    var(--color-ice);
+    var(--surface-page);
   font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  color: #0f172a;
+  color: var(--text-body);
+  transition: background-color 0.25s ease, color 0.25s ease;
 }
 
 /* ─── Scrollbar Personalizada ─── */
 ::-webkit-scrollbar       { width: 7px; height: 7px; }
-::-webkit-scrollbar-track { background: var(--color-ice-mid); border-radius: 99px; }
+::-webkit-scrollbar-track { background: var(--surface-hover); border-radius: 99px; }
 ::-webkit-scrollbar-thumb {
   background: linear-gradient(180deg, var(--color-navy-bright) 0%, var(--color-navy-mid) 100%);
   border-radius: 99px;
-  border: 2px solid var(--color-ice-mid);
+  border: 2px solid var(--surface-hover);
 }
 ::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, var(--color-blue-accent) 0%, var(--color-navy-mid) 100%); }
 
 /* ─── Seleção de texto ─── */
 ::selection { background: rgba(var(--color-gold-rgb),0.35); color: var(--color-navy-deep); }
+
+/* ─── Placeholder de inputs — theme-aware em toda a app ─── */
+::placeholder { color: var(--text-faint); opacity: 1; }
 
 /* ══════════════════════════════════════════════════
    ANIMAÇÕES PRINCIPAIS
