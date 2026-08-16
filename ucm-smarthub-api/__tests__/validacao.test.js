@@ -1,13 +1,11 @@
 import { describe, it, expect } from "vitest";
 
-// Estes testes só exercitam os schemas zod exportados (funções puras, sem
-// tocar na BD) — importar server.js liga-se de facto à BD real configurada em
-// .env (só uma ligação de teste em config/db.js, sem correr queries), o que é
-// inofensivo aqui.
+// Estes testes só exercitam os schemas zod exportados (funções puras) —
+// importam directamente de schemas/, sem tocar em server.js nem na BD.
 const {
   schemaRegisto, schemaLogin, schemaMaterial, schemaConfig, schemaCurso,
   schemaPerfilNome, schemaPerfilSenha, schemaEsqueciSenha, schemaReporSenha,
-} = require("../server");
+} = require("../schemas");
 
 describe("schemaRegisto", () => {
   it("aceita dados válidos e normaliza (trim/lowercase)", () => {

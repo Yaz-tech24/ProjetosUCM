@@ -67,6 +67,7 @@ describe("POST /api/register", () => {
     mockSql([
       [/FROM cursos/, [[{ id: 1, nome: "Geral" }]]],
       [/SELECT id FROM usuarios/, [[]]],
+      [/COUNT\(\*\) AS total FROM usuarios/, [[{ total: 5 }]]],
       [/INSERT INTO usuarios/, [{ insertId: 42 }]],
       [/FROM configuracoes/, [[{ nome_plataforma: "SmartHub", cor_primaria: "#04122e", cor_destaque: "#ffd700" }]]],
     ]);
@@ -74,6 +75,25 @@ describe("POST /api/register", () => {
       nome: "Ana", email: "ana@teste.com", senha: "senha1234", curso: "Geral",
     });
     expect(res.status).toBe(201);
+    expect(res.body.mensagem).toBe("Utilizador criado com sucesso!");
+  });
+
+  it("torna admin a primeira conta criada numa plataforma vazia", async () => {
+    let papelInserido;
+    vi.spyOn(db, "query").mockImplementation((sql, params) => {
+      if (/FROM cursos/.test(sql)) return Promise.resolve([[{ id: 1, nome: "Geral" }]]);
+      if (/SELECT id FROM usuarios/.test(sql)) return Promise.resolve([[]]);
+      if (/COUNT\(\*\) AS total FROM usuarios/.test(sql)) return Promise.resolve([[{ total: 0 }]]);
+      if (/INSERT INTO usuarios/.test(sql)) { papelInserido = params[4]; return Promise.resolve([{ insertId: 1 }]); }
+      if (/FROM configuracoes/.test(sql)) return Promise.resolve([[{ nome_plataforma: "SmartHub", cor_primaria: "#04122e", cor_destaque: "#ffd700" }]]);
+      return Promise.resolve([[]]);
+    });
+    const res = await request(app).post("/api/register").send({
+      nome: "Primeiro Admin", email: "primeiro@teste.com", senha: "senha1234", papel: "estudante", curso: "Geral",
+    });
+    expect(res.status).toBe(201);
+    expect(papelInserido).toBe("admin");
+    expect(res.body.mensagem).toMatch(/administrador/);
   });
 });
 
@@ -121,5 +141,22 @@ describe("middleware autenticar", () => {
     const res = await request(app).get("/api/meus-materiais").set("Authorization", "Bearer token-invalido");
     expect(res.status).toBe(401);
     expect(res.body.erro).toMatch(/inválido/);
+  });
+});
+
+describe("GET /api/status", () => {
+  beforeEach(() => { restaurarDb(); });
+
+  it("responde 200 quando a BD está acessível", async () => {
+    vi.spyOn(db, "query").mockResolvedValue([[{ 1: 1 }]]);
+    const res = await request(app).get("/api/status");
+    expect(res.status).toBe(200);
+    expect(res.body.bd).toBe("ligada");
+  });
+
+  it("responde 503 quando a BD está inacessível — o healthcheck não mente", async () => {
+    vi.spyOn(db, "query").mockRejectedValue(new Error("connection refused"));
+    const res = await request(app).get("/api/status");
+    expect(res.status).toBe(503);
   });
 });

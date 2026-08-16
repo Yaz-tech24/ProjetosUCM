@@ -80,5 +80,5 @@ const definicao = {
 
 module.exports = swaggerJsdoc({
   definition: definicao,
-  apis: [__dirname + "/server.js"],
+  apis: [__dirname + "/server.js", __dirname + "/routes/*.js"],
 });

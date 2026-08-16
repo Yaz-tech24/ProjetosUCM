@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Estes testes chamam verificarConformidadeIA directamente com um cliente Gemini
 // falso (ver abaixo) — nunca tocam na BD, por isso não precisam de a mockar.
-const { verificarConformidadeIA } = require("../server");
+const { verificarConformidadeIA } = require("../services/ia");
 
 // `verificarConformidadeIA` aceita um cliente Gemini injectável (3º parâmetro) —
 // evita ter de mockar o módulo do SDK (o node_modules externo não é interceptado

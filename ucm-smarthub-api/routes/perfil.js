@@ -1,0 +1,135 @@
+const bcrypt = require("bcryptjs");
+const path = require("path");
+const fs = require("fs");
+
+const db = require("../config/db");
+const validar = require("../middleware/validar");
+const { autenticar } = require("../middleware/auth");
+const { uploadsDir, uploadAvatar } = require("../middleware/upload");
+const { schemaPerfilNome, schemaPerfilSenha } = require("../schemas");
+
+module.exports = function registarRotasPerfil(app) {
+  // ==========================================
+  // PERFIL DO UTILIZADOR
+  // ==========================================
+  /**
+   * @openapi
+   * /api/perfil:
+   *   put:
+   *     summary: Actualiza o nome do próprio perfil
+   *     tags: [Perfil]
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema: { type: object, required: [nome], properties: { nome: { type: string } } }
+   *     responses:
+   *       200:
+   *         description: Perfil actualizado
+   *         content: { application/json: { schema: { type: object, properties: { utilizador: { $ref: '#/components/schemas/Utilizador' } } } } }
+   *       401: { description: Não autenticado }
+   */
+  app.put("/api/perfil", autenticar, validar(schemaPerfilNome), async (req, res) => {
+    try {
+      await db.query("UPDATE usuarios SET nome = ? WHERE id = ?", [req.body.nome, req.utilizador.id]);
+      const [[utilizador]] = await db.query(
+        "SELECT id, nome, email, papel, curso, avatar_url FROM usuarios WHERE id = ?",
+        [req.utilizador.id]
+      );
+      res.json({ mensagem: "Perfil actualizado com sucesso!", utilizador });
+    } catch (erro) {
+      console.error("Erro ao actualizar perfil:", erro.message);
+      res.status(500).json({ erro: "Falha ao actualizar perfil." });
+    }
+  });
+
+  /**
+   * @openapi
+   * /api/perfil/senha:
+   *   put:
+   *     summary: Muda a palavra-passe do próprio utilizador
+   *     tags: [Perfil]
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required: [senha_actual, nova_senha]
+   *             properties:
+   *               senha_actual: { type: string }
+   *               nova_senha: { type: string, minLength: 8 }
+   *     responses:
+   *       200: { description: Palavra-passe alterada }
+   *       400: { description: Palavra-passe actual incorrecta, content: { application/json: { schema: { $ref: '#/components/schemas/Erro' } } } }
+   */
+  app.put("/api/perfil/senha", autenticar, validar(schemaPerfilSenha), async (req, res) => {
+    try {
+      const { senha_actual, nova_senha } = req.body;
+      const [[utilizador]] = await db.query("SELECT senha FROM usuarios WHERE id = ?", [req.utilizador.id]);
+      const senhaValida = await bcrypt.compare(senha_actual, utilizador.senha);
+      if (!senhaValida) {
+        return res.status(400).json({ erro: "Palavra-passe actual incorrecta." });
+      }
+      const senhaCriptografada = await bcrypt.hash(nova_senha, await bcrypt.genSalt(10));
+      await db.query("UPDATE usuarios SET senha = ? WHERE id = ?", [senhaCriptografada, req.utilizador.id]);
+      res.json({ mensagem: "Palavra-passe alterada com sucesso!" });
+    } catch (erro) {
+      console.error("Erro ao mudar password:", erro.message);
+      res.status(500).json({ erro: "Falha ao alterar a palavra-passe." });
+    }
+  });
+
+  /**
+   * @openapi
+   * /api/perfil/avatar:
+   *   post:
+   *     summary: Carrega/substitui o avatar do utilizador
+   *     tags: [Perfil]
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         multipart/form-data:
+   *           schema: { type: object, properties: { avatar: { type: string, format: binary } } }
+   *     responses:
+   *       200: { description: Avatar actualizado }
+   *   delete:
+   *     summary: Remove o avatar do utilizador
+   *     tags: [Perfil]
+   *     responses:
+   *       200: { description: Avatar removido }
+   */
+  app.post("/api/perfil/avatar", autenticar, uploadAvatar.single("avatar"), async (req, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ erro: "Nenhuma imagem enviada." });
+
+      const [[actual]] = await db.query("SELECT avatar_url FROM usuarios WHERE id = ?", [req.utilizador.id]);
+      const baseUrl = process.env.API_URL || `http://localhost:${process.env.PORT || 5000}`;
+      const avatar_url = `${baseUrl}/uploads/${req.file.filename}`;
+      await db.query("UPDATE usuarios SET avatar_url = ? WHERE id = ?", [avatar_url, req.utilizador.id]);
+
+      if (actual?.avatar_url) {
+        fs.unlink(path.join(uploadsDir, path.basename(actual.avatar_url)), () => {});
+      }
+      res.json({ mensagem: "Avatar actualizado!", avatar_url });
+    } catch (erro) {
+      if (req.file) fs.unlink(req.file.path, () => {});
+      console.error("Erro ao gravar avatar:", erro.message);
+      res.status(500).json({ erro: "Falha ao actualizar avatar." });
+    }
+  });
+
+  app.delete("/api/perfil/avatar", autenticar, async (req, res) => {
+    try {
+      const [[actual]] = await db.query("SELECT avatar_url FROM usuarios WHERE id = ?", [req.utilizador.id]);
+      await db.query("UPDATE usuarios SET avatar_url = NULL WHERE id = ?", [req.utilizador.id]);
+      if (actual?.avatar_url) {
+        fs.unlink(path.join(uploadsDir, path.basename(actual.avatar_url)), () => {});
+      }
+      res.json({ mensagem: "Avatar removido." });
+    } catch (erro) {
+      console.error("Erro ao remover avatar:", erro.message);
+      res.status(500).json({ erro: "Falha ao remover avatar." });
+    }
+  });
+};
