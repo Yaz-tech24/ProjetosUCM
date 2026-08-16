@@ -1,8 +1,13 @@
 const db = require("../config/db");
+const { paraUrlAbsoluto } = require("../utils/urls");
 
 async function getConfiguracoes() {
   const [[config]] = await db.query("SELECT * FROM configuracoes WHERE id = 1");
-  return config || {};
+  if (!config) return {};
+  // logo_url é guardado como caminho relativo — converte-se aqui, num único
+  // sítio, para que todos os consumidores (rotas, emails) recebam sempre um
+  // URL absoluto correcto face ao domínio ACTUAL da instância.
+  return { ...config, logo_url: paraUrlAbsoluto(config.logo_url) };
 }
 
 async function getCursos() {

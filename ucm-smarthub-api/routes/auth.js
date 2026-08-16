@@ -5,6 +5,7 @@ const crypto = require("crypto");
 const db = require("../config/db");
 const mailer = require("../services/email");
 const { getConfiguracoes, getCursos } = require("../services/plataforma");
+const { paraUrlAbsoluto } = require("../utils/urls");
 const validar = require("../middleware/validar");
 const { JWT_SECRET } = require("../middleware/auth");
 const {
@@ -13,6 +14,7 @@ const {
 } = require("../middleware/rateLimiters");
 const {
   schemaRegisto, schemaLogin, schemaEsqueciSenha, schemaReporSenha,
+  emailComDominioPermitido,
 } = require("../schemas");
 
 // Hash bcrypt fixo sem correspondência real — usado quando o email não existe,
@@ -28,7 +30,7 @@ module.exports = function registarRotasAuth(app) {
    * @openapi
    * /api/register:
    *   post:
-   *     summary: Cria uma nova conta (a primeira conta da plataforma torna-se admin automaticamente)
+   *     summary: Cria uma nova conta de estudante (a primeira conta da plataforma torna-se admin automaticamente). Contas de docente/admin só podem ser criadas por um administrador — ver /api/admin/utilizadores.
    *     tags: [Autenticação]
    *     security: []
    *     requestBody:
@@ -42,15 +44,19 @@ module.exports = function registarRotasAuth(app) {
    *               nome: { type: string }
    *               email: { type: string }
    *               senha: { type: string, minLength: 8 }
-   *               papel: { type: string, enum: [estudante, professor] }
    *               curso: { type: string }
    *     responses:
    *       201: { description: Conta criada }
-   *       400: { description: Dados inválidos ou email já em uso, content: { application/json: { schema: { $ref: '#/components/schemas/Erro' } } } }
+   *       400: { description: Dados inválidos, domínio de email não permitido, ou email já em uso, content: { application/json: { schema: { $ref: '#/components/schemas/Erro' } } } }
    */
   app.post("/api/register", limitarRegisto, validar(schemaRegisto), async (req, res) => {
     try {
-      const { nome, email, senha, papel } = req.body;
+      const { nome, email, senha } = req.body;
+
+      const config = await getConfiguracoes();
+      if (!emailComDominioPermitido(email, config.dominios_email_permitidos)) {
+        return res.status(400).json({ erro: "Este domínio de email não é aceite nesta plataforma." });
+      }
 
       const cursos = await getCursos();
       const cursoValido = cursos.find(c => c.nome === req.body.curso)?.nome;
@@ -74,8 +80,10 @@ module.exports = function registarRotasAuth(app) {
       // Bootstrap: numa instalação nova (sem nenhum utilizador ainda), a primeira
       // conta criada torna-se admin automaticamente — sem isto não haveria
       // nenhuma forma de configurar a plataforma numa instalação de raiz.
+      // O registo público é sempre "estudante" fora deste caso — docentes só
+      // podem ser criados por um admin (POST /api/admin/utilizadores).
       const [[{ total }]] = await db.query("SELECT COUNT(*) AS total FROM usuarios");
-      const papelFinal = total === 0 ? "admin" : papel;
+      const papelFinal = total === 0 ? "admin" : "estudante";
 
       await db.query(
         "INSERT INTO usuarios (nome, email, senha, curso, papel) VALUES (?, ?, ?, ?, ?)",
@@ -173,7 +181,7 @@ module.exports = function registarRotasAuth(app) {
           email: utilizador.email,
           papel: utilizador.papel,
           curso: utilizador.curso,
-          avatar_url: utilizador.avatar_url,
+          avatar_url: paraUrlAbsoluto(utilizador.avatar_url),
         },
       });
     } catch (erro) {

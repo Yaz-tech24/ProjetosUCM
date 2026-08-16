@@ -1,6 +1,6 @@
 const util = require("util");
 const fs = require("fs");
-const pdfParse = require("pdf-parse");
+const { PDFParse } = require("pdf-parse");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 const readFile = util.promisify(fs.readFile);
@@ -21,8 +21,15 @@ const GEMINI_MODELS = [
 
 async function extractPdfText(filePath) {
   const dataBuffer = await readFile(filePath);
-  const parsed = await pdfParse(dataBuffer);
-  return parsed.text || "";
+  // pdf-parse 2.x expõe uma classe (não uma função callable como em versões
+  // anteriores) — new PDFParse({ data }) + getText() é a API actual.
+  const parser = new PDFParse({ data: dataBuffer });
+  try {
+    const resultado = await parser.getText();
+    return resultado.text || "";
+  } finally {
+    await parser.destroy();
+  }
 }
 
 async function gerarResumoIA(prompt, fallbackText) {

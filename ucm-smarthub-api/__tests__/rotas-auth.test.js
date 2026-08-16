@@ -78,6 +78,34 @@ describe("POST /api/register", () => {
     expect(res.body.mensagem).toBe("Utilizador criado com sucesso!");
   });
 
+  it("rejeita registo quando o domínio de email não está na lista configurada pelo admin", async () => {
+    mockSql([
+      [/FROM configuracoes/, [[{ dominios_email_permitidos: "gmail.com" }]]],
+    ]);
+    const res = await request(app).post("/api/register").send({
+      nome: "Ana", email: "ana@hotmail.com", senha: "senha1234", curso: "Geral",
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.erro).toMatch(/domínio/);
+  });
+
+  it("não força o papel via body — registo público insere sempre 'estudante' (fora do bootstrap)", async () => {
+    let papelInserido;
+    vi.spyOn(db, "query").mockImplementation((sql, params) => {
+      if (/FROM configuracoes/.test(sql)) return Promise.resolve([[{ dominios_email_permitidos: "" }]]);
+      if (/FROM cursos/.test(sql)) return Promise.resolve([[{ id: 1, nome: "Geral" }]]);
+      if (/SELECT id FROM usuarios/.test(sql)) return Promise.resolve([[]]);
+      if (/COUNT\(\*\) AS total FROM usuarios/.test(sql)) return Promise.resolve([[{ total: 3 }]]);
+      if (/INSERT INTO usuarios/.test(sql)) { papelInserido = params[4]; return Promise.resolve([{ insertId: 2 }]); }
+      return Promise.resolve([[]]);
+    });
+    const res = await request(app).post("/api/register").send({
+      nome: "Ana", email: "ana2@teste.com", senha: "senha1234", curso: "Geral", papel: "professor",
+    });
+    expect(res.status).toBe(201);
+    expect(papelInserido).toBe("estudante");
+  });
+
   it("torna admin a primeira conta criada numa plataforma vazia", async () => {
     let papelInserido;
     vi.spyOn(db, "query").mockImplementation((sql, params) => {

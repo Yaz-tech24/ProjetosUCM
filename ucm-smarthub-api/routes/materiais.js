@@ -4,7 +4,8 @@ const fs = require("fs");
 const db = require("../config/db");
 const mailer = require("../services/email");
 const { getConfiguracoes, getCursos } = require("../services/plataforma");
-const { extractPdfText, gerarResumoIA, verificarConformidadeIA } = require("../services/ia");
+const { genAI, extractPdfText, gerarResumoIA, verificarConformidadeIA } = require("../services/ia");
+const { paraUrlAbsoluto } = require("../utils/urls");
 const validar = require("../middleware/validar");
 const { autenticar, apenasAdmin } = require("../middleware/auth");
 const { uploadsDir, upload } = require("../middleware/upload");
@@ -98,7 +99,7 @@ module.exports = function registarRotasMateriais(app) {
       );
 
       res.status(200).json({
-        materiais,
+        materiais: materiais.map(m => ({ ...m, url_arquivo: paraUrlAbsoluto(m.url_arquivo) })),
         pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
       });
     } catch (erro) {
@@ -137,7 +138,7 @@ module.exports = function registarRotasMateriais(app) {
       if (resultado.length === 0) {
         return res.status(404).json({ erro: "Material não encontrado." });
       }
-      res.status(200).json(resultado[0]);
+      res.status(200).json({ ...resultado[0], url_arquivo: paraUrlAbsoluto(resultado[0].url_arquivo) });
     } catch (erro) {
       console.error("Erro ao buscar material:", erro.message);
       res.status(500).json({ erro: "Falha ao buscar material." });
@@ -348,18 +349,28 @@ Responde APENAS com as 3 notas numeradas. Sem introdução, sem conclusão.`;
 
       const { sinalizado, motivo } = await verificarConformidadeIA(config, { titulo, cadeira, tipo });
 
+      // A IA já analisou o material acima: se a moderação estiver activada, a
+      // chave do Gemini estiver configurada (sem ela, verificarConformidadeIA
+      // nunca sinaliza nada — não podemos tratar "não verificou" como "está
+      // conforme") e nada de suspeito for encontrado, o material é publicado
+      // de imediato. Em qualquer outro caso — sinalizado, moderação desligada,
+      // ou IA não configurada — vai para a fila de aprovação manual do admin.
+      const statusInicial = config.moderacao_ia_activada && genAI && !sinalizado ? "aprovado" : "pendente";
+
       // Usa sempre o ID do utilizador autenticado — ignora qualquer autor_id do body
       const autor_id = req.utilizador.id;
-      const baseUrl = process.env.API_URL || `http://localhost:${process.env.PORT || 5000}`;
-      const url_arquivo = `${baseUrl}/uploads/${req.file.filename}`;
+      const url_arquivo = `/uploads/${req.file.filename}`;
       const [resultado] = await db.query(
         "INSERT INTO materiais (titulo, cadeira, tipo, url_arquivo, autor_id, status, ia_sinalizado, ia_motivo) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        [titulo, cadeira, tipo, url_arquivo, autor_id, "pendente", sinalizado, motivo]
+        [titulo, cadeira, tipo, url_arquivo, autor_id, statusInicial, sinalizado, motivo]
       );
 
       res.status(201).json({
-        mensagem: "Ficheiro enviado para aprovação.",
+        mensagem: statusInicial === "aprovado"
+          ? "Material publicado automaticamente após verificação pela IA."
+          : "Ficheiro enviado para aprovação.",
         id_novo_material: resultado.insertId,
+        status: statusInicial,
       });
     } catch (erro) {
       limparFicheiroOrfao();

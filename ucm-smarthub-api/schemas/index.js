@@ -16,13 +16,38 @@ const senhaForte = () => z.string()
   .regex(/[A-Za-z]/, "A palavra-passe deve conter pelo menos uma letra.")
   .regex(/[0-9]/, "A palavra-passe deve conter pelo menos um número.");
 
+// Registo público — sempre estudante. Contas de docente/admin só podem ser
+// criadas por um administrador (ver schemaUtilizadorAdmin), por isso este
+// schema nem aceita "papel" do cliente — evita que alguém tente forçar o
+// campo directamente na API, ignorando a interface.
 const schemaRegisto = z.object({
   nome: z.string().trim().min(1, "Nome é obrigatório."),
   email: z.string().trim().toLowerCase().pipe(z.email("Email inválido.")),
   senha: senhaForte(),
-  papel: z.enum(["estudante", "professor"]).catch("estudante"),
   curso: z.string().trim().min(1, "Curso inválido."),
 });
+
+// Criação de conta pelo admin — pode escolher qualquer papel (inclui
+// "professor" e mesmo outro "admin"), ao contrário do registo público.
+const schemaUtilizadorAdmin = z.object({
+  nome: z.string().trim().min(1, "Nome é obrigatório."),
+  email: z.string().trim().toLowerCase().pipe(z.email("Email inválido.")),
+  senha: senhaForte(),
+  papel: z.enum(["estudante", "professor", "admin"]).catch("professor"),
+  curso: z.string().trim().min(1, "Curso inválido."),
+});
+
+// Restrição de domínio de email — configurável pelo admin (ex: só contas
+// "@universidade.ac.mz" ou "@gmail.com"). Lista vazia = sem restrição,
+// qualquer domínio é aceite. Verificado no handler da rota (depende da
+// configuração guardada na BD, não é uma regra estática do schema).
+function emailComDominioPermitido(email, dominiosPermitidos) {
+  const lista = (dominiosPermitidos || "")
+    .split(",").map(d => d.trim().toLowerCase()).filter(Boolean);
+  if (lista.length === 0) return true;
+  const dominio = email.split("@")[1]?.toLowerCase();
+  return lista.includes(dominio);
+}
 
 const schemaLogin = z.object({
   email: z.string().trim().toLowerCase(),
@@ -46,6 +71,7 @@ const schemaConfig = z.object({
   link_facebook: z.string().trim().catch(""),
   link_instagram: z.string().trim().catch(""),
   link_linkedin: z.string().trim().catch(""),
+  dominios_email_permitidos: z.string().trim().catch(""),
   chat_activado: z.coerce.boolean(),
   ia_activada: z.coerce.boolean(),
   moderacao_ia_activada: z.coerce.boolean(),
@@ -78,6 +104,7 @@ const schemaReporSenha = z.object({
 
 module.exports = {
   HEX_COLOR_REGEX, TIPOS_FICHEIRO_VALIDOS, TAMANHO_MAXIMO_TECTO_MB,
-  schemaRegisto, schemaLogin, schemaMaterial, schemaConfig, schemaCurso,
+  schemaRegisto, schemaUtilizadorAdmin, schemaLogin, schemaMaterial, schemaConfig, schemaCurso,
   schemaPerfilNome, schemaPerfilSenha, schemaEsqueciSenha, schemaReporSenha,
+  emailComDominioPermitido,
 };

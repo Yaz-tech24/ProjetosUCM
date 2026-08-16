@@ -64,6 +64,7 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 // ─── Rotas — cada módulo regista os seus próprios endpoints em `app` ──────
 require("./routes/auth")(app);
 require("./routes/perfil")(app);
+require("./routes/utilizadores")(app);
 require("./routes/materiais")(app);
 require("./routes/config")(app);
 require("./routes/stats")(app);
@@ -128,6 +129,11 @@ async function runMigrations() {
       // Coluna já existe — ignorar
     }
   }
+  try {
+    await db.query(`ALTER TABLE configuracoes ADD COLUMN dominios_email_permitidos VARCHAR(255) NULL`);
+  } catch {
+    // Coluna já existe — ignorar
+  }
 
   await db.query(`
     CREATE TABLE IF NOT EXISTS configuracoes (
@@ -143,6 +149,7 @@ async function runMigrations() {
       link_facebook VARCHAR(255) NULL,
       link_instagram VARCHAR(255) NULL,
       link_linkedin VARCHAR(255) NULL,
+      dominios_email_permitidos VARCHAR(255) NULL,
       chat_activado BOOLEAN NOT NULL DEFAULT TRUE,
       ia_activada BOOLEAN NOT NULL DEFAULT TRUE,
       moderacao_ia_activada BOOLEAN NOT NULL DEFAULT TRUE,

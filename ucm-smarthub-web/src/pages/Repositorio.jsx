@@ -105,6 +105,7 @@ const Repositorio = () => {
   const [arquivoReal,     setArquivoReal]     = useState(null);
   const [uploadErro,      setUploadErro]      = useState('');
   const [uploadSucesso,   setUploadSucesso]   = useState(false);
+  const [uploadPublicado, setUploadPublicado] = useState(false);
   const [favs,            setFavs]            = useState(getFavoritos);
 
   const TIPOS_MATERIAL_DISPONIVEIS = useMemo(() => {
@@ -171,11 +172,12 @@ const Repositorio = () => {
     formData.append("tipo",    newMaterial.tipo);
     formData.append("arquivo", arquivoReal);
     try {
-      await api.post("/materiais", formData, { headers: { "Content-Type": "multipart/form-data" } });
+      const res = await api.post("/materiais", formData, { headers: { "Content-Type": "multipart/form-data" } });
       setShowUploadModal(false);
       setNewMaterial({ titulo: "", cadeira: "Informática", tipo: "PDF" });
       setArquivoReal(null);
       setUploadErro('');
+      setUploadPublicado(res.data.status === "aprovado");
       setUploadSucesso(true);
       setTimeout(() => setUploadSucesso(false), 5000);
       fetchMateriais(1);
@@ -203,8 +205,14 @@ const Repositorio = () => {
           style={{ background: "var(--surface-card)", borderLeft: "3px solid #10b981", border: "1px solid var(--border-subtle-strong)", borderLeftWidth: 3, borderLeftColor: "#10b981", color: "var(--text-heading)", boxShadow: "0 10px 40px rgba(0,0,0,0.16)" }}>
           <CheckCircle size={18} style={{ color: "#10b981", flexShrink: 0 }} />
           <div>
-            <p style={{ fontSize: 14, fontWeight: 700 }}>Material enviado para aprovação!</p>
-            <p style={{ fontSize: 12, opacity: 0.75 }}>O admin irá rever e publicar em breve.</p>
+            <p style={{ fontSize: 14, fontWeight: 700 }}>
+              {uploadPublicado ? "Material publicado!" : "Material enviado para aprovação!"}
+            </p>
+            <p style={{ fontSize: 12, opacity: 0.75 }}>
+              {uploadPublicado
+                ? "A IA verificou o conteúdo e já está disponível no repositório."
+                : "O admin irá rever e publicar em breve."}
+            </p>
           </div>
           <button onClick={() => setUploadSucesso(false)} style={{ opacity: 0.45, marginLeft: 8, background: "none", border: "none", cursor: "pointer" }}>
             <X size={15} />

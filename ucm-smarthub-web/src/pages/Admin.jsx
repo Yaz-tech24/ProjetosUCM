@@ -2,9 +2,10 @@ import React, { useState, useEffect, useCallback } from "react";
 import api from "../services/api";
 import {
   ShieldCheck, CheckCircle, XCircle, Clock, AlertTriangle, X, MessageCircle, Trash2,
-  Settings, Upload, Plus, Save, Sparkles,
+  Settings, Upload, Plus, Save, Sparkles, Users, UserPlus, Mail, GraduationCap, Lock,
 } from "lucide-react";
 import { useConfig } from "../context/ConfigContext";
+import { aplicarPaleta } from "../utils/palette";
 
 const TIPOS_FICHEIRO_OPCOES = [
   { valor: "pdf",  label: "PDF" },
@@ -117,12 +118,37 @@ const Admin = ({ usuarioLogado }) => {
   const [logoUploading, setLogoUploading] = useState(false);
   const [novoCurso,     setNovoCurso]     = useState('');
 
+  /* ── Utilizadores state ── */
+  const [utilizadores,       setUtilizadores]       = useState([]);
+  const [loadingUtilizadores, setLoadingUtilizadores] = useState(false);
+  const [criandoUtilizador,  setCriandoUtilizador]  = useState(false);
+  const [novoUtilizador, setNovoUtilizador] = useState({ nome: '', email: '', senha: '', papel: 'professor', curso: '' });
+
   /* Semeia o rascunho local uma única vez, quando a configuração chega */
   useEffect(() => {
     if (!configForm && config) {
       setConfigForm({ ...config, tipos_ficheiro_permitidos: (config.tipos_ficheiro_permitidos || '').split(',') });
     }
   }, [config, configForm]);
+
+  /* Pré-visualização em tempo real: como todos os gradientes e cores da app
+     derivam destas duas cores base via variáveis CSS, aplicá-las já ao
+     rascunho (antes de guardar) mostra imediatamente o efeito em todo o
+     lado — incluindo neste próprio painel. Só fica activa enquanto a aba
+     "Configurações" está aberta — mudar de aba sem guardar repõe de
+     imediato a paleta realmente guardada (não fica "presa" em pré-visualização). */
+  useEffect(() => {
+    if (aba === 'config' && configForm?.cor_primaria && configForm?.cor_destaque) {
+      aplicarPaleta(configForm.cor_primaria, configForm.cor_destaque);
+    } else if (config?.cor_primaria && config?.cor_destaque) {
+      aplicarPaleta(config.cor_primaria, config.cor_destaque);
+    }
+    return () => {
+      if (config?.cor_primaria && config?.cor_destaque) {
+        aplicarPaleta(config.cor_primaria, config.cor_destaque);
+      }
+    };
+  }, [aba, configForm?.cor_primaria, configForm?.cor_destaque, config]);
 
   const showToast = useCallback((message, type = 'success') => {
     setToast({ message, type });
@@ -163,6 +189,29 @@ const Admin = ({ usuarioLogado }) => {
   useEffect(() => {
     if (aba === 'chat') fetchMensagens(cursoChatFiltro);
   }, [aba, cursoChatFiltro, fetchMensagens]);
+
+  const fetchUtilizadores = useCallback(async () => {
+    setLoadingUtilizadores(true);
+    try {
+      const res = await api.get('/admin/utilizadores');
+      setUtilizadores(res.data || []);
+    } catch {
+      showToast('Erro ao carregar utilizadores.', 'error');
+    } finally {
+      setLoadingUtilizadores(false);
+    }
+  }, [showToast]);
+
+  useEffect(() => {
+    if (aba === 'utilizadores') fetchUtilizadores();
+  }, [aba, fetchUtilizadores]);
+
+  /* Selecciona o primeiro curso disponível assim que a lista carrega */
+  useEffect(() => {
+    if (!novoUtilizador.curso && cursos.length > 0) {
+      setNovoUtilizador(u => ({ ...u, curso: cursos[0].nome }));
+    }
+  }, [cursos, novoUtilizador.curso]);
 
   if (usuarioLogado?.papel !== "admin") {
     return (
@@ -265,6 +314,21 @@ const Admin = ({ usuarioLogado }) => {
       await refetchConfig();
     } catch {
       showToast('Erro ao remover logótipo.', 'error');
+    }
+  };
+
+  const handleCriarUtilizador = async (e) => {
+    e.preventDefault();
+    setCriandoUtilizador(true);
+    try {
+      await api.post('/admin/utilizadores', novoUtilizador);
+      showToast(`Conta de ${novoUtilizador.papel} criada com sucesso!`, 'success');
+      setNovoUtilizador(u => ({ nome: '', email: '', senha: '', papel: 'professor', curso: u.curso }));
+      fetchUtilizadores();
+    } catch (err) {
+      showToast(err.response?.data?.erro || 'Erro ao criar utilizador.', 'error');
+    } finally {
+      setCriandoUtilizador(false);
     }
   };
 
@@ -381,9 +445,10 @@ const Admin = ({ usuarioLogado }) => {
         {/* ═══ ABAS ════════════════════════════════════════════════ */}
         <div className="flex gap-2">
           {[
-            { key: 'materiais', label: 'Fila de Aprovação', icon: Clock, badge: pendentes.length },
-            { key: 'chat',      label: 'Moderação do Chat', icon: MessageCircle, badge: mensagens.length },
-            { key: 'config',    label: 'Configurações',     icon: Settings, badge: 0 },
+            { key: 'materiais',    label: 'Fila de Aprovação', icon: Clock, badge: pendentes.length },
+            { key: 'chat',         label: 'Moderação do Chat', icon: MessageCircle, badge: mensagens.length },
+            { key: 'utilizadores', label: 'Utilizadores',      icon: Users, badge: 0 },
+            { key: 'config',       label: 'Configurações',     icon: Settings, badge: 0 },
           ].map(({ key, label, icon: Icon, badge }) => (
             <button
               key={key}
@@ -680,6 +745,123 @@ const Admin = ({ usuarioLogado }) => {
           </section>
         )}
 
+        {/* ═══ UTILIZADORES ═══════════════════════════════════════════ */}
+        {aba === 'utilizadores' && (
+          <div className="space-y-6">
+            {/* Criar conta */}
+            <section
+              className="rounded-[28px] overflow-hidden"
+              style={{ background: "var(--surface-card)", border: "1px solid var(--border-subtle)", boxShadow: "0 4px 32px rgba(var(--color-navy-mid-rgb),0.07)" }}
+            >
+              <div className="flex items-center gap-2.5 px-7 py-5" style={{ borderBottom: "1px solid var(--border-subtle)" }}>
+                <UserPlus size={19} style={{ color: "var(--color-navy-mid)" }} />
+                <h2 style={{ fontSize: 18, fontWeight: 900, color: "var(--text-heading)" }}>Criar conta</h2>
+              </div>
+              <div className="p-7">
+                <p style={{ fontSize: 13, color: "var(--text-faint)", marginBottom: 20, lineHeight: 1.6 }}>
+                  Docentes e outros administradores não se podem registar sozinhos — só o admin cria estas contas. Estudantes continuam a poder criar a própria conta na página de entrada.
+                </p>
+                <form onSubmit={handleCriarUtilizador} className="grid gap-4 sm:grid-cols-2">
+                  <div className="relative">
+                    <div className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2" style={{ color: "var(--text-faint)" }}><Users size={16} /></div>
+                    <input required placeholder="Nome completo" value={novoUtilizador.nome}
+                      onChange={e => setNovoUtilizador(u => ({ ...u, nome: e.target.value }))}
+                      className="w-full rounded-2xl py-3.5 pl-12 pr-4 text-sm outline-none"
+                      style={{ background: "var(--surface-input)", border: "1.5px solid var(--border-subtle-strong)", color: "var(--text-heading)" }} />
+                  </div>
+                  <div className="relative">
+                    <div className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2" style={{ color: "var(--text-faint)" }}><Mail size={16} /></div>
+                    <input required type="email" placeholder="Email" value={novoUtilizador.email}
+                      onChange={e => setNovoUtilizador(u => ({ ...u, email: e.target.value }))}
+                      className="w-full rounded-2xl py-3.5 pl-12 pr-4 text-sm outline-none"
+                      style={{ background: "var(--surface-input)", border: "1.5px solid var(--border-subtle-strong)", color: "var(--text-heading)" }} />
+                  </div>
+                  <div className="relative">
+                    <div className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2" style={{ color: "var(--text-faint)" }}><Lock size={16} /></div>
+                    <input required type="password" minLength={8} placeholder="Palavra-passe inicial" value={novoUtilizador.senha}
+                      onChange={e => setNovoUtilizador(u => ({ ...u, senha: e.target.value }))}
+                      className="w-full rounded-2xl py-3.5 pl-12 pr-4 text-sm outline-none"
+                      style={{ background: "var(--surface-input)", border: "1.5px solid var(--border-subtle-strong)", color: "var(--text-heading)" }} />
+                  </div>
+                  <div className="relative">
+                    <div className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2" style={{ color: "var(--text-faint)" }}><GraduationCap size={16} /></div>
+                    <select value={novoUtilizador.curso} onChange={e => setNovoUtilizador(u => ({ ...u, curso: e.target.value }))}
+                      className="w-full rounded-2xl py-3.5 pl-12 pr-4 text-sm outline-none appearance-none"
+                      style={{ background: "var(--surface-input)", border: "1.5px solid var(--border-subtle-strong)", color: "var(--text-heading)" }}>
+                      {cursos.map(c => <option key={c.id} value={c.nome}>{c.nome}</option>)}
+                    </select>
+                  </div>
+                  <div className="sm:col-span-2 grid grid-cols-3 gap-2 p-1.5 rounded-2xl"
+                    style={{ background: "var(--surface-hover)", border: "1px solid var(--border-subtle-strong)" }}>
+                    {[["professor", "Docente"], ["estudante", "Estudante"], ["admin", "Admin"]].map(([v, lbl]) => (
+                      <button key={v} type="button" onClick={() => setNovoUtilizador(u => ({ ...u, papel: v }))}
+                        className="rounded-xl py-2.5 text-sm font-bold transition-all duration-200"
+                        style={novoUtilizador.papel === v
+                          ? { background: "linear-gradient(135deg,var(--color-navy-deep),var(--color-navy-mid))", color: "#fff", boxShadow: "0 4px 16px rgba(var(--color-navy-deep-rgb),.30)" }
+                          : { color: "var(--text-muted)" }}>
+                        {lbl}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="sm:col-span-2">
+                    <button type="submit" disabled={criandoUtilizador}
+                      className="inline-flex items-center gap-2.5 rounded-2xl px-6 py-3.5 text-sm font-black uppercase tracking-wider text-white transition-all duration-200 disabled:opacity-60"
+                      style={{ background: "linear-gradient(135deg,var(--color-navy-deep),var(--color-navy-mid))", boxShadow: "0 8px 28px rgba(var(--color-navy-deep-rgb),0.38)", letterSpacing: "0.08em" }}>
+                      <UserPlus size={16} /> {criandoUtilizador ? "A criar..." : "Criar conta"}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </section>
+
+            {/* Lista de utilizadores */}
+            <section
+              className="rounded-[28px] overflow-hidden"
+              style={{ background: "var(--surface-card)", border: "1px solid var(--border-subtle)", boxShadow: "0 4px 32px rgba(var(--color-navy-mid-rgb),0.07)" }}
+            >
+              <div className="flex items-center gap-2.5 px-7 py-5" style={{ borderBottom: "1px solid var(--border-subtle)" }}>
+                <Users size={19} style={{ color: "var(--color-navy-mid)" }} />
+                <h2 style={{ fontSize: 18, fontWeight: 900, color: "var(--text-heading)" }}>
+                  Todos os utilizadores {utilizadores.length > 0 && `(${utilizadores.length})`}
+                </h2>
+              </div>
+              <div className="p-3">
+                {loadingUtilizadores ? (
+                  <div className="text-center p-14">
+                    <div className="w-12 h-12 rounded-full border-4 animate-spin mx-auto mb-4"
+                      style={{ borderColor: "rgba(var(--color-navy-mid-rgb),0.10)", borderTopColor: "var(--color-navy-mid)" }} />
+                  </div>
+                ) : (
+                  <div className="divide-y" style={{ borderColor: "var(--border-subtle)" }}>
+                    {utilizadores.map(u => (
+                      <div key={u.id} className="flex items-center gap-4 px-4 py-3.5">
+                        <div className="w-10 h-10 rounded-xl grid place-items-center text-sm font-black shrink-0 overflow-hidden"
+                          style={{ background: "linear-gradient(135deg,var(--color-gold-dark),var(--color-gold))", color: "var(--color-navy-deep)" }}>
+                          {u.avatar_url
+                            ? <img src={u.avatar_url} alt={u.nome} className="w-full h-full object-cover" />
+                            : u.nome?.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p style={{ fontSize: 14, fontWeight: 700, color: "var(--text-heading)" }} className="truncate">{u.nome}</p>
+                          <p style={{ fontSize: 12, color: "var(--text-faint)" }} className="truncate">{u.email} · {u.curso}</p>
+                        </div>
+                        <span className="rounded-full px-3 py-1.5 text-[10px] font-black uppercase shrink-0"
+                          style={{
+                            letterSpacing: "0.15em",
+                            background: u.papel === 'admin' ? "rgba(var(--color-gold-rgb),0.15)" : u.papel === 'professor' ? "rgba(59,130,246,0.12)" : "var(--surface-hover)",
+                            color: u.papel === 'admin' ? "#8a6800" : u.papel === 'professor' ? "#1d4ed8" : "var(--text-muted)",
+                          }}>
+                          {u.papel}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </section>
+          </div>
+        )}
+
         {/* ═══ CONFIGURAÇÕES ════════════════════════════════════════ */}
         {aba === 'config' && configForm && (
           <div className="space-y-6">
@@ -781,6 +963,30 @@ const Admin = ({ usuarioLogado }) => {
                           className="w-full rounded-2xl px-5 py-3.5 text-sm outline-none"
                           style={{ background: "var(--surface-input)", border: "1.5px solid var(--border-subtle-strong)", color: "var(--text-heading)" }} />
                       ))}
+                    </div>
+                  </div>
+
+                  {/* Domínios de email permitidos — restringe quem se pode registar */}
+                  <div>
+                    <label style={{ display: "block", marginBottom: 8, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.22em", color: "var(--text-muted)" }}>
+                      Domínios de email permitidos (opcional)
+                    </label>
+                    <input value={configForm.dominios_email_permitidos || ''} placeholder="ex: gmail.com, universidade.ac.mz"
+                      onChange={e => setConfigForm(f => ({ ...f, dominios_email_permitidos: e.target.value }))}
+                      className="w-full rounded-2xl px-5 py-3.5 text-sm outline-none"
+                      style={{ background: "var(--surface-input)", border: "1.5px solid var(--border-subtle-strong)", color: "var(--text-heading)" }} />
+                    <p style={{ marginTop: 6, fontSize: 12, color: "var(--text-faint)" }}>
+                      Lista separada por vírgulas. Só contas com email nestes domínios podem registar-se ou ser criadas. Vazio = sem restrição.
+                    </p>
+                  </div>
+
+                  <div>
+                    <div className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 mb-4"
+                      style={{ background: "rgba(var(--color-gold-rgb),0.12)", border: "1px solid rgba(var(--color-gold-rgb),0.30)" }}>
+                      <Sparkles size={12} style={{ color: "var(--color-gold-dark)" }} />
+                      <span style={{ fontSize: 11, fontWeight: 700, color: "var(--color-gold-dark)" }}>
+                        Pré-visualização em tempo real — toda a app (incluindo este painel) muda de cor enquanto ajusta, antes de guardar
+                      </span>
                     </div>
                   </div>
 

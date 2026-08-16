@@ -2,16 +2,68 @@ import React, { useState, useEffect } from "react";
 import api from "../services/api";
 import { useNavigate } from "react-router-dom";
 import {
-  BookOpen, User, Lock, Mail, GraduationCap,
+  BookOpen, User, Lock, Mail, GraduationCap, MapPin, Info,
   ArrowRight, Library, MessageCircle, Sparkles, CheckCircle,
   AlertCircle, Menu, X,
 } from "lucide-react";
 import { useConfig } from "../context/ConfigContext";
 import { FacebookIcon, InstagramIcon, LinkedinIcon } from "../components/SocialIcons";
 
-/* ─── Constantes de navegação / footer ─── */
-const NAV_LINKS    = ["Sobre Nós", "Projectos", "Carreiras", "Contacto"];
-const FOOTER_LINKS = ["Sobre", "Projectos", "Carreiras", "Sitemap"];
+/* ─── Painel "Sobre" — mostra a informação real e editável pelo admin
+   (nome, propósito, localização, contacto) em vez de links falsos ─── */
+const SobreModal = ({ config, onClose }) => (
+  <div
+    className="fixed inset-0 z-[100] flex items-center justify-center px-4"
+    style={{ background: "rgba(var(--color-navy-abyss-rgb),0.55)", backdropFilter: "blur(8px)" }}
+    onClick={onClose}
+  >
+    <div
+      className="w-full max-w-md rounded-[28px] p-8 animate-scale-in"
+      style={{ background: "#fff", border: "1px solid rgba(var(--color-navy-mid-rgb),0.08)", boxShadow: "0 30px 90px rgba(var(--color-navy-deep-rgb),0.30)" }}
+      onClick={e => e.stopPropagation()}
+    >
+      <div className="flex items-start justify-between mb-5">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-2xl grid place-items-center shrink-0"
+            style={{ background: "linear-gradient(135deg,var(--color-gold-dark),var(--color-gold))", color: "var(--color-navy-deep)" }}>
+            {config.logo_url
+              ? <img src={config.logo_url} alt={config.nome_plataforma} className="w-full h-full object-contain rounded-2xl" />
+              : <BookOpen size={22} />}
+          </div>
+          <h3 style={{ fontSize: 19, fontWeight: 900, color: "var(--color-navy-deep)" }}>{config.nome_plataforma}</h3>
+        </div>
+        <button onClick={onClose} style={{ color: "#94a3b8" }}><X size={18} /></button>
+      </div>
+
+      {config.descricao_proposito && (
+        <p style={{ fontSize: 14, color: "#475569", lineHeight: 1.7, marginBottom: 20 }}>{config.descricao_proposito}</p>
+      )}
+
+      <div className="space-y-3">
+        {config.localizacao && (
+          <div className="flex items-center gap-3">
+            <MapPin size={16} style={{ color: "var(--color-navy-mid)", flexShrink: 0 }} />
+            <span style={{ fontSize: 13.5, color: "#334155" }}>{config.localizacao}</span>
+          </div>
+        )}
+        {config.contacto_email && (
+          <a href={`mailto:${config.contacto_email}`} className="flex items-center gap-3" style={{ textDecoration: "none" }}>
+            <Mail size={16} style={{ color: "var(--color-navy-mid)", flexShrink: 0 }} />
+            <span style={{ fontSize: 13.5, color: "var(--color-navy-mid)", fontWeight: 600 }}>{config.contacto_email}</span>
+          </a>
+        )}
+      </div>
+
+      {(config.link_facebook || config.link_instagram || config.link_linkedin) && (
+        <div className="flex items-center gap-4 mt-6 pt-5" style={{ borderTop: "1px solid #f1f5f9" }}>
+          {config.link_facebook  && <a href={config.link_facebook}  className="lp-social"><FacebookIcon size={16} /></a>}
+          {config.link_instagram && <a href={config.link_instagram} className="lp-social"><InstagramIcon size={16} /></a>}
+          {config.link_linkedin  && <a href={config.link_linkedin}  className="lp-social"><LinkedinIcon size={16} /></a>}
+        </div>
+      )}
+    </div>
+  </div>
+);
 
 /* ─── Card flutuante no painel hero ─── */
 const FloatCard = ({ icon: Icon, label, value, delay, style }) => (
@@ -73,13 +125,13 @@ const Login = ({ onLogin }) => {
   const [nome,             setNome]             = useState("");
   const [email,            setEmail]            = useState("");
   const [senha,            setSenha]            = useState("");
-  const [papel,            setPapel]            = useState("estudante");
   const [curso,            setCurso]            = useState("");
   const [stats,            setStats]            = useState(null);
   const [emailRecuperacao, setEmailRecuperacao] = useState("");
 
   /* navbar mobile */
   const [mobileMenu, setMobileMenu] = useState(false);
+  const [sobreAberto, setSobreAberto] = useState(false);
 
   /* Selecciona o primeiro curso disponível assim que a lista carrega */
   useEffect(() => {
@@ -116,7 +168,7 @@ const Login = ({ onLogin }) => {
     setMensagem({ texto: "", tipo: "" });
     setLoading(true);
     try {
-      await api.post("/register", { nome, email, senha, papel, curso });
+      await api.post("/register", { nome, email, senha, curso });
       setMensagem({ texto: "Conta criada! Faça login para entrar.", tipo: "sucesso" });
       setIsRegistering(false);
       setSenha("");
@@ -142,7 +194,6 @@ const Login = ({ onLogin }) => {
   const switchMode = () => {
     setIsRegistering(v => !v);
     setMensagem({ texto: "", tipo: "" });
-    setPapel("estudante");
     setCurso(cursos[0]?.nome || "");
   };
 
@@ -288,7 +339,12 @@ const Login = ({ onLogin }) => {
 
           {/* Links desktop */}
           <div className="hidden lg:flex" style={{ gap:28, alignItems:"center" }}>
-            {NAV_LINKS.map(l => <a key={l} href="#" className="lp-navlink">{l}</a>)}
+            <button type="button" onClick={() => setSobreAberto(true)} className="lp-navlink" style={{ background:"none", border:"none", cursor:"pointer", display:"inline-flex", alignItems:"center", gap:6 }}>
+              <Info size={14} /> Sobre
+            </button>
+            {config.contacto_email && (
+              <a href={`mailto:${config.contacto_email}`} className="lp-navlink">Contacto</a>
+            )}
           </div>
 
           {/* Hamburger mobile */}
@@ -313,14 +369,19 @@ const Login = ({ onLogin }) => {
               boxShadow:"0 8px 32px rgba(var(--color-navy-mid-rgb),.10)",
             }}
           >
-            {NAV_LINKS.map(l => (
-              <a key={l} href="#" className="lp-navlink" style={{ fontSize:14 }}
-                onClick={() => setMobileMenu(false)}>
-                {l}
+            <button type="button" onClick={() => { setSobreAberto(true); setMobileMenu(false); }}
+              className="lp-navlink" style={{ fontSize:14, background:"none", border:"none", cursor:"pointer", textAlign:"left", display:"inline-flex", alignItems:"center", gap:6 }}>
+              <Info size={14} /> Sobre
+            </button>
+            {config.contacto_email && (
+              <a href={`mailto:${config.contacto_email}`} className="lp-navlink" style={{ fontSize:14 }} onClick={() => setMobileMenu(false)}>
+                Contacto
               </a>
-            ))}
+            )}
           </div>
         )}
+
+        {sobreAberto && <SobreModal config={config} onClose={() => setSobreAberto(false)} />}
 
         {/* ── PAINÉIS (hero + formulário) ────────────────────────── */}
         <div style={{ flex:1, display:"flex", position:"relative", overflow:"hidden", minHeight:0 }}>
@@ -463,7 +524,7 @@ const Login = ({ onLogin }) => {
                   {esqueciSenha
                     ? "Indique o seu email e enviamos um link para repor a palavra-passe."
                     : isRegistering
-                    ? "Junte-se à nossa comunidade académica."
+                    ? "Junte-se à nossa comunidade académica como estudante. Contas de docente são criadas pela administração."
                     : "Aceda ao seu espaço de aprendizagem."}
                 </p>
               </div>
@@ -516,20 +577,6 @@ const Login = ({ onLogin }) => {
 
                 {isRegistering && (
                   <>
-                    {/* toggle aluno / docente */}
-                    <div className="grid grid-cols-2 gap-2 p-1.5 rounded-2xl"
-                      style={{ background:"var(--surface-hover)", border:"1px solid var(--border-subtle-strong)" }}>
-                      {[["estudante","Aluno"],["professor","Docente"]].map(([v, lbl]) => (
-                        <button key={v} type="button" onClick={() => setPapel(v)}
-                          className="rounded-xl py-2.5 text-sm font-bold transition-all duration-200"
-                          style={papel === v
-                            ? { background:"linear-gradient(135deg,var(--color-navy-deep),var(--color-navy-mid))", color:"#fff", boxShadow:"0 4px 16px rgba(var(--color-navy-deep-rgb),.30)" }
-                            : { color:"var(--text-muted)" }}>
-                          {v === "estudante" ? "🎓" : "👨‍🏫"} {lbl}
-                        </button>
-                      ))}
-                    </div>
-
                     <InputField icon={<User size={17} />}
                       type="text" placeholder="Nome completo" required
                       value={nome} onChange={e => setNome(e.target.value)} />
@@ -636,7 +683,8 @@ const Login = ({ onLogin }) => {
           </div>
 
           <div className="hidden sm:flex" style={{ gap:20 }}>
-            {FOOTER_LINKS.map(l => <a key={l} href="#" className="lp-footlink">{l}</a>)}
+            <button type="button" onClick={() => setSobreAberto(true)} className="lp-footlink" style={{ background:"none", border:"none", cursor:"pointer" }}>Sobre</button>
+            {config.contacto_email && <a href={`mailto:${config.contacto_email}`} className="lp-footlink">Contacto</a>}
           </div>
 
           <div style={{ display:"flex", gap:14, alignItems:"center" }}>

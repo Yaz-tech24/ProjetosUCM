@@ -21,6 +21,7 @@ const CONFIG_DEFEITO = {
   link_facebook: "",
   link_instagram: "",
   link_linkedin: "",
+  dominios_email_permitidos: "",
   chat_activado: true,
   ia_activada: true,
   moderacao_ia_activada: true,

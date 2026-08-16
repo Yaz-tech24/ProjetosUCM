@@ -3,6 +3,7 @@ const fs = require("fs");
 
 const db = require("../config/db");
 const { getConfiguracoes, getCursos } = require("../services/plataforma");
+const { paraUrlAbsoluto } = require("../utils/urls");
 const validar = require("../middleware/validar");
 const { autenticar, apenasAdmin } = require("../middleware/auth");
 const { uploadsDir, uploadLogo } = require("../middleware/upload");
@@ -111,14 +112,13 @@ module.exports = function registarRotasConfig(app) {
       if (!req.file) return res.status(400).json({ erro: "Nenhuma imagem enviada." });
 
       const configAntiga = await getConfiguracoes();
-      const baseUrl = process.env.API_URL || `http://localhost:${process.env.PORT || 5000}`;
-      const logo_url = `${baseUrl}/uploads/${req.file.filename}`;
-      await db.query("UPDATE configuracoes SET logo_url = ? WHERE id = 1", [logo_url]);
+      const caminhoRelativo = `/uploads/${req.file.filename}`;
+      await db.query("UPDATE configuracoes SET logo_url = ? WHERE id = 1", [caminhoRelativo]);
 
       if (configAntiga.logo_url) {
         fs.unlink(path.join(uploadsDir, path.basename(configAntiga.logo_url)), () => {});
       }
-      res.json({ mensagem: "Logótipo actualizado!", logo_url });
+      res.json({ mensagem: "Logótipo actualizado!", logo_url: paraUrlAbsoluto(caminhoRelativo) });
     } catch (erro) {
       if (req.file) fs.unlink(req.file.path, () => {});
       console.error("Erro ao gravar logótipo:", erro.message);

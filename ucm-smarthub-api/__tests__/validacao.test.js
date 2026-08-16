@@ -3,17 +3,24 @@ import { describe, it, expect } from "vitest";
 // Estes testes só exercitam os schemas zod exportados (funções puras) —
 // importam directamente de schemas/, sem tocar em server.js nem na BD.
 const {
-  schemaRegisto, schemaLogin, schemaMaterial, schemaConfig, schemaCurso,
+  schemaRegisto, schemaUtilizadorAdmin, schemaLogin, schemaMaterial, schemaConfig, schemaCurso,
   schemaPerfilNome, schemaPerfilSenha, schemaEsqueciSenha, schemaReporSenha,
+  emailComDominioPermitido,
 } = require("../schemas");
 
 describe("schemaRegisto", () => {
-  it("aceita dados válidos e normaliza (trim/lowercase)", () => {
+  it("aceita dados válidos e normaliza (trim/lowercase) — sem campo papel: registo público é sempre estudante", () => {
     const r = schemaRegisto.safeParse({
-      nome: "  Ana  ", email: " Ana@Teste.COM ", senha: "senha1234", papel: "estudante", curso: "Geral",
+      nome: "  Ana  ", email: " Ana@Teste.COM ", senha: "senha1234", curso: "Geral",
     });
     expect(r.success).toBe(true);
-    expect(r.data).toEqual({ nome: "Ana", email: "ana@teste.com", senha: "senha1234", papel: "estudante", curso: "Geral" });
+    expect(r.data).toEqual({ nome: "Ana", email: "ana@teste.com", senha: "senha1234", curso: "Geral" });
+  });
+
+  it("ignora um campo 'papel' enviado pelo cliente (não pode ser forçado via API)", () => {
+    const r = schemaRegisto.safeParse({ nome: "Ana", email: "a@b.com", senha: "senha1234", curso: "Geral", papel: "admin" });
+    expect(r.success).toBe(true);
+    expect(r.data.papel).toBeUndefined();
   });
 
   it("rejeita email inválido", () => {
@@ -37,11 +44,33 @@ describe("schemaRegisto", () => {
     const r = schemaRegisto.safeParse({ nome: "   ", email: "a@b.com", senha: "senha1234", curso: "Geral" });
     expect(r.success).toBe(false);
   });
+});
 
-  it("papel inválido cai para 'estudante' em vez de rejeitar", () => {
-    const r = schemaRegisto.safeParse({ nome: "Ana", email: "a@b.com", senha: "senha1234", papel: "hacker", curso: "Geral" });
+describe("schemaUtilizadorAdmin", () => {
+  it("aceita papel professor/admin — só disponível na criação pelo admin", () => {
+    const base = { nome: "Prof. Ana", email: "prof@teste.com", senha: "senha1234", curso: "Geral" };
+    expect(schemaUtilizadorAdmin.safeParse({ ...base, papel: "professor" }).data.papel).toBe("professor");
+    expect(schemaUtilizadorAdmin.safeParse({ ...base, papel: "admin" }).data.papel).toBe("admin");
+  });
+
+  it("papel inválido cai para 'professor' em vez de rejeitar", () => {
+    const r = schemaUtilizadorAdmin.safeParse({ nome: "Ana", email: "a@b.com", senha: "senha1234", curso: "Geral", papel: "hacker" });
     expect(r.success).toBe(true);
-    expect(r.data.papel).toBe("estudante");
+    expect(r.data.papel).toBe("professor");
+  });
+});
+
+describe("emailComDominioPermitido", () => {
+  it("sem restrição configurada, aceita qualquer domínio", () => {
+    expect(emailComDominioPermitido("a@qualquercoisa.com", "")).toBe(true);
+    expect(emailComDominioPermitido("a@qualquercoisa.com", null)).toBe(true);
+  });
+
+  it("com restrição, só aceita os domínios listados (case-insensitive)", () => {
+    expect(emailComDominioPermitido("a@gmail.com", "gmail.com")).toBe(true);
+    expect(emailComDominioPermitido("a@GMAIL.com", "gmail.com")).toBe(true);
+    expect(emailComDominioPermitido("a@hotmail.com", "gmail.com")).toBe(false);
+    expect(emailComDominioPermitido("a@ucm.ac.mz", "gmail.com, ucm.ac.mz")).toBe(true);
   });
 });
 
@@ -66,6 +95,7 @@ describe("schemaConfig", () => {
     cor_primaria: "#04122e", cor_destaque: "#ffd700",
     contacto_email: "", localizacao: "",
     link_facebook: "", link_instagram: "", link_linkedin: "",
+    dominios_email_permitidos: "",
     chat_activado: true, ia_activada: true, moderacao_ia_activada: true,
     tipos_ficheiro_permitidos: ["pdf"], tamanho_maximo_mb: 100,
   };

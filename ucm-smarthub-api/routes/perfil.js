@@ -3,6 +3,7 @@ const path = require("path");
 const fs = require("fs");
 
 const db = require("../config/db");
+const { paraUrlAbsoluto } = require("../utils/urls");
 const validar = require("../middleware/validar");
 const { autenticar } = require("../middleware/auth");
 const { uploadsDir, uploadAvatar } = require("../middleware/upload");
@@ -36,6 +37,7 @@ module.exports = function registarRotasPerfil(app) {
         "SELECT id, nome, email, papel, curso, avatar_url FROM usuarios WHERE id = ?",
         [req.utilizador.id]
       );
+      utilizador.avatar_url = paraUrlAbsoluto(utilizador.avatar_url);
       res.json({ mensagem: "Perfil actualizado com sucesso!", utilizador });
     } catch (erro) {
       console.error("Erro ao actualizar perfil:", erro.message);
@@ -104,14 +106,13 @@ module.exports = function registarRotasPerfil(app) {
       if (!req.file) return res.status(400).json({ erro: "Nenhuma imagem enviada." });
 
       const [[actual]] = await db.query("SELECT avatar_url FROM usuarios WHERE id = ?", [req.utilizador.id]);
-      const baseUrl = process.env.API_URL || `http://localhost:${process.env.PORT || 5000}`;
-      const avatar_url = `${baseUrl}/uploads/${req.file.filename}`;
-      await db.query("UPDATE usuarios SET avatar_url = ? WHERE id = ?", [avatar_url, req.utilizador.id]);
+      const caminhoRelativo = `/uploads/${req.file.filename}`;
+      await db.query("UPDATE usuarios SET avatar_url = ? WHERE id = ?", [caminhoRelativo, req.utilizador.id]);
 
       if (actual?.avatar_url) {
         fs.unlink(path.join(uploadsDir, path.basename(actual.avatar_url)), () => {});
       }
-      res.json({ mensagem: "Avatar actualizado!", avatar_url });
+      res.json({ mensagem: "Avatar actualizado!", avatar_url: paraUrlAbsoluto(caminhoRelativo) });
     } catch (erro) {
       if (req.file) fs.unlink(req.file.path, () => {});
       console.error("Erro ao gravar avatar:", erro.message);
