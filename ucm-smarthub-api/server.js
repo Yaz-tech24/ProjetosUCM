@@ -209,6 +209,9 @@ const schemaConfig = z.object({
   cor_destaque: z.string().regex(HEX_COLOR_REGEX, "Cores inválidas — use o formato #rrggbb."),
   contacto_email: z.string().trim().catch(""),
   localizacao: z.string().trim().catch(""),
+  link_facebook: z.string().trim().catch(""),
+  link_instagram: z.string().trim().catch(""),
+  link_linkedin: z.string().trim().catch(""),
   chat_activado: z.coerce.boolean(),
   ia_activada: z.coerce.boolean(),
   moderacao_ia_activada: z.coerce.boolean(),
@@ -438,7 +441,7 @@ app.post("/api/register", limitarRegisto, validar(schemaRegisto), async (req, re
     getConfiguracoes().then(config => {
       mailer.enviarBoasVindas({
         to: email, nome, nomePlataforma: config.nome_plataforma,
-        corPrimaria: config.cor_primaria, corDestaque: config.cor_destaque,
+        corPrimaria: config.cor_primaria, corDestaque: config.cor_destaque, logoUrl: config.logo_url,
       });
     }).catch(() => {});
   } catch (erro) {
@@ -565,6 +568,7 @@ app.post("/api/esqueci-senha", limitarEsqueciSenha, validar(schemaEsqueciSenha),
       to: email, nome: utilizador.nome,
       link: `${frontendUrl}/repor-senha?token=${tokenBruto}`,
       nomePlataforma: config.nome_plataforma, corPrimaria: config.cor_primaria, corDestaque: config.cor_destaque,
+      logoUrl: config.logo_url,
     });
   } catch (erro) {
     console.error("Erro ao pedir recuperação de password:", erro.message);
@@ -1173,19 +1177,22 @@ app.put("/api/admin/config", autenticar, apenasAdmin, validar(schemaConfig), asy
   try {
     const {
       nome_plataforma, tagline, descricao_proposito, cor_primaria, cor_destaque,
-      contacto_email, localizacao, chat_activado, ia_activada, moderacao_ia_activada,
+      contacto_email, localizacao, link_facebook, link_instagram, link_linkedin,
+      chat_activado, ia_activada, moderacao_ia_activada,
       tipos_ficheiro_permitidos, tamanho_maximo_mb,
     } = req.body;
 
     await db.query(
       `UPDATE configuracoes SET
          nome_plataforma = ?, tagline = ?, descricao_proposito = ?, cor_primaria = ?, cor_destaque = ?,
-         contacto_email = ?, localizacao = ?, chat_activado = ?, ia_activada = ?, moderacao_ia_activada = ?,
+         contacto_email = ?, localizacao = ?, link_facebook = ?, link_instagram = ?, link_linkedin = ?,
+         chat_activado = ?, ia_activada = ?, moderacao_ia_activada = ?,
          tipos_ficheiro_permitidos = ?, tamanho_maximo_mb = ?
        WHERE id = 1`,
       [
         nome_plataforma, tagline, descricao_proposito,
         cor_primaria, cor_destaque, contacto_email, localizacao,
+        link_facebook, link_instagram, link_linkedin,
         chat_activado, ia_activada, moderacao_ia_activada,
         tipos_ficheiro_permitidos.join(","), tamanho_maximo_mb,
       ]
@@ -1450,6 +1457,7 @@ app.put("/api/admin/materiais/:id/status", autenticar, apenasAdmin, async (req, 
           to: material.autor_email, nome: material.autor_nome, titulo: material.titulo,
           aprovado: acao === "aprovar",
           nomePlataforma: config.nome_plataforma, corPrimaria: config.cor_primaria, corDestaque: config.cor_destaque,
+          logoUrl: config.logo_url,
         });
       }).catch(() => {});
     }
@@ -1762,6 +1770,14 @@ async function runMigrations() {
     // Coluna já existe — ignorar
   }
 
+  for (const coluna of ["link_facebook", "link_instagram", "link_linkedin"]) {
+    try {
+      await db.query(`ALTER TABLE configuracoes ADD COLUMN ${coluna} VARCHAR(255) NULL`);
+    } catch {
+      // Coluna já existe — ignorar
+    }
+  }
+
   await db.query(`
     CREATE TABLE IF NOT EXISTS configuracoes (
       id INT PRIMARY KEY DEFAULT 1,
@@ -1773,6 +1789,9 @@ async function runMigrations() {
       cor_destaque CHAR(7) NOT NULL DEFAULT '#ffd700',
       contacto_email VARCHAR(150) NULL,
       localizacao VARCHAR(150) NULL,
+      link_facebook VARCHAR(255) NULL,
+      link_instagram VARCHAR(255) NULL,
+      link_linkedin VARCHAR(255) NULL,
       chat_activado BOOLEAN NOT NULL DEFAULT TRUE,
       ia_activada BOOLEAN NOT NULL DEFAULT TRUE,
       moderacao_ia_activada BOOLEAN NOT NULL DEFAULT TRUE,

@@ -62,6 +62,7 @@ describe("schemaConfig", () => {
     nome_plataforma: "SmartHub", tagline: "", descricao_proposito: "",
     cor_primaria: "#04122e", cor_destaque: "#ffd700",
     contacto_email: "", localizacao: "",
+    link_facebook: "", link_instagram: "", link_linkedin: "",
     chat_activado: true, ia_activada: true, moderacao_ia_activada: true,
     tipos_ficheiro_permitidos: ["pdf"], tamanho_maximo_mb: 100,
   };

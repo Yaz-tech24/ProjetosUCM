@@ -767,6 +767,23 @@ const Admin = ({ usuarioLogado }) => {
                     </div>
                   </div>
 
+                  {/* Redes sociais — opcional; só aparecem no rodapé/página de entrada os ícones preenchidos */}
+                  <div>
+                    <label style={{ display: "block", marginBottom: 8, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.22em", color: "var(--text-muted)" }}>Redes sociais (opcional)</label>
+                    <div className="grid gap-4 sm:grid-cols-3">
+                      {[
+                        { key: 'link_facebook', placeholder: 'https://facebook.com/...' },
+                        { key: 'link_instagram', placeholder: 'https://instagram.com/...' },
+                        { key: 'link_linkedin', placeholder: 'https://linkedin.com/...' },
+                      ].map(({ key, placeholder }) => (
+                        <input key={key} type="url" value={configForm[key] || ''} placeholder={placeholder}
+                          onChange={e => setConfigForm(f => ({ ...f, [key]: e.target.value }))}
+                          className="w-full rounded-2xl px-5 py-3.5 text-sm outline-none"
+                          style={{ background: "var(--surface-input)", border: "1.5px solid var(--border-subtle-strong)", color: "var(--text-heading)" }} />
+                      ))}
+                    </div>
+                  </div>
+
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div>
                       <label style={{ display: "block", marginBottom: 8, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.22em", color: "var(--text-muted)" }}>Cor primária</label>

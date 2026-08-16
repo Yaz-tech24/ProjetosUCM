@@ -4,9 +4,10 @@ import { useNavigate } from "react-router-dom";
 import {
   BookOpen, User, Lock, Mail, GraduationCap,
   ArrowRight, Library, MessageCircle, Sparkles, CheckCircle,
-  AlertCircle, Globe, Share2, Menu, X,
+  AlertCircle, Menu, X,
 } from "lucide-react";
 import { useConfig } from "../context/ConfigContext";
+import { FacebookIcon, InstagramIcon, LinkedinIcon } from "../components/SocialIcons";
 
 /* ─── Constantes de navegação / footer ─── */
 const NAV_LINKS    = ["Sobre Nós", "Projectos", "Carreiras", "Contacto"];
@@ -90,11 +91,18 @@ const Login = ({ onLogin }) => {
     api.get("/stats/publicas").then(res => setStats(res.data)).catch(() => setStats(null));
   }, []);
 
+  // Headline do hero — deriva-se do tagline configurado pelo admin (separado por "·"),
+  // com o mesmo efeito visual de 3 linhas de sempre. Cai para as 3 palavras por
+  // defeito se o tagline estiver vazio ou não tiver o separador esperado.
+  const segmentosTagline = (config.tagline || "").split("·").map(s => s.trim()).filter(Boolean);
+  const HEADLINE_LINHAS = segmentosTagline.length >= 2 ? segmentosTagline : ["Aprenda", "Partilhe", "Cresça"];
+  const indiceDestaque = Math.floor((HEADLINE_LINHAS.length - 1) / 2);
+
   const SOCIALS = [
     { Icon: Mail,          href: config.contacto_email ? `mailto:${config.contacto_email}` : null },
-    { Icon: Globe,         href: "#" },
-    { Icon: MessageCircle, href: "#" },
-    { Icon: Share2,        href: "#" },
+    { Icon: FacebookIcon,  href: config.link_facebook || null },
+    { Icon: InstagramIcon, href: config.link_instagram || null },
+    { Icon: LinkedinIcon,  href: config.link_linkedin || null },
   ].filter(s => s.href);
 
   const FEATURES = [
@@ -374,12 +382,17 @@ const Login = ({ onLogin }) => {
                 </p>
                 <h1 className="text-[3.4rem] font-black leading-[1.02] tracking-tight text-white"
                   style={{ textShadow:"0 0 50px rgba(var(--color-gold-rgb),.18)" }}>
-                  Aprenda.<br />
-                  <span style={{ background:"linear-gradient(135deg,var(--color-gold-dark),var(--color-gold),var(--color-gold-light))",
-                    WebkitBackgroundClip:"text", backgroundClip:"text", WebkitTextFillColor:"transparent" }}>
-                    Partilhe.
-                  </span><br />
-                  Cresça.
+                  {HEADLINE_LINHAS.map((linha, i) => (
+                    <React.Fragment key={i}>
+                      {i === indiceDestaque
+                        ? <span style={{ background:"linear-gradient(135deg,var(--color-gold-dark),var(--color-gold),var(--color-gold-light))",
+                            WebkitBackgroundClip:"text", backgroundClip:"text", WebkitTextFillColor:"transparent" }}>
+                            {linha}.
+                          </span>
+                        : `${linha}.`}
+                      {i < HEADLINE_LINHAS.length - 1 && <br />}
+                    </React.Fragment>
+                  ))}
                 </h1>
               </div>
 

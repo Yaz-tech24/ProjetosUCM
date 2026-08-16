@@ -18,6 +18,9 @@ const CONFIG_DEFEITO = {
   cor_destaque: "#ffd700",
   contacto_email: "",
   localizacao: "",
+  link_facebook: "",
+  link_instagram: "",
+  link_linkedin: "",
   chat_activado: true,
   ia_activada: true,
   moderacao_ia_activada: true,
@@ -58,6 +61,18 @@ export const ConfigProvider = ({ children }) => {
   useEffect(() => {
     document.title = config.nome_plataforma;
   }, [config.nome_plataforma]);
+
+  // Favicon — reflecte o logótipo do admin quando existir; volta ao ícone
+  // por defeito do projecto quando o logótipo é removido.
+  useEffect(() => {
+    let link = document.querySelector('link[rel="icon"]');
+    if (!link) {
+      link = document.createElement("link");
+      link.rel = "icon";
+      document.head.appendChild(link);
+    }
+    link.href = config.logo_url || "/vite.svg";
+  }, [config.logo_url]);
 
   return (
     <ConfigContext.Provider value={{ config, cursos, loading, refetchConfig: carregar }}>

@@ -14,6 +14,9 @@ const SummaryRenderer = ({ text }) => {
   const isSecao   = (l) => SECOES_CONHECIDAS.some(s => l.trim().toUpperCase() === s) || /^[A-ZÁÉÍÓÚÂÊÎÔÛÃÕÇ\s]{6,}$/.test(l.trim());
   const isBullet  = (l) => l.trim().startsWith("• ") || l.trim().startsWith("- ");
   const limparBullet = (l) => l.trim().replace(/^[•-]\s*/, "");
+  // A IA por vezes ignora a instrução "sem markdown" do prompt — remove
+  // **negrito**/__negrito__ que sobrevivam, para nunca mostrar asteriscos literais.
+  const limparMarkdown = (s) => s.replace(/\*\*(.+?)\*\*/g, "$1").replace(/__(.+?)__/g, "$1");
 
   const linhas = text.split('\n').filter(l => l.trim().length > 0);
 
@@ -25,14 +28,14 @@ const SummaryRenderer = ({ text }) => {
             <div className="flex items-center gap-2.5">
               <div style={{ width: 3, height: 16, borderRadius: 2, background: "linear-gradient(180deg,var(--color-gold-dark),var(--color-gold))", flexShrink: 0 }} />
               <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.38em", color: "rgba(var(--color-gold-rgb),0.85)", textTransform: "uppercase" }}>
-                {linha.trim()}
+                {limparMarkdown(linha.trim())}
               </p>
             </div>
           </div>
         );
 
         if (isBullet(linha)) {
-          const partes = limparBullet(linha).split(/:(.+)/);
+          const partes = limparMarkdown(limparBullet(linha)).split(/:(.+)/);
           const temLabel = partes.length > 1;
           return (
             <div key={i} className="flex items-start gap-3" style={{ paddingLeft: 8, paddingTop: 3 }}>
@@ -48,7 +51,7 @@ const SummaryRenderer = ({ text }) => {
 
         return (
           <p key={i} style={{ fontSize: 13.5, color: "rgba(var(--color-blue-sky-rgb),0.80)", lineHeight: 1.70, paddingTop: 2 }}>
-            {linha.trim()}
+            {limparMarkdown(linha.trim())}
           </p>
         );
       })}
