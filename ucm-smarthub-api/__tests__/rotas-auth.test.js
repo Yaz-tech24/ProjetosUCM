@@ -35,7 +35,7 @@ describe("POST /api/register", () => {
   it("rejeita email inválido sem tocar na BD", async () => {
     const spy = vi.spyOn(db, "query");
     const res = await request(app).post("/api/register").send({
-      nome: "Ana", email: "nao-e-email", senha: "123456", curso: "Geral",
+      nome: "Ana", email: "nao-e-email", senha: "senha1234", curso: "Geral",
     });
     expect(res.status).toBe(400);
     expect(res.body.erro).toMatch(/email/i);
@@ -45,7 +45,7 @@ describe("POST /api/register", () => {
   it("rejeita curso que não existe na lista da BD", async () => {
     mockSql([[/FROM cursos/, [[{ id: 1, nome: "Geral" }]]]]);
     const res = await request(app).post("/api/register").send({
-      nome: "Ana", email: "ana@teste.com", senha: "123456", curso: "Curso Inventado",
+      nome: "Ana", email: "ana@teste.com", senha: "senha1234", curso: "Curso Inventado",
     });
     expect(res.status).toBe(400);
     expect(res.body.erro).toBe("Curso inválido.");
@@ -57,7 +57,7 @@ describe("POST /api/register", () => {
       [/SELECT id FROM usuarios/, [[{ id: 99 }]]],
     ]);
     const res = await request(app).post("/api/register").send({
-      nome: "Ana", email: "ana@teste.com", senha: "123456", curso: "Geral",
+      nome: "Ana", email: "ana@teste.com", senha: "senha1234", curso: "Geral",
     });
     expect(res.status).toBe(400);
     expect(res.body.erro).toMatch(/já está em uso/);
@@ -71,7 +71,7 @@ describe("POST /api/register", () => {
       [/FROM configuracoes/, [[{ nome_plataforma: "SmartHub", cor_primaria: "#04122e", cor_destaque: "#ffd700" }]]],
     ]);
     const res = await request(app).post("/api/register").send({
-      nome: "Ana", email: "ana@teste.com", senha: "123456", curso: "Geral",
+      nome: "Ana", email: "ana@teste.com", senha: "senha1234", curso: "Geral",
     });
     expect(res.status).toBe(201);
   });
@@ -85,18 +85,18 @@ describe("POST /api/login", () => {
     expect(res.status).toBe(400);
   });
 
-  it("rejeita utilizador inexistente", async () => {
+  it("rejeita utilizador inexistente com mensagem genérica (não revela se o email existe)", async () => {
     mockSql([[/FROM usuarios WHERE email/, [[]]]]);
-    const res = await request(app).post("/api/login").send({ email: "naoexiste@teste.com", senha: "qualquer" });
+    const res = await request(app).post("/api/login").send({ email: "naoexiste-a@teste.com", senha: "qualquer" });
     expect(res.status).toBe(400);
-    expect(res.body.erro).toMatch(/não encontrado/);
+    expect(res.body.erro).toBe("Email ou palavra-passe incorrectos.");
   });
 
-  it("rejeita palavra-passe incorrecta", async () => {
-    mockSql([[/FROM usuarios WHERE email/, [[{ id: 1, email: "a@b.com", senha: HASH_SENHA_CORRECTA, papel: "estudante", nome: "Ana", curso: "Geral" }]]]]);
-    const res = await request(app).post("/api/login").send({ email: "a@b.com", senha: "errada" });
+  it("rejeita palavra-passe incorrecta com a MESMA mensagem genérica que o utilizador inexistente", async () => {
+    mockSql([[/FROM usuarios WHERE email/, [[{ id: 1, email: "naoexiste-b@teste.com", senha: HASH_SENHA_CORRECTA, papel: "estudante", nome: "Ana", curso: "Geral" }]]]]);
+    const res = await request(app).post("/api/login").send({ email: "naoexiste-b@teste.com", senha: "errada" });
     expect(res.status).toBe(400);
-    expect(res.body.erro).toMatch(/incorreta/);
+    expect(res.body.erro).toBe("Email ou palavra-passe incorrectos.");
   });
 
   it("autentica com sucesso e devolve um token", async () => {

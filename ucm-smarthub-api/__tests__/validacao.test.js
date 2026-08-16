@@ -12,31 +12,36 @@ const {
 describe("schemaRegisto", () => {
   it("aceita dados válidos e normaliza (trim/lowercase)", () => {
     const r = schemaRegisto.safeParse({
-      nome: "  Ana  ", email: " Ana@Teste.COM ", senha: "123456", papel: "estudante", curso: "Geral",
+      nome: "  Ana  ", email: " Ana@Teste.COM ", senha: "senha1234", papel: "estudante", curso: "Geral",
     });
     expect(r.success).toBe(true);
-    expect(r.data).toEqual({ nome: "Ana", email: "ana@teste.com", senha: "123456", papel: "estudante", curso: "Geral" });
+    expect(r.data).toEqual({ nome: "Ana", email: "ana@teste.com", senha: "senha1234", papel: "estudante", curso: "Geral" });
   });
 
   it("rejeita email inválido", () => {
-    const r = schemaRegisto.safeParse({ nome: "Ana", email: "nao-e-email", senha: "123456", curso: "Geral" });
+    const r = schemaRegisto.safeParse({ nome: "Ana", email: "nao-e-email", senha: "senha1234", curso: "Geral" });
     expect(r.success).toBe(false);
     expect(r.error.issues[0].message).toMatch(/email/i);
   });
 
-  it("rejeita password com menos de 6 caracteres", () => {
-    const r = schemaRegisto.safeParse({ nome: "Ana", email: "a@b.com", senha: "123", curso: "Geral" });
+  it("rejeita password com menos de 8 caracteres", () => {
+    const r = schemaRegisto.safeParse({ nome: "Ana", email: "a@b.com", senha: "abc123", curso: "Geral" });
     expect(r.success).toBe(false);
-    expect(r.error.issues[0].message).toMatch(/6 caracteres/);
+    expect(r.error.issues[0].message).toMatch(/8 caracteres/);
+  });
+
+  it("rejeita password só com números ou só com letras", () => {
+    expect(schemaRegisto.safeParse({ nome: "Ana", email: "a@b.com", senha: "12345678", curso: "Geral" }).success).toBe(false);
+    expect(schemaRegisto.safeParse({ nome: "Ana", email: "a@b.com", senha: "apenasletras", curso: "Geral" }).success).toBe(false);
   });
 
   it("rejeita nome vazio", () => {
-    const r = schemaRegisto.safeParse({ nome: "   ", email: "a@b.com", senha: "123456", curso: "Geral" });
+    const r = schemaRegisto.safeParse({ nome: "   ", email: "a@b.com", senha: "senha1234", curso: "Geral" });
     expect(r.success).toBe(false);
   });
 
   it("papel inválido cai para 'estudante' em vez de rejeitar", () => {
-    const r = schemaRegisto.safeParse({ nome: "Ana", email: "a@b.com", senha: "123456", papel: "hacker", curso: "Geral" });
+    const r = schemaRegisto.safeParse({ nome: "Ana", email: "a@b.com", senha: "senha1234", papel: "hacker", curso: "Geral" });
     expect(r.success).toBe(true);
     expect(r.data.papel).toBe("estudante");
   });
@@ -97,17 +102,19 @@ describe("schemaCurso / schemaPerfilNome", () => {
 });
 
 describe("schemaPerfilSenha", () => {
-  it("exige senha actual e nova senha com pelo menos 6 caracteres", () => {
-    expect(schemaPerfilSenha.safeParse({ senha_actual: "x", nova_senha: "123456" }).success).toBe(true);
-    expect(schemaPerfilSenha.safeParse({ senha_actual: "", nova_senha: "123456" }).success).toBe(false);
-    expect(schemaPerfilSenha.safeParse({ senha_actual: "x", nova_senha: "123" }).success).toBe(false);
+  it("exige senha actual e nova senha forte (8+ caracteres, letra e número)", () => {
+    expect(schemaPerfilSenha.safeParse({ senha_actual: "x", nova_senha: "senha1234" }).success).toBe(true);
+    expect(schemaPerfilSenha.safeParse({ senha_actual: "", nova_senha: "senha1234" }).success).toBe(false);
+    expect(schemaPerfilSenha.safeParse({ senha_actual: "x", nova_senha: "abc123" }).success).toBe(false);
+    expect(schemaPerfilSenha.safeParse({ senha_actual: "x", nova_senha: "12345678" }).success).toBe(false);
   });
 });
 
 describe("schemaEsqueciSenha / schemaReporSenha", () => {
   it("normalizam e validam", () => {
     expect(schemaEsqueciSenha.safeParse({ email: " A@B.com " }).data.email).toBe("a@b.com");
-    expect(schemaReporSenha.safeParse({ token: "abc", novaSenha: "123456" }).success).toBe(true);
-    expect(schemaReporSenha.safeParse({ token: "", novaSenha: "123456" }).success).toBe(false);
+    expect(schemaReporSenha.safeParse({ token: "abc", novaSenha: "senha1234" }).success).toBe(true);
+    expect(schemaReporSenha.safeParse({ token: "", novaSenha: "senha1234" }).success).toBe(false);
+    expect(schemaReporSenha.safeParse({ token: "abc", novaSenha: "12345678" }).success).toBe(false);
   });
 });

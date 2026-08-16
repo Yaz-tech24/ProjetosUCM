@@ -114,18 +114,21 @@ const ReporSenha = () => {
                     <Lock size={17} />
                   </div>
                   <input
-                    type="password" placeholder="Nova palavra-passe" required minLength={6}
+                    type="password" placeholder="Nova palavra-passe" required minLength={8}
                     value={novaSenha} onChange={e => setNovaSenha(e.target.value)}
                     className="w-full rounded-2xl py-4 pl-12 pr-4 text-sm outline-none transition-all duration-200"
                     style={{ background: "var(--surface-input)", border: "1.5px solid var(--border-subtle-strong)", color: "var(--text-heading)" }}
                   />
                 </div>
+                <p className="-mt-2 px-1" style={{ fontSize: 11.5, color: "var(--text-faint)" }}>
+                  Mínimo 8 caracteres, com pelo menos uma letra e um número.
+                </p>
                 <div className="relative">
                   <div className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2" style={{ color: "var(--text-faint)" }}>
                     <Lock size={17} />
                   </div>
                   <input
-                    type="password" placeholder="Confirmar palavra-passe" required minLength={6}
+                    type="password" placeholder="Confirmar palavra-passe" required minLength={8}
                     value={confirmar} onChange={e => setConfirmar(e.target.value)}
                     className="w-full rounded-2xl py-4 pl-12 pr-4 text-sm outline-none transition-all duration-200"
                     style={{ background: "var(--surface-input)", border: "1.5px solid var(--border-subtle-strong)", color: "var(--text-heading)" }}

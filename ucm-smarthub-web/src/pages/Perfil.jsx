@@ -46,7 +46,7 @@ const Cartao = ({ icon: Icon, titulo, subtitulo, children }) => (
   </section>
 );
 
-const Campo = ({ label, icon, ...props }) => (
+const Campo = ({ label, icon, hint, ...props }) => (
   <label className="block">
     <span className="block mb-2 text-xs font-bold uppercase" style={{ letterSpacing: "0.10em", color: "var(--text-muted)" }}>{label}</span>
     <div className="relative">
@@ -61,6 +61,7 @@ const Campo = ({ label, icon, ...props }) => (
         onBlur={e => (e.target.style.borderColor = "var(--border-subtle-strong)", e.target.style.boxShadow = "")}
       />
     </div>
+    {hint && <span className="block mt-1.5" style={{ fontSize: 11.5, color: "var(--text-faint)" }}>{hint}</span>}
   </label>
 );
 
@@ -254,7 +255,8 @@ const Perfil = ({ usuarioLogado, onUpdateUsuario }) => {
         <Cartao icon={Lock} titulo="Segurança" subtitulo="Altere a sua palavra-passe periodicamente">
           <form onSubmit={handleMudarSenha} className="space-y-4">
             <Campo label="Palavra-passe actual" icon={<KeyRound size={16} />} type="password" value={senhaActual} onChange={e => setSenhaActual(e.target.value)} required />
-            <Campo label="Nova palavra-passe" icon={<Lock size={16} />} type="password" value={novaSenha} onChange={e => setNovaSenha(e.target.value)} minLength={6} required />
+            <Campo label="Nova palavra-passe" icon={<Lock size={16} />} type="password" value={novaSenha} onChange={e => setNovaSenha(e.target.value)} minLength={8} required
+              hint="Mínimo 8 caracteres, com pelo menos uma letra e um número." />
             <div className="flex justify-end">
               <BotaoPrimario type="submit" loading={savingSenha}>
                 <Lock size={16} /> Alterar palavra-passe

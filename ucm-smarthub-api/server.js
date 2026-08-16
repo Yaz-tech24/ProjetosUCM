@@ -18,7 +18,7 @@ const pdfParse = require("pdf-parse");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const http = require("http");
 const socketIo = require("socket.io");
-require("dotenv").config();
+require("dotenv").config({ quiet: true });
 
 const swaggerUi = require("swagger-ui-express");
 
@@ -108,11 +108,42 @@ function criarLimitadorTaxa({ janelaMs, maxTentativas }) {
   };
 }
 const limitarLogin = criarLimitadorTaxa({ janelaMs: 15 * 60 * 1000, maxTentativas: 10 });
+
+// ─── Bloqueio de conta por tentativas falhadas ────────────────────────────
+// Complementa o limite por IP acima: um atacante que rode várias origens/IPs
+// contra a MESMA conta continua bloqueado, porque isto é indexado por email.
+const FALHAS_LOGIN_MAX = 5;
+const BLOQUEIO_CONTA_MS = 15 * 60 * 1000;
+const falhasLoginPorEmail = new Map(); // email -> { falhas, bloqueadoAte }
+// Hash bcrypt fixo sem correspondência real — usado quando o email não existe,
+// para que bcrypt.compare() corra sempre e o tempo de resposta não denuncie
+// se a conta existe ou não (mitigação de ataques de temporização).
+const SENHA_DUMMY_HASH = "$2a$10$CwTycUXWue0Thq9StjUM0uJ8xLzKLBiOJvOl5UaGz6zw2p4A5v8Nu";
+
+function contaBloqueada(email) {
+  const registo = falhasLoginPorEmail.get(email);
+  return !!(registo?.bloqueadoAte && Date.now() < registo.bloqueadoAte);
+}
+
+function registarFalhaLogin(email) {
+  const registo = falhasLoginPorEmail.get(email) || { falhas: 0, bloqueadoAte: 0 };
+  registo.falhas += 1;
+  if (registo.falhas >= FALHAS_LOGIN_MAX) {
+    registo.bloqueadoAte = Date.now() + BLOQUEIO_CONTA_MS;
+    registo.falhas = 0;
+  }
+  falhasLoginPorEmail.set(email, registo);
+}
+
+const limparFalhasLogin = (email) => falhasLoginPorEmail.delete(email);
 const limitarRegisto = criarLimitadorTaxa({ janelaMs: 60 * 60 * 1000, maxTentativas: 8 });
 // Chat de IA — cada pedido custa dinheiro (API do Gemini); sem limite, um utilizador
 // autenticado podia esgotar a quota sozinho.
 const limitarChat = criarLimitadorTaxa({ janelaMs: 60 * 1000, maxTentativas: 15 });
 const limitarEsqueciSenha = criarLimitadorTaxa({ janelaMs: 60 * 60 * 1000, maxTentativas: 5 });
+// O token em si tem 256 bits de entropia (impraticável de adivinhar), mas um
+// limite generoso aqui é defesa em profundidade barata contra automatismos.
+const limitarReporSenha = criarLimitadorTaxa({ janelaMs: 60 * 60 * 1000, maxTentativas: 20 });
 
 // Instância Gemini criada uma vez ao arrancar o servidor
 const genAI = process.env.GEMINI_API_KEY
@@ -182,10 +213,20 @@ function validar(schema) {
   };
 }
 
+// Política de palavra-passe: comprimento mínimo + pelo menos uma letra e um
+// número. Aplica-se a palavras-passe NOVAS (registo, alteração, reposição) —
+// contas já existentes com palavras-passe mais curtas continuam a conseguir
+// entrar normalmente, só passam a ter de cumprir a regra quando a mudarem.
+const SENHA_MIN = 8;
+const senhaForte = () => z.string()
+  .min(SENHA_MIN, `A palavra-passe deve ter pelo menos ${SENHA_MIN} caracteres.`)
+  .regex(/[A-Za-z]/, "A palavra-passe deve conter pelo menos uma letra.")
+  .regex(/[0-9]/, "A palavra-passe deve conter pelo menos um número.");
+
 const schemaRegisto = z.object({
   nome: z.string().trim().min(1, "Nome é obrigatório."),
   email: z.string().trim().toLowerCase().pipe(z.email("Email inválido.")),
-  senha: z.string().min(6, "A palavra-passe deve ter pelo menos 6 caracteres."),
+  senha: senhaForte(),
   papel: z.enum(["estudante", "professor"]).catch("estudante"),
   curso: z.string().trim().min(1, "Curso inválido."),
 });
@@ -230,7 +271,7 @@ const schemaPerfilNome = z.object({
 
 const schemaPerfilSenha = z.object({
   senha_actual: z.string().min(1, "Indique a palavra-passe actual."),
-  nova_senha: z.string().min(6, "A nova palavra-passe deve ter pelo menos 6 caracteres."),
+  nova_senha: senhaForte(),
 });
 
 const schemaEsqueciSenha = z.object({
@@ -239,7 +280,7 @@ const schemaEsqueciSenha = z.object({
 
 const schemaReporSenha = z.object({
   token: z.string().min(1, "Token em falta."),
-  novaSenha: z.string().min(6, "A nova palavra-passe deve ter pelo menos 6 caracteres."),
+  novaSenha: senhaForte(),
 });
 
 async function getConfiguracoes() {
@@ -399,7 +440,7 @@ const uploadAvatar = multer({
  *             properties:
  *               nome: { type: string }
  *               email: { type: string }
- *               senha: { type: string, minLength: 6 }
+ *               senha: { type: string, minLength: 8 }
  *               papel: { type: string, enum: [estudante, professor] }
  *               curso: { type: string }
  *     responses:
@@ -484,21 +525,27 @@ app.post("/api/login", limitarLogin, validar(schemaLogin), async (req, res) => {
   try {
     const { email, senha } = req.body;
 
+    if (contaBloqueada(email)) {
+      return res.status(429).json({ erro: "Demasiadas tentativas falhadas. Tente novamente dentro de 15 minutos ou recupere a palavra-passe." });
+    }
+
     const [utilizadores] = await db.query(
       "SELECT * FROM usuarios WHERE email = ?",
       [email]
     );
 
-    if (utilizadores.length === 0) {
-      return res.status(400).json({ erro: "Utilizador não encontrado no sistema." });
-    }
-
+    // bcrypt.compare corre sempre, mesmo sem utilizador — evita que o tempo de
+    // resposta revele se o email está ou não registado (ver SENHA_DUMMY_HASH acima).
     const utilizador = utilizadores[0];
-    const senhaValida = await bcrypt.compare(senha, utilizador.senha);
+    const senhaValida = await bcrypt.compare(senha, utilizador?.senha || SENHA_DUMMY_HASH);
 
-    if (!senhaValida) {
-      return res.status(400).json({ erro: "Palavra-passe incorreta." });
+    if (!utilizador || !senhaValida) {
+      registarFalhaLogin(email);
+      // Mensagem genérica de propósito — não revela se o email existe no sistema.
+      return res.status(400).json({ erro: "Email ou palavra-passe incorrectos." });
     }
+
+    limparFalhasLogin(email);
 
     const token = jwt.sign(
       { id: utilizador.id, papel: utilizador.papel, nome: utilizador.nome, curso: utilizador.curso },
@@ -592,12 +639,12 @@ app.post("/api/esqueci-senha", limitarEsqueciSenha, validar(schemaEsqueciSenha),
  *             required: [token, novaSenha]
  *             properties:
  *               token: { type: string }
- *               novaSenha: { type: string, minLength: 6 }
+ *               novaSenha: { type: string, minLength: 8 }
  *     responses:
  *       200: { description: Palavra-passe reposta }
  *       400: { description: Token inválido ou expirado, content: { application/json: { schema: { $ref: '#/components/schemas/Erro' } } } }
  */
-app.post("/api/repor-senha", validar(schemaReporSenha), async (req, res) => {
+app.post("/api/repor-senha", limitarReporSenha, validar(schemaReporSenha), async (req, res) => {
   try {
     const { token, novaSenha } = req.body;
     const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
@@ -672,7 +719,7 @@ app.put("/api/perfil", autenticar, validar(schemaPerfilNome), async (req, res) =
  *             required: [senha_actual, nova_senha]
  *             properties:
  *               senha_actual: { type: string }
- *               nova_senha: { type: string, minLength: 6 }
+ *               nova_senha: { type: string, minLength: 8 }
  *     responses:
  *       200: { description: Palavra-passe alterada }
  *       400: { description: Palavra-passe actual incorrecta, content: { application/json: { schema: { $ref: '#/components/schemas/Erro' } } } }

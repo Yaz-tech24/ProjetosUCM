@@ -551,9 +551,16 @@ const Login = ({ onLogin }) => {
                   type="email" placeholder="Email institucional" required
                   value={email} onChange={e => setEmail(e.target.value)} />
 
-                <InputField icon={<Lock size={17} />}
-                  type="password" placeholder="Palavra-passe" required
-                  value={senha} onChange={e => setSenha(e.target.value)} />
+                <div>
+                  <InputField icon={<Lock size={17} />}
+                    type="password" placeholder="Palavra-passe" required minLength={isRegistering ? 8 : undefined}
+                    value={senha} onChange={e => setSenha(e.target.value)} />
+                  {isRegistering && (
+                    <p className="mt-1.5 px-1" style={{ fontSize: 11.5, color: "var(--text-faint)" }}>
+                      Mínimo 8 caracteres, com pelo menos uma letra e um número.
+                    </p>
+                  )}
+                </div>
 
                 {!isRegistering && (
                   <div className="flex justify-end -mt-1">
