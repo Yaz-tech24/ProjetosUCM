@@ -5,6 +5,19 @@ Plataforma académica de partilha de materiais, chat entre estudantes e resumos 
 - **Frontend**: [ucm-smarthub-web](ucm-smarthub-web) — React 19 + Vite
 - **Backend**: [ucm-smarthub-api](ucm-smarthub-api) — Node.js + Express 5 + MySQL
 
+### Estrutura do backend
+
+```
+ucm-smarthub-api/
+  server.js       — arranque: middlewares globais, montagem das rotas, migrações, ciclo de vida
+  routes/         — um ficheiro por domínio (auth, perfil, materiais, config, stats, chat, status)
+  middleware/     — autenticação JWT, validação zod, rate limiting, uploads (multer)
+  schemas/        — schemas zod de validação de entrada
+  services/       — integrações externas (email, IA/Gemini) e acesso à configuração da plataforma
+  config/db.js    — pool de ligação MySQL
+  __tests__/      — testes Vitest + Supertest
+```
+
 ## Desenvolvimento local
 
 Ver `iniciar.ps1` (Windows) — arranca os dois servidores de desenvolvimento (API em `:5000`, frontend em `:5173`). Cada projecto tem também o seu próprio `.env.example`.
