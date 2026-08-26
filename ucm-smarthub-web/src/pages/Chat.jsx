@@ -25,12 +25,26 @@ const Chat = ({ usuarioLogado }) => {
     setCursoActivo(nomesCursos.includes(usuarioLogado?.curso) ? usuarioLogado.curso : nomesCursos[0]);
   }, [cursoActivo, nomesCursos, usuarioLogado]);
 
-  /* Liga o socket uma única vez, ao montar */
+  /* Liga o socket uma única vez, ao montar — o token vai em `auth`, é como
+     o servidor confirma quem realmente está a enviar cada mensagem (ver
+     io.use() em routes/chat.js), em vez de confiar no que o cliente diga. */
   useEffect(() => {
     const apiBase = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace('/api', '');
-    const sock = io(apiBase);
+    const sock = io(apiBase, { auth: { token: localStorage.getItem('token') } });
     socketRef.current = sock;
+
+    const handleConnectError = (err) => {
+      mostrarAviso(err?.message === 'Token inválido ou expirado.'
+        ? 'Sessão expirada — inicie sessão novamente para usar o chat.'
+        : 'Não foi possível ligar ao chat.');
+    };
+    const handleRejected = ({ mensagem }) => mostrarAviso(mensagem || 'Mensagem não permitida.');
+    sock.on('connect_error', handleConnectError);
+    sock.on('messageRejected', handleRejected);
+
     return () => {
+      sock.off('connect_error', handleConnectError);
+      sock.off('messageRejected', handleRejected);
       sock.disconnect();
       socketRef.current = null;
     };
@@ -104,10 +118,11 @@ const Chat = ({ usuarioLogado }) => {
       return;
     }
 
+    // Nota: já não envia userId/userName — o servidor identifica o remetente
+    // pelo token da ligação (ver io.use() em routes/chat.js), não pelo que
+    // o cliente diga que é.
     socketRef.current.emit('sendMessage', {
       message: newMessage,
-      userId: usuarioLogado?.id || 0,
-      userName: usuarioLogado?.nome || 'Estudante',
       curso: cursoActivo,
     });
     setNewMessage('');

@@ -1,8 +1,11 @@
+const jwt = require("jsonwebtoken");
+
 const db = require("../config/db");
 const { getConfiguracoes } = require("../services/plataforma");
 const { genAI } = require("../services/ia");
-const { autenticar, apenasAdmin } = require("../middleware/auth");
+const { autenticar, apenasAdmin, JWT_SECRET } = require("../middleware/auth");
 const { limitarChat } = require("../middleware/rateLimiters");
+const { analisarMensagem, mensagemAviso } = require("../utils/filtroChat");
 
 module.exports = function registarRotasChat(app, io) {
   // ==========================================
@@ -84,6 +87,22 @@ Pergunta do estudante: ${mensagem}`;
   // ==========================================
   // SOCKET.IO — CHAT ENTRE ESTUDANTES (SALAS POR CURSO)
   // ==========================================
+  // Autenticação da ligação: o cliente envia o JWT em `auth.token` (ver
+  // Chat.jsx). Sem isto, qualquer cliente ligado directamente ao socket.io
+  // (fora da app) podia enviar `userId`/`userName` arbitrários e falsificar
+  // a identidade de outro utilizador no chat — o token verificado aqui é a
+  // ÚNICA fonte de identidade usada em sendMessage, nunca o payload do evento.
+  io.use((socket, next) => {
+    const token = socket.handshake.auth?.token;
+    if (!token) return next(new Error("Autenticação necessária."));
+    try {
+      socket.utilizador = jwt.verify(token, JWT_SECRET);
+      next();
+    } catch {
+      next(new Error("Token inválido ou expirado."));
+    }
+  });
+
   io.on("connection", (socket) => {
     // Cliente pede para entrar numa sala de curso
     socket.on("joinRoom", ({ curso }) => {
@@ -96,8 +115,25 @@ Pergunta do estudante: ${mensagem}`;
     });
 
     socket.on("sendMessage", async (data) => {
-      const { message, userId, userName, curso } = data;
-      const sala = curso || "Geral";
+      const { message } = data || {};
+      // Sala: vem do cliente (é só uma escolha de sala, não uma alegação de
+      // identidade). Identidade: vem SEMPRE do token verificado em io.use(),
+      // nunca do payload — impede um cliente de se fazer passar por outro.
+      const sala = data?.curso || "Geral";
+      const userId = socket.utilizador.id;
+      const userName = socket.utilizador.nome;
+
+      if (typeof message !== "string" || !message.trim()) return;
+
+      // Mesma verificação de conteúdo que a app já faz no browser (ver
+      // filtroChat.js no frontend) — repetida aqui porque o filtro do lado
+      // do cliente pode ser contornado por quem falar directamente com o socket.
+      const { bloqueada, motivo } = analisarMensagem(message);
+      if (bloqueada) {
+        socket.emit("messageRejected", { motivo, mensagem: mensagemAviso(motivo) });
+        return;
+      }
+
       try {
         const [resultado] = await db.query(
           "INSERT INTO mensagens_estudantes (user_id, message, timestamp, curso) VALUES (?, ?, NOW(), ?)",
