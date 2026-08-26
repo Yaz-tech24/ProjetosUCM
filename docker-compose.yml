@@ -3,7 +3,7 @@ services:
     image: mysql:8
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD no .env — sem isto o MySQL arrancaria com password vazia.}
       MYSQL_DATABASE: ${DB_NAME:-ucm_smarthub}
     volumes:
       - db_data:/var/lib/mysql
@@ -23,14 +23,16 @@ services:
     environment:
       PORT: 5000
       NODE_ENV: production
-      CORS_ORIGINS: ${FRONTEND_URL}
-      API_URL: ${API_URL}
-      FRONTEND_URL: ${FRONTEND_URL}
+      # Mesmo domínio para tudo (frontend, API, uploads, Socket.IO) através do
+      # Caddy abaixo — não há CORS entre origens diferentes para gerir.
+      CORS_ORIGINS: https://${DOMAIN:?Defina DOMAIN no .env (o domínio público ou "localhost" para testar).}
+      API_URL: https://${DOMAIN}
+      FRONTEND_URL: https://${DOMAIN}
       DB_HOST: db
       DB_USER: root
-      DB_PASSWORD: ${DB_PASSWORD}
+      DB_PASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD no .env.}
       DB_NAME: ${DB_NAME:-ucm_smarthub}
-      JWT_SECRET: ${JWT_SECRET}
+      JWT_SECRET: ${JWT_SECRET:?Defina JWT_SECRET no .env — gere uma chave forte com "openssl rand -hex 32".}
       GEMINI_API_KEY: ${GEMINI_API_KEY}
       SMTP_HOST: ${SMTP_HOST}
       SMTP_PORT: ${SMTP_PORT}
@@ -39,20 +41,47 @@ services:
       SMTP_FROM: ${SMTP_FROM}
     volumes:
       - api_uploads:/app/uploads
-    ports:
-      - "5000:5000"
+    # Sem "ports": só é alcançável dentro da rede Docker, através do Caddy.
+    # Se preferir expor a API directamente (sem o Caddy à frente), descomente:
+    # ports:
+    #   - "5000:5000"
 
   web:
     build:
       context: ./ucm-smarthub-web
       args:
-        VITE_API_URL: ${API_URL}/api
+        VITE_API_URL: https://${DOMAIN}/api
     restart: unless-stopped
     depends_on:
       - api
+    # Sem "ports": servido através do Caddy, não publicado directamente.
+    # ports:
+    #   - "80:80"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - api
+      - web
+    environment:
+      DOMAIN: ${DOMAIN}
     ports:
       - "80:80"
+      - "443:443"
+    healthcheck:
+      test: ["CMD", "wget", "--no-check-certificate", "-qO-", "http://127.0.0.1:2019/config/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
 
 volumes:
   db_data:
   api_uploads:
+  caddy_data:
+  caddy_config:

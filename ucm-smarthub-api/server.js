@@ -1,5 +1,5 @@
 // ==========================================
-// UCM SMARTHUB - BACKEND API (NODE.JS)
+// SMARTHUB - BACKEND API (NODE.JS)
 //
 // Este ficheiro só trata do arranque: middlewares globais, montagem das
 // rotas (cada domínio tem o seu módulo em routes/), migrações e o ciclo de
@@ -25,6 +25,14 @@ const { genAI } = require("./services/ia");
 
 const app = express();
 const server = http.createServer(app);
+
+// Atrás do Caddy (docker-compose.yml), o Express só vê o IP interno do
+// proxy em cada pedido — sem isto, req.ip (usado por todos os limitadores
+// de taxa por IP) seria sempre o mesmo, tornando-os efectivamente globais
+// em vez de por-cliente. "1" confia exactamente um hop (o Caddy), que
+// define X-Forwarded-For correctamente; superior ao "true" (que confiaria
+// numa cadeia arbitrária de proxies, mais fácil de contornar).
+app.set("trust proxy", 1);
 
 // Origens permitidas: variável de ambiente ou localhost em desenvolvimento
 const CORS_ORIGINS = (process.env.CORS_ORIGINS || "http://localhost:5173,http://localhost:5174")
@@ -188,7 +196,7 @@ async function iniciar() {
   // em vez de arriscar isso; em desenvolvimento continua a funcionar sem
   // configuração extra.
   if (!process.env.JWT_SECRET && process.env.NODE_ENV === "production") {
-    console.error("[UCM SmartHub] JWT_SECRET não está definida. Defina uma chave forte e aleatória (ex: openssl rand -hex 32) antes de arrancar em produção.");
+    console.error("[SmartHub] JWT_SECRET não está definida. Defina uma chave forte e aleatória (ex: openssl rand -hex 32) antes de arrancar em produção.");
     process.exit(1);
   }
 
@@ -196,9 +204,9 @@ async function iniciar() {
   // /api/register, etc. antes de as tabelas novas existirem.
   await runMigrations();
   server.listen(PORT, () => {
-    console.log(`[UCM SmartHub] Servidor activo na porta ${PORT} | ${new Date().toISOString()}`);
-    if (!genAI) console.warn("[UCM SmartHub] GEMINI_API_KEY não definida — funcionalidades de IA desactivadas.");
-    if (!process.env.JWT_SECRET) console.warn("[UCM SmartHub] JWT_SECRET não definida — a usar valor de desenvolvimento. Defina JWT_SECRET em produção.");
+    console.log(`[SmartHub] Servidor activo na porta ${PORT} | ${new Date().toISOString()}`);
+    if (!genAI) console.warn("[SmartHub] GEMINI_API_KEY não definida — funcionalidades de IA desactivadas.");
+    if (!process.env.JWT_SECRET) console.warn("[SmartHub] JWT_SECRET não definida — a usar valor de desenvolvimento. Defina JWT_SECRET em produção.");
   });
 }
 

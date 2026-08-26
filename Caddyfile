@@ -1,0 +1,31 @@
+{$DOMAIN} {
+	# HTTPS automático (Let's Encrypt) para um domínio público real; para
+	# "localhost" ou um IP, o Caddy usa a sua própria CA interna em vez disso
+	# — funciona na mesma, só que o browser mostra o aviso de certificado
+	# não-confiável (normal em desenvolvimento/testes locais).
+
+	encode gzip
+
+	# API, ficheiros carregados (uploads) e o chat em tempo real (Socket.IO)
+	# ficam todos no mesmo domínio que o frontend — evita CORS por completo.
+	handle /api/* {
+		reverse_proxy api:5000
+	}
+	handle /uploads/* {
+		reverse_proxy api:5000
+	}
+	handle /socket.io/* {
+		reverse_proxy api:5000
+	}
+
+	# Tudo o resto é o frontend (SPA servida pelo nginx do container web)
+	handle {
+		reverse_proxy web:80
+	}
+
+	header {
+		X-Frame-Options "SAMEORIGIN"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+}

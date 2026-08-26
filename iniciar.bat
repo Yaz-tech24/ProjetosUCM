@@ -31,6 +31,17 @@ for /f "tokens=*" %%i in ('node --version') do set NODE_VER=%%i
 echo  [OK] Node.js %NODE_VER% detectado
 echo.
 
+:: ─── Verificar .env da API (obrigatório: ligação à base de dados) ───
+if not exist "ucm-smarthub-api\.env" (
+    copy "ucm-smarthub-api\.env.example" "ucm-smarthub-api\.env" >nul
+    color 4F
+    echo  [ERRO] Não existia .env na API — copiado de .env.example.
+    echo  Edite ucm-smarthub-api\.env e preencha pelo menos DB_PASSWORD antes de continuar.
+    echo.
+    pause
+    exit /b 1
+)
+
 :: ─── Instalar dependências da API se necessário ──────────────
 echo  A verificar dependências do servidor API...
 if not exist "ucm-smarthub-api\node_modules" (

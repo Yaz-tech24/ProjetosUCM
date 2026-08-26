@@ -14,7 +14,7 @@ const pool = mysql.createPool({
 // Teste rápido para ver se conectou quando o arquivo for chamado
 pool.getConnection()
     .then(connection => {
-        console.log('✅ Conectado ao banco de dados MySQL (ucm_smarthub) com sucesso!');
+        console.log(`✅ Conectado ao banco de dados MySQL (${process.env.DB_NAME}) com sucesso!`);
         connection.release();
     })
     .catch(err => {

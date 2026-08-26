@@ -24,25 +24,51 @@ Ver `iniciar.ps1` (Windows) — arranca os dois servidores de desenvolvimento (A
 
 ## Deployment (VPS com Docker)
 
-Pré-requisitos no servidor: Docker + Docker Compose.
+Pré-requisitos no servidor: Docker + Docker Compose, e um domínio cujo DNS (registo A) já aponte para o IP do servidor.
 
-1. Copiar `.env.example` para `.env` na raiz e preencher os valores (password da base de dados, `JWT_SECRET`, URLs públicas, e opcionalmente `GEMINI_API_KEY`/SMTP).
-2. Arrancar a stack:
+1. Copiar `.env.example` para `.env` na raiz e preencher os valores — em particular `DOMAIN` (o domínio público real, ex: `smarthub.auniversidade.ac.mz`), `DB_PASSWORD`, `JWT_SECRET`, e opcionalmente `GEMINI_API_KEY`/SMTP.
+2. Garantir que as portas **80 e 443** estão abertas no firewall do servidor (necessárias para o HTTPS automático).
+3. Arrancar a stack:
 
    ```bash
    docker compose up -d --build
    ```
 
-3. Confirmar que tudo está a correr:
-   - Frontend: `http://<servidor>/`
-   - API: `http://<servidor>:5000/api/status`
-   - Documentação da API (Swagger): `http://<servidor>:5000/api/docs`
+4. Confirmar que tudo está a correr (pode demorar um minuto na primeira vez, enquanto o Caddy pede o certificado HTTPS ao Let's Encrypt):
+   - Frontend: `https://<domínio>/`
+   - API: `https://<domínio>/api/status`
+   - Documentação da API (Swagger): `https://<domínio>/api/docs`
 
-A stack tem três serviços (`db`, `api`, `web`) — ver [docker-compose.yml](docker-compose.yml). A base de dados MySQL e os ficheiros submetidos (`uploads/`) persistem em volumes nomeados entre reinícios/deploys.
+A stack tem quatro serviços — ver [docker-compose.yml](docker-compose.yml):
+- `db` (MySQL) e `api`/`web` não expõem portas directamente ao exterior.
+- `caddy` é o único ponto de entrada (portas 80/443), serve HTTPS automático (Let's Encrypt) e encaminha `/api/*`, `/uploads/*` e `/socket.io/*` para a API, e tudo o resto para o frontend — mesmo domínio para tudo, sem problemas de CORS.
+
+A base de dados MySQL, os ficheiros submetidos (`uploads/`) e os certificados HTTPS persistem em volumes nomeados entre reinícios/deploys.
+
+### Testar localmente sem domínio real
+
+Definir `DOMAIN=localhost` no `.env` e aceder a `https://localhost/` — o Caddy usa um certificado próprio (não confiável para o browser, vai pedir para aceitar o aviso) em vez de tentar obter um certificado Let's Encrypt real.
 
 ### Notas importantes
 
-- **`VITE_API_URL` é gravado no bundle do frontend em build-time**, não é uma variável de ambiente lida em runtime pelo container `web`. Se mudar `API_URL` no `.env`, é preciso reconstruir a imagem do frontend (`docker compose up -d --build web`).
+- **`VITE_API_URL` é gravado no bundle do frontend em build-time**, não é uma variável de ambiente lida em runtime pelo container `web`. Se mudar `DOMAIN` no `.env`, é preciso reconstruir a imagem do frontend (`docker compose up -d --build web`).
 - Sem `GEMINI_API_KEY`, a IA (resumos, chat assistente, moderação automática) fica desactivada — o resto da aplicação continua a funcionar normalmente.
 - Sem as variáveis `SMTP_*`, os emails (boas-vindas, recuperação de password, notificação de moderação) não são enviados — a app regista um aviso e continua.
 - Para actualizar depois de alterações no código: `git pull && docker compose up -d --build`.
+- Se preferir gerir o HTTPS com o seu próprio proxy (Cloudflare, outro nginx, etc.) em vez do Caddy incluído, remova o serviço `caddy` do `docker-compose.yml` e descomente as secções `ports:` dos serviços `api`/`web`. Se o `api` ficar exposto **directamente à Internet sem nenhum proxy à frente**, mude `app.set("trust proxy", 1)` para `false` em `server.js` — com um proxy real (Caddy ou outro) esse "1" garante que os limitadores de taxa vêem o IP verdadeiro de cada cliente em vez do IP interno do proxy; sem proxy nenhum, o mesmo ajuste deixaria um cliente malicioso falsificar o cabeçalho `X-Forwarded-For` para contornar os limites.
+
+### Backups
+
+`./backup-db.sh` cria uma cópia comprimida da base de dados em `backups/` (mantém as últimas 14). Para automatizar diariamente no servidor:
+
+```bash
+crontab -e
+# adicionar:
+0 3 * * * cd /caminho/para/o/projecto && ./backup-db.sh >> backups/backup.log 2>&1
+```
+
+Para restaurar um backup:
+
+```bash
+gunzip -c backups/ucm_smarthub_20260101_030000.sql.gz | docker compose exec -T db mysql -uroot -p"$DB_PASSWORD" ucm_smarthub
+```

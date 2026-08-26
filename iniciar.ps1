@@ -41,6 +41,19 @@ try {
 }
 
 # -----------------------------------------------------------------
+# Verificar .env da API (obrigatorio: ligacao a base de dados)
+# -----------------------------------------------------------------
+$envApi = Join-Path $apiDir ".env"
+if (-not (Test-Path $envApi)) {
+    $exemploApi = Join-Path $apiDir ".env.example"
+    Copy-Item $exemploApi $envApi
+    Write-Err "Nao existia .env na API — copiado de .env.example."
+    Write-Host "       Edite '$envApi' e preencha pelo menos DB_PASSWORD antes de continuar." -ForegroundColor DarkYellow
+    Read-Host "Prima Enter para sair"
+    exit 1
+}
+
+# -----------------------------------------------------------------
 # Instalar dependencias da API
 # -----------------------------------------------------------------
 Write-Info "A verificar dependencias da API..."
