@@ -54,6 +54,34 @@ if (-not (Test-Path $envApi)) {
 }
 
 # -----------------------------------------------------------------
+# Verificar se o MySQL esta acessivel — sem isto, os servidores
+# arrancam na mesma e parece tudo bem, mas toda rota que toque a
+# base de dados falha com erro 500 sem pista nenhuma da causa.
+# -----------------------------------------------------------------
+Write-Info "A verificar ligacao ao MySQL..."
+$dbHostLinha = Get-Content $envApi | Where-Object { $_ -match '^DB_HOST=' } | Select-Object -First 1
+$dbHostValor = "localhost"
+if ($dbHostLinha) {
+    $valor = ($dbHostLinha -split '=', 2)[1].Trim()
+    if ($valor) { $dbHostValor = $valor }
+}
+$mysqlOk = $false
+try {
+    $mysqlOk = (Test-NetConnection -ComputerName $dbHostValor -Port 3306 -InformationLevel Quiet -WarningAction SilentlyContinue)
+} catch {
+    $mysqlOk = $false
+}
+if ($mysqlOk) {
+    Write-Ok "MySQL acessivel em ${dbHostValor}:3306"
+} else {
+    Write-Err "MySQL nao respondeu em ${dbHostValor}:3306"
+    Write-Host "       A API vai arrancar na mesma, mas toda rota que use a base de dados" -ForegroundColor DarkYellow
+    Write-Host "       vai falhar ate o MySQL estar a correr (XAMPP, servico do Windows, Docker, etc)." -ForegroundColor DarkYellow
+    Write-Host "       Confirme DB_HOST em '$envApi' e inicie o MySQL antes de continuar." -ForegroundColor DarkYellow
+    Write-Host ""
+}
+
+# -----------------------------------------------------------------
 # Instalar dependencias da API
 # -----------------------------------------------------------------
 Write-Info "A verificar dependencias da API..."

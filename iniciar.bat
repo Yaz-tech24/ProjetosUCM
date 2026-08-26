@@ -42,6 +42,28 @@ if not exist "ucm-smarthub-api\.env" (
     exit /b 1
 )
 
+:: ─── Verificar se o MySQL está acessível ──────────────────────
+:: Sem isto, os servidores arrancam na mesma e parece tudo bem, mas
+:: toda rota que use a base de dados falha com erro 500 sem pista
+:: nenhuma da causa.
+echo  A verificar ligação ao MySQL...
+set "DB_HOST_VALOR=localhost"
+for /f "tokens=2 delims==" %%h in ('findstr /b "DB_HOST=" "ucm-smarthub-api\.env" 2^>nul') do set "DB_HOST_VALOR=%%h"
+if "%DB_HOST_VALOR%"=="" set "DB_HOST_VALOR=localhost"
+powershell -NoProfile -Command "if (Test-NetConnection -ComputerName '%DB_HOST_VALOR%' -Port 3306 -InformationLevel Quiet -WarningAction SilentlyContinue) { exit 0 } else { exit 1 }" >nul 2>&1
+if errorlevel 1 (
+    color 4F
+    echo  [AVISO] MySQL não respondeu em %DB_HOST_VALOR%:3306
+    color 1F
+    echo  A API vai arrancar na mesma, mas toda rota que use a base de dados
+    echo  vai falhar até o MySQL estar a correr ^(XAMPP, serviço do Windows, Docker, etc^).
+    echo  Confirme DB_HOST em ucm-smarthub-api\.env e inicie o MySQL antes de continuar.
+    echo.
+) else (
+    echo  [OK] MySQL acessível em %DB_HOST_VALOR%:3306
+)
+echo.
+
 :: ─── Instalar dependências da API se necessário ──────────────
 echo  A verificar dependências do servidor API...
 if not exist "ucm-smarthub-api\node_modules" (

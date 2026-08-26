@@ -20,6 +20,8 @@ ucm-smarthub-api/
 
 ## Desenvolvimento local
 
+Pré-requisito: um servidor MySQL a correr localmente (XAMPP, serviço nativo do Windows, ou um `docker run` só do serviço `db`), com a base de dados criada e o `DB_HOST`/`DB_PASSWORD` em `ucm-smarthub-api/.env` a apontar para ele — ao contrário do caminho Docker abaixo, `iniciar.ps1`/`iniciar.bat` não sobem o MySQL por si; só arrancam a API e o frontend (e agora avisam, mas não bloqueiam, se não conseguirem alcançar o MySQL antes de arrancar).
+
 Ver `iniciar.ps1` (Windows) — arranca os dois servidores de desenvolvimento (API em `:5000`, frontend em `:5173`). Cada projecto tem também o seu próprio `.env.example`.
 
 ## Deployment (VPS com Docker)
