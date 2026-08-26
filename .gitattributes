@@ -3,3 +3,8 @@
 *.jpg binary
 *.jpeg binary
 *.ico binary
+
+# Scripts que correm no servidor Linux (VPS) — têm de manter LF mesmo que
+# sejam commitados a partir do Windows, senão o shebang (#!/bin/sh) falha.
+*.sh text eol=lf
+Caddyfile text eol=lf
