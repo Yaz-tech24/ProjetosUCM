@@ -17,6 +17,15 @@ function mockSql(regrasPorOrdem) {
   });
 }
 
+// O fileFilter do multer (ver middleware/upload.js) chama getConfiguracoes()
+// em TODO upload, mesmo antes de qualquer validação do corpo do pedido — por
+// isso qualquer teste que anexe um ficheiro precisa deste mock, ou a query
+// real (sem BD nos testes) falha e mascara a validação que o teste quer
+// mesmo exercitar, respondendo sempre com o erro genérico de tipo de ficheiro.
+const mockConfiguracoesPadrao = () => mockSql([
+  [/FROM configuracoes/, [[{ tamanho_maximo_mb: 100, moderacao_ia_activada: false, tipos_ficheiro_permitidos: "pdf,mp4,webm,ogg,mov" }]]],
+]);
+
 describe("POST /api/materiais", () => {
   beforeEach(() => { vi.restoreAllMocks(); });
 
@@ -37,6 +46,7 @@ describe("POST /api/materiais", () => {
   });
 
   it("rejeita título vazio e não deixa o ficheiro na pasta uploads", async () => {
+    mockConfiguracoesPadrao();
     const res = await request(app)
       .post("/api/materiais")
       .set("Authorization", `Bearer ${tokenEstudante}`)
@@ -49,6 +59,7 @@ describe("POST /api/materiais", () => {
   });
 
   it("rejeita tipo de material inválido", async () => {
+    mockConfiguracoesPadrao();
     const res = await request(app)
       .post("/api/materiais")
       .set("Authorization", `Bearer ${tokenEstudante}`)
@@ -60,6 +71,7 @@ describe("POST /api/materiais", () => {
   });
 
   it("rejeita ficheiro de tipo MIME não permitido", async () => {
+    mockConfiguracoesPadrao();
     const res = await request(app)
       .post("/api/materiais")
       .set("Authorization", `Bearer ${tokenEstudante}`)

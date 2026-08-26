@@ -1,7 +1,27 @@
 // ─── Rate limiting simples (sem dependências) para rotas de autenticação ──────
 // Protege login/registo contra força bruta e spam de contas.
+//
+// Nota sobre memória: cada IP/email que alguma vez bate num destes limites
+// fica com uma entrada no Map correspondente. Sem limpeza, isto cresce sem
+// limite ao longo de meses de actividade (nunca mais liberta memória do
+// processo). Cada limitador limpa-se sozinho periodicamente — ver
+// limparPeriodicamente() abaixo.
 function criarLimitadorTaxa({ janelaMs, maxTentativas }) {
   const tentativasPorChave = new Map();
+
+  const limpar = () => {
+    const agora = Date.now();
+    for (const [chave, tentativas] of tentativasPorChave) {
+      const activas = tentativas.filter(t => agora - t < janelaMs);
+      if (activas.length === 0) tentativasPorChave.delete(chave);
+      else tentativasPorChave.set(chave, activas);
+    }
+  };
+  // .unref() — este temporizador nunca deve, por si só, impedir o processo
+  // Node de terminar (relevante em testes e em paragem graciosa do servidor).
+  const intervalo = setInterval(limpar, Math.max(janelaMs, 10 * 60 * 1000));
+  intervalo.unref?.();
+
   return (req, res, next) => {
     const chave = req.ip;
     const agora = Date.now();
@@ -48,6 +68,16 @@ function registarFalhaLogin(email) {
 }
 
 const limparFalhasLogin = (email) => falhasLoginPorEmail.delete(email);
+
+// Purga contas cujo bloqueio já expirou e que não tiveram nenhuma falha nova
+// entretanto — mesmo raciocínio de memória que os limitadores acima.
+const intervaloFalhas = setInterval(() => {
+  const agora = Date.now();
+  for (const [email, registo] of falhasLoginPorEmail) {
+    if (agora >= registo.bloqueadoAte) falhasLoginPorEmail.delete(email);
+  }
+}, 30 * 60 * 1000);
+intervaloFalhas.unref?.();
 
 module.exports = {
   limitarLogin, limitarRegisto, limitarChat, limitarEsqueciSenha, limitarReporSenha,

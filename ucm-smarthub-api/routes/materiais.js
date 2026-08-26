@@ -465,6 +465,10 @@ Responde APENAS com as 3 notas numeradas. Sem introdução, sem conclusão.`;
         [id]
       );
 
+      if (!material) {
+        return res.status(404).json({ erro: "Material não encontrado." });
+      }
+
       if (acao === "aprovar") {
         await db.query("UPDATE materiais SET status = 'aprovado' WHERE id = ?", [id]);
         res.json({ mensagem: "Material aprovado com sucesso!" });

@@ -85,10 +85,21 @@ module.exports = function registarRotasAuth(app) {
       const [[{ total }]] = await db.query("SELECT COUNT(*) AS total FROM usuarios");
       const papelFinal = total === 0 ? "admin" : "estudante";
 
-      await db.query(
-        "INSERT INTO usuarios (nome, email, senha, curso, papel) VALUES (?, ?, ?, ?, ?)",
-        [nome, email, senhaCriptografada, cursoValido, papelFinal]
-      );
+      try {
+        await db.query(
+          "INSERT INTO usuarios (nome, email, senha, curso, papel) VALUES (?, ?, ?, ?, ?)",
+          [nome, email, senhaCriptografada, cursoValido, papelFinal]
+        );
+      } catch (erroInsert) {
+        // Condição de corrida: dois registos com o mesmo email quase em
+        // simultâneo passam ambos pela verificação SELECT acima antes de
+        // qualquer um inserir — a constraint UNIQUE da BD apanha o segundo,
+        // e devolvemos a mesma mensagem amigável em vez de um 500 genérico.
+        if (erroInsert.code === "ER_DUP_ENTRY") {
+          return res.status(400).json({ erro: "Este email institucional já está em uso." });
+        }
+        throw erroInsert;
+      }
 
       res.status(201).json({
         mensagem: papelFinal === "admin"
