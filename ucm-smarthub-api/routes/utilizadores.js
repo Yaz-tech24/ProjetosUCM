@@ -1,4 +1,6 @@
 const bcrypt = require("bcryptjs");
+const path = require("path");
+const fs = require("fs");
 
 const db = require("../config/db");
 const mailer = require("../services/email");
@@ -6,6 +8,7 @@ const { getConfiguracoes, getCursos } = require("../services/plataforma");
 const { paraUrlAbsoluto } = require("../utils/urls");
 const validar = require("../middleware/validar");
 const { autenticar, apenasAdmin } = require("../middleware/auth");
+const { uploadsDir } = require("../middleware/upload");
 const { schemaUtilizadorAdmin, emailComDominioPermitido } = require("../schemas");
 
 module.exports = function registarRotasUtilizadores(app) {
@@ -74,10 +77,19 @@ module.exports = function registarRotasUtilizadores(app) {
       }
 
       const senhaCriptografada = await bcrypt.hash(senha, await bcrypt.genSalt(10));
-      const [resultado] = await db.query(
-        "INSERT INTO usuarios (nome, email, senha, curso, papel) VALUES (?, ?, ?, ?, ?)",
-        [nome, email, senhaCriptografada, cursoValido, papel]
-      );
+      let resultado;
+      try {
+        [resultado] = await db.query(
+          "INSERT INTO usuarios (nome, email, senha, curso, papel) VALUES (?, ?, ?, ?, ?)",
+          [nome, email, senhaCriptografada, cursoValido, papel]
+        );
+      } catch (erroInsert) {
+        // Mesma condição de corrida do registo público — ver comentário em routes/auth.js.
+        if (erroInsert.code === "ER_DUP_ENTRY") {
+          return res.status(400).json({ erro: "Este email já está em uso." });
+        }
+        throw erroInsert;
+      }
 
       res.status(201).json({
         mensagem: "Conta criada com sucesso!",
@@ -91,6 +103,68 @@ module.exports = function registarRotasUtilizadores(app) {
     } catch (erro) {
       console.error("Erro ao criar utilizador:", erro.message);
       res.status(500).json({ erro: "Erro interno ao criar utilizador." });
+    }
+  });
+
+  /**
+   * @openapi
+   * /api/admin/utilizadores/{id}:
+   *   delete:
+   *     summary: Remove uma conta de utilizador (admin)
+   *     tags: [Admin]
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema: { type: integer }
+   *     responses:
+   *       200: { description: Utilizador removido }
+   *       400: { description: "Auto-remoção, último admin, ou utilizador com conteúdo associado", content: { application/json: { schema: { $ref: '#/components/schemas/Erro' } } } }
+   *       404: { description: Utilizador não encontrado }
+   */
+  app.delete("/api/admin/utilizadores/:id", autenticar, apenasAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (!id) return res.status(400).json({ erro: "ID inválido." });
+
+      if (id === req.utilizador.id) {
+        return res.status(400).json({ erro: "Não pode remover a sua própria conta." });
+      }
+
+      const [[alvo]] = await db.query("SELECT id, papel, avatar_url FROM usuarios WHERE id = ?", [id]);
+      if (!alvo) return res.status(404).json({ erro: "Utilizador não encontrado." });
+
+      if (alvo.papel === "admin") {
+        const [[{ total: totalAdmins }]] = await db.query(
+          "SELECT COUNT(*) AS total FROM usuarios WHERE papel = 'admin'"
+        );
+        if (totalAdmins <= 1) {
+          return res.status(400).json({ erro: "Não é possível remover o único administrador da plataforma." });
+        }
+      }
+
+      try {
+        await db.query("DELETE FROM usuarios WHERE id = ?", [id]);
+      } catch (erroDelete) {
+        // O utilizador tem materiais e/ou mensagens associados (FK RESTRICT) —
+        // apagar em cascata seria destrutivo demais para fazer sem confirmação
+        // explícita, por isso bloqueia com uma mensagem clara em vez disso.
+        if (erroDelete.code === "ER_ROW_IS_REFERENCED_2" || erroDelete.code === "ER_ROW_IS_REFERENCED") {
+          return res.status(400).json({
+            erro: "Não é possível remover: este utilizador tem materiais ou mensagens de chat associados.",
+          });
+        }
+        throw erroDelete;
+      }
+
+      if (alvo.avatar_url) {
+        fs.unlink(path.join(uploadsDir, path.basename(alvo.avatar_url)), () => {});
+      }
+
+      res.json({ mensagem: "Utilizador removido com sucesso." });
+    } catch (erro) {
+      console.error("Erro ao remover utilizador:", erro.message);
+      res.status(500).json({ erro: "Erro interno ao remover utilizador." });
     }
   });
 };

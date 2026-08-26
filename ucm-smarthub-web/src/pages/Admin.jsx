@@ -243,6 +243,10 @@ const Admin = ({ usuarioLogado }) => {
     setConfirm({ message: 'Remover este curso da lista? Materiais e contas já criados com ele não são afectados.', id, tipo: 'curso' });
   };
 
+  const handleRemoverUtilizador = (id) => {
+    setConfirm({ message: 'Remover esta conta permanentemente? Esta acção não pode ser desfeita.', id, tipo: 'utilizador' });
+  };
+
   const handleConfirmRejeitar = async () => {
     const { id, tipo } = confirm;
     setConfirm({ message: '', id: null, tipo: 'material' });
@@ -255,13 +259,17 @@ const Admin = ({ usuarioLogado }) => {
         await api.delete(`/admin/cursos/${id}`);
         showToast('Curso removido.', 'success');
         await refetchConfig();
+      } else if (tipo === 'utilizador') {
+        await api.delete(`/admin/utilizadores/${id}`);
+        setUtilizadores(prev => prev.filter(u => u.id !== id));
+        showToast('Utilizador removido.', 'success');
       } else {
         await api.put(`/admin/materiais/${id}/status`, { acao: 'rejeitar' });
         showToast('Material rejeitado e removido do sistema.', 'error');
         fetchPendentes();
       }
-    } catch {
-      showToast('Erro ao processar. Verifique a ligação ao servidor.', 'error');
+    } catch (err) {
+      showToast(err.response?.data?.erro || 'Erro ao processar. Verifique a ligação ao servidor.', 'error');
     }
   };
 
@@ -834,7 +842,7 @@ const Admin = ({ usuarioLogado }) => {
                 ) : (
                   <div className="divide-y" style={{ borderColor: "var(--border-subtle)" }}>
                     {utilizadores.map(u => (
-                      <div key={u.id} className="flex items-center gap-4 px-4 py-3.5">
+                      <div key={u.id} className="group flex items-center gap-4 px-4 py-3.5">
                         <div className="w-10 h-10 rounded-xl grid place-items-center text-sm font-black shrink-0 overflow-hidden"
                           style={{ background: "linear-gradient(135deg,var(--color-gold-dark),var(--color-gold))", color: "var(--color-navy-deep)" }}>
                           {u.avatar_url
@@ -853,6 +861,16 @@ const Admin = ({ usuarioLogado }) => {
                           }}>
                           {u.papel}
                         </span>
+                        {u.id !== usuarioLogado?.id && (
+                          <button
+                            onClick={() => handleRemoverUtilizador(u.id)}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 rounded-xl p-2"
+                            style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.20)", color: "#ef4444" }}
+                            title="Remover utilizador"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        )}
                       </div>
                     ))}
                   </div>

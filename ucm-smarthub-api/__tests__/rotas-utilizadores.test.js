@@ -94,3 +94,65 @@ describe("GET /api/admin/utilizadores", () => {
     expect(res.body).toHaveLength(1);
   });
 });
+
+describe("DELETE /api/admin/utilizadores/:id", () => {
+  beforeEach(() => { vi.restoreAllMocks(); });
+
+  it("rejeita quem não é admin", async () => {
+    const res = await request(app).delete("/api/admin/utilizadores/2").set("Authorization", `Bearer ${tokenEstudante}`);
+    expect(res.status).toBe(403);
+  });
+
+  it("rejeita pedidos sem autenticação", async () => {
+    const res = await request(app).delete("/api/admin/utilizadores/2");
+    expect(res.status).toBe(401);
+  });
+
+  it("rejeita remover a própria conta", async () => {
+    const res = await request(app).delete("/api/admin/utilizadores/1").set("Authorization", `Bearer ${tokenAdmin}`);
+    expect(res.status).toBe(400);
+    expect(res.body.erro).toMatch(/própria conta/);
+  });
+
+  it("devolve 404 para utilizador inexistente", async () => {
+    mockSql([[/SELECT id, papel, avatar_url FROM usuarios/, [[]]]]);
+    const res = await request(app).delete("/api/admin/utilizadores/999").set("Authorization", `Bearer ${tokenAdmin}`);
+    expect(res.status).toBe(404);
+  });
+
+  it("rejeita remover o único administrador", async () => {
+    mockSql([
+      [/SELECT id, papel, avatar_url FROM usuarios/, [[{ id: 5, papel: "admin", avatar_url: null }]]],
+      [/COUNT\(\*\) AS total FROM usuarios WHERE papel = 'admin'/, [[{ total: 1 }]]],
+    ]);
+    const res = await request(app).delete("/api/admin/utilizadores/5").set("Authorization", `Bearer ${tokenAdmin}`);
+    expect(res.status).toBe(400);
+    expect(res.body.erro).toMatch(/único administrador/);
+  });
+
+  it("remove um estudante com sucesso", async () => {
+    mockSql([
+      [/SELECT id, papel, avatar_url FROM usuarios/, [[{ id: 2, papel: "estudante", avatar_url: null }]]],
+      [/DELETE FROM usuarios WHERE id = \?/, [{ affectedRows: 1 }]],
+    ]);
+    const res = await request(app).delete("/api/admin/utilizadores/2").set("Authorization", `Bearer ${tokenAdmin}`);
+    expect(res.status).toBe(200);
+  });
+
+  it("bloqueia com mensagem clara quando o utilizador tem conteúdo associado (FK)", async () => {
+    vi.spyOn(db, "query").mockImplementation((sql) => {
+      if (/SELECT id, papel, avatar_url FROM usuarios/.test(sql)) {
+        return Promise.resolve([[{ id: 2, papel: "estudante", avatar_url: null }]]);
+      }
+      if (/DELETE FROM usuarios WHERE id = \?/.test(sql)) {
+        const erro = new Error("Cannot delete or update a parent row: a foreign key constraint fails");
+        erro.code = "ER_ROW_IS_REFERENCED_2";
+        return Promise.reject(erro);
+      }
+      return Promise.resolve([[]]);
+    });
+    const res = await request(app).delete("/api/admin/utilizadores/2").set("Authorization", `Bearer ${tokenAdmin}`);
+    expect(res.status).toBe(400);
+    expect(res.body.erro).toMatch(/materiais ou mensagens/);
+  });
+});
