@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { BookOpen, Home, Library, ShieldCheck, Search, MessageCircle, LogOut, Bell, X, FileText, PlayCircle, Sun, Moon } from 'lucide-react';
+import { BookOpen, Home, Library, ShieldCheck, Search, MessageCircle, LogOut, Bell, X, FileText, PlayCircle, Sun, Moon, Menu } from 'lucide-react';
 import Chatbot from './Chatbot';
 import api from '../services/api';
 import { useConfig } from '../context/ConfigContext';
@@ -22,8 +22,16 @@ const Layout = ({ usuarioLogado, onLogout }) => {
   const [notifMats,    setNotifMats]    = useState([]);
   const [notifLoading, setNotifLoading] = useState(false);
   const [chatOpen,     setChatOpen]     = useState(false);
+  const [sidebarOpen,  setSidebarOpen]  = useState(false);
   const notifRef = useRef(null);
   const searchInputRef = useRef(null);
+
+  /* Fecha a aba lateral (mobile) ao mudar de página e trava o scroll do fundo enquanto está aberta */
+  useEffect(() => { setSidebarOpen(false); }, [location.pathname]);
+  useEffect(() => {
+    document.body.style.overflow = sidebarOpen ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [sidebarOpen]);
 
   /* Contexto disponibilizado às páginas filhas (via <Outlet context>) para
      que possam abrir o assistente de IA flutuante — ex: o atalho no Dashboard. */
@@ -97,9 +105,18 @@ const Layout = ({ usuarioLogado, onLogout }) => {
       color: "var(--text-body)",
     }}>
 
+      {/* Fundo escurecido atrás da aba lateral em ecrãs pequenos */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/50 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
       {/* ═══ SIDEBAR ══════════════════════════════════════════════ */}
       <aside
-        className="w-72 xl:w-80 flex flex-col relative overflow-hidden"
+        className={`fixed lg:relative inset-y-0 left-0 z-40 lg:z-auto w-72 max-w-[85vw] xl:w-80 flex flex-col overflow-hidden transform transition-transform duration-300 ease-out lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
         style={{
           background: "linear-gradient(-45deg, var(--color-navy-abyss), var(--color-navy-deep), var(--color-navy), #0a1d38)",
           backgroundSize: "400% 400%",
@@ -155,9 +172,17 @@ const Layout = ({ usuarioLogado, onLogout }) => {
                 ? <img src={config.logo_url} alt={config.nome_plataforma} className="w-full h-full object-contain rounded-[18px]" />
                 : <BookOpen size={24} strokeWidth={1.7} />}
             </div>
-            <div>
-              <h1 style={{ fontSize: 22, fontWeight: 900, color: "#fff", letterSpacing: "-0.02em", lineHeight: 1.1 }}>{config.nome_plataforma}</h1>
+            <div className="min-w-0 flex-1">
+              <h1 className="truncate" style={{ fontSize: 22, fontWeight: 900, color: "#fff", letterSpacing: "-0.02em", lineHeight: 1.1 }}>{config.nome_plataforma}</h1>
             </div>
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="lg:hidden shrink-0 w-9 h-9 rounded-xl grid place-items-center"
+              style={{ color: "rgba(255,255,255,0.60)", background: "rgba(255,255,255,0.07)" }}
+              aria-label="Fechar menu"
+            >
+              <X size={17} />
+            </button>
           </div>
         </div>
 
@@ -255,7 +280,7 @@ const Layout = ({ usuarioLogado, onLogout }) => {
 
         {/* Header sticky com pesquisa funcional */}
         <header
-          className="sticky top-0 z-20 px-8 py-5"
+          className="sticky top-0 z-20 px-4 sm:px-8 py-5"
           style={{
             background: "var(--surface-card-glass)",
             backdropFilter: "blur(28px) saturate(180%)",
@@ -265,16 +290,26 @@ const Layout = ({ usuarioLogado, onLogout }) => {
           }}
         >
           <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
-            <div>
-              <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.38em", color: "var(--text-faint)", textTransform: "uppercase" }}>
-                {config.nome_plataforma}
-              </p>
-              <h2 className="mt-1.5 leading-tight" style={{ fontSize: 26, fontWeight: 900, color: "var(--text-heading)", letterSpacing: "-0.02em" }}>
-                Bem-vindo,{' '}
-                <span style={{ background: "var(--gradient-accent-text)", WebkitBackgroundClip: "text", backgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-                  {usuarioLogado?.nome?.split(' ')[0]}
-                </span>
-              </h2>
+            <div className="flex items-center gap-3 min-w-0">
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="lg:hidden shrink-0 w-10 h-10 rounded-xl grid place-items-center transition-all duration-200"
+                style={{ background: "var(--surface-card-glass)", border: "1.5px solid var(--border-subtle-strong)", color: "var(--text-muted)" }}
+                aria-label="Abrir menu"
+              >
+                <Menu size={19} />
+              </button>
+              <div className="min-w-0">
+                <p className="truncate" style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.38em", color: "var(--text-faint)", textTransform: "uppercase" }}>
+                  {config.nome_plataforma}
+                </p>
+                <h2 className="mt-1.5 leading-tight truncate" style={{ fontSize: 26, fontWeight: 900, color: "var(--text-heading)", letterSpacing: "-0.02em" }}>
+                  Bem-vindo,{' '}
+                  <span style={{ background: "var(--gradient-accent-text)", WebkitBackgroundClip: "text", backgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+                    {usuarioLogado?.nome?.split(' ')[0]}
+                  </span>
+                </h2>
+              </div>
             </div>
 
             <div className="flex items-center gap-3">
@@ -390,7 +425,7 @@ const Layout = ({ usuarioLogado, onLogout }) => {
           </div>
         </header>
 
-        <div className="flex-1 overflow-auto p-8" style={{
+        <div className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8" style={{
           background: `
             radial-gradient(ellipse at 18% 18%, rgba(var(--color-blue-accent-rgb),.055) 0%, transparent 48%),
             radial-gradient(ellipse at 82% 82%, rgba(var(--color-navy-mid-rgb),.045)  0%, transparent 48%),
