@@ -16,6 +16,13 @@ const senhaForte = () => z.string()
   .regex(/[A-Za-z]/, "A palavra-passe deve conter pelo menos uma letra.")
   .regex(/[0-9]/, "A palavra-passe deve conter pelo menos um número.");
 
+// Número de identificação institucional (número de estudante, de docente,
+// etc.) — genérico de propósito, para servir qualquer instituição que use a
+// plataforma, não só a UCM. Opcional: nem toda a instituição atribui um, e
+// não convém bloquear o registo por causa disto.
+const numeroEstudante = () => z.string().trim().max(50).catch("");
+const telefone = () => z.string().trim().max(30).catch("");
+
 // Registo público — sempre estudante. Contas de docente/admin só podem ser
 // criadas por um administrador (ver schemaUtilizadorAdmin), por isso este
 // schema nem aceita "papel" do cliente — evita que alguém tente forçar o
@@ -25,6 +32,8 @@ const schemaRegisto = z.object({
   email: z.string().trim().toLowerCase().pipe(z.email("Email inválido.")),
   senha: senhaForte(),
   curso: z.string().trim().min(1, "Curso inválido."),
+  numero_estudante: numeroEstudante(),
+  telefone: telefone(),
 });
 
 // Criação de conta pelo admin — pode escolher qualquer papel (inclui
@@ -35,6 +44,8 @@ const schemaUtilizadorAdmin = z.object({
   senha: senhaForte(),
   papel: z.enum(["estudante", "professor", "admin"]).catch("professor"),
   curso: z.string().trim().min(1, "Curso inválido."),
+  numero_estudante: numeroEstudante(),
+  telefone: telefone(),
 });
 
 // Restrição de domínio de email — configurável pelo admin (ex: só contas
@@ -84,8 +95,10 @@ const schemaCurso = z.object({
   nome: z.string().trim().min(1, "O nome do curso é obrigatório."),
 });
 
-const schemaPerfilNome = z.object({
+const schemaPerfilDados = z.object({
   nome: z.string().trim().min(1, "O nome é obrigatório."),
+  numero_estudante: numeroEstudante(),
+  telefone: telefone(),
 });
 
 const schemaPerfilSenha = z.object({
@@ -105,6 +118,6 @@ const schemaReporSenha = z.object({
 module.exports = {
   HEX_COLOR_REGEX, TIPOS_FICHEIRO_VALIDOS, TAMANHO_MAXIMO_TECTO_MB,
   schemaRegisto, schemaUtilizadorAdmin, schemaLogin, schemaMaterial, schemaConfig, schemaCurso,
-  schemaPerfilNome, schemaPerfilSenha, schemaEsqueciSenha, schemaReporSenha,
+  schemaPerfilDados, schemaPerfilSenha, schemaEsqueciSenha, schemaReporSenha,
   emailComDominioPermitido,
 };

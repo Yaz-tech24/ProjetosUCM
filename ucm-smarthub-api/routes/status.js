@@ -1,4 +1,7 @@
 const db = require("../config/db");
+const { autenticar, apenasAdmin } = require("../middleware/auth");
+const { genAI } = require("../services/ia");
+const { emailConfigurado } = require("../services/email");
 
 module.exports = function registarRotasStatus(app) {
   // ==========================================
@@ -23,5 +26,28 @@ module.exports = function registarRotasStatus(app) {
       console.error("Healthcheck falhou — BD inacessível:", erro.message);
       res.status(503).json({ mensagem: "Base de dados inacessível", status: "DEGRADADO", erro: "bd_inacessivel" });
     }
+  });
+
+  /**
+   * @openapi
+   * /api/admin/status:
+   *   get:
+   *     summary: Estado detalhado dos serviços integrados — BD, IA e email (admin)
+   *     tags: [Admin]
+   *     responses:
+   *       200: { description: Estado de cada serviço (ligada/inacessivel, configurada/nao_configurada) }
+   */
+  app.get("/api/admin/status", autenticar, apenasAdmin, async (req, res) => {
+    let bd = "ligada";
+    try {
+      await db.query("SELECT 1");
+    } catch {
+      bd = "inacessivel";
+    }
+    res.json({
+      bd,
+      ia: genAI ? "configurada" : "nao_configurada",
+      email: emailConfigurado() ? "configurada" : "nao_configurada",
+    });
   });
 };

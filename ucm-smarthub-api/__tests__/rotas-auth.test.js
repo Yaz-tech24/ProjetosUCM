@@ -172,6 +172,51 @@ describe("middleware autenticar", () => {
   });
 });
 
+describe("Sessão via cookie httpOnly", () => {
+  beforeEach(() => { restaurarDb(); });
+
+  it("login define um cookie httpOnly 'token'", async () => {
+    mockSql([[/FROM usuarios WHERE email/, [[{ id: 1, email: "a@b.com", senha: HASH_SENHA_CORRECTA, papel: "estudante", nome: "Ana", curso: "Geral", avatar_url: null }]]]]);
+    const res = await request(app).post("/api/login").send({ email: "a@b.com", senha: "senhaCorrecta123" });
+    const cookies = res.headers["set-cookie"] || [];
+    const tokenCookie = cookies.find(c => c.startsWith("token="));
+    expect(tokenCookie).toBeTruthy();
+    expect(tokenCookie).toMatch(/HttpOnly/i);
+  });
+
+  it("GET /api/me autentica pelo cookie de sessão, sem cabeçalho Authorization", async () => {
+    const agent = request.agent(app);
+
+    mockSql([[/FROM usuarios WHERE email/, [[{ id: 7, email: "c@d.com", senha: HASH_SENHA_CORRECTA, papel: "estudante", nome: "Carlos", curso: "Geral", avatar_url: null }]]]]);
+    await agent.post("/api/login").send({ email: "c@d.com", senha: "senhaCorrecta123" });
+
+    mockSql([[/SELECT id, nome, email, papel, curso, numero_estudante, telefone, avatar_url FROM usuarios WHERE id/, [[{ id: 7, nome: "Carlos", email: "c@d.com", papel: "estudante", curso: "Geral", avatar_url: null }]]]]);
+    const res = await agent.get("/api/me");
+    expect(res.status).toBe(200);
+    expect(res.body.utilizador.email).toBe("c@d.com");
+  });
+
+  it("GET /api/me continua a aceitar Authorization: Bearer (clientes de API/Swagger)", async () => {
+    const jwt = require("jsonwebtoken");
+    const { JWT_SECRET } = require("../middleware/auth");
+    const token = jwt.sign({ id: 9, papel: "estudante", nome: "Bea", curso: "Geral" }, JWT_SECRET, { expiresIn: "1h" });
+
+    mockSql([[/SELECT id, nome, email, papel, curso, numero_estudante, telefone, avatar_url FROM usuarios WHERE id/, [[{ id: 9, nome: "Bea", email: "bea@teste.com", papel: "estudante", curso: "Geral", avatar_url: null }]]]]);
+    const res = await request(app).get("/api/me").set("Authorization", `Bearer ${token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.utilizador.nome).toBe("Bea");
+  });
+
+  it("POST /api/logout limpa o cookie de sessão", async () => {
+    const res = await request(app).post("/api/logout");
+    expect(res.status).toBe(200);
+    const cookies = res.headers["set-cookie"] || [];
+    const tokenCookie = cookies.find(c => c.startsWith("token="));
+    expect(tokenCookie).toBeTruthy();
+    expect(tokenCookie).toMatch(/Expires=/i); // clearCookie expira o cookie no passado
+  });
+});
+
 describe("GET /api/status", () => {
   beforeEach(() => { restaurarDb(); });
 

@@ -7,7 +7,7 @@ const mailer = require("../services/email");
 const { getConfiguracoes, getCursos } = require("../services/plataforma");
 const { paraUrlAbsoluto } = require("../utils/urls");
 const validar = require("../middleware/validar");
-const { JWT_SECRET } = require("../middleware/auth");
+const { autenticar, JWT_SECRET } = require("../middleware/auth");
 const {
   limitarLogin, limitarRegisto, limitarEsqueciSenha, limitarReporSenha,
   contaBloqueada, registarFalhaLogin, limparFalhasLogin,
@@ -21,6 +21,20 @@ const {
 // para que bcrypt.compare() corra sempre e o tempo de resposta não denuncie
 // se a conta existe ou não (mitigação de ataques de temporização).
 const SENHA_DUMMY_HASH = "$2a$10$CwTycUXWue0Thq9StjUM0uJ8xLzKLBiOJvOl5UaGz6zw2p4A5v8Nu";
+
+// Opções do cookie de sessão — httpOnly para que JavaScript no browser nunca
+// consiga ler o token (mitiga exfiltração por XSS); secure só em produção
+// (HTTPS, atrás do Caddy — ver docker-compose.yml) porque em desenvolvimento
+// corre em HTTP puro; sameSite "lax" bloqueia o cookie em pedidos POST/fetch
+// de outros sítios (protecção contra CSRF) sem exigir um token CSRF à parte.
+// maxAge acompanha o tempo de vida do próprio JWT (8h, definido no jwt.sign).
+const OPCOES_COOKIE_SESSAO = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "lax",
+  maxAge: 8 * 60 * 60 * 1000,
+  path: "/",
+};
 
 module.exports = function registarRotasAuth(app) {
   // ==========================================
@@ -45,13 +59,15 @@ module.exports = function registarRotasAuth(app) {
    *               email: { type: string }
    *               senha: { type: string, minLength: 8 }
    *               curso: { type: string }
+   *               numero_estudante: { type: string, description: "Número de identificação institucional — opcional, genérico para qualquer instituição" }
+   *               telefone: { type: string }
    *     responses:
    *       201: { description: Conta criada }
    *       400: { description: Dados inválidos, domínio de email não permitido, ou email já em uso, content: { application/json: { schema: { $ref: '#/components/schemas/Erro' } } } }
    */
   app.post("/api/register", limitarRegisto, validar(schemaRegisto), async (req, res) => {
     try {
-      const { nome, email, senha } = req.body;
+      const { nome, email, senha, numero_estudante, telefone } = req.body;
 
       const config = await getConfiguracoes();
       if (!emailComDominioPermitido(email, config.dominios_email_permitidos)) {
@@ -87,8 +103,8 @@ module.exports = function registarRotasAuth(app) {
 
       try {
         await db.query(
-          "INSERT INTO usuarios (nome, email, senha, curso, papel) VALUES (?, ?, ?, ?, ?)",
-          [nome, email, senhaCriptografada, cursoValido, papelFinal]
+          "INSERT INTO usuarios (nome, email, senha, curso, papel, numero_estudante, telefone) VALUES (?, ?, ?, ?, ?, ?, ?)",
+          [nome, email, senhaCriptografada, cursoValido, papelFinal, numero_estudante || null, telefone || null]
         );
       } catch (erroInsert) {
         // Condição de corrida: dois registos com o mesmo email quase em
@@ -183,6 +199,11 @@ module.exports = function registarRotasAuth(app) {
         { expiresIn: "8h" }
       );
 
+      // Cookie httpOnly é a forma "real" de autenticação da SPA (ver
+      // middleware/auth.js); o token continua também no corpo da resposta
+      // para clientes de API/Swagger/testes que não guardam cookies.
+      res.cookie("token", token, OPCOES_COOKIE_SESSAO);
+
       res.status(200).json({
         mensagem: "Login aprovado!",
         token,
@@ -192,6 +213,8 @@ module.exports = function registarRotasAuth(app) {
           email: utilizador.email,
           papel: utilizador.papel,
           curso: utilizador.curso,
+          numero_estudante: utilizador.numero_estudante,
+          telefone: utilizador.telefone,
           avatar_url: paraUrlAbsoluto(utilizador.avatar_url),
         },
       });
@@ -297,6 +320,47 @@ module.exports = function registarRotasAuth(app) {
     } catch (erro) {
       console.error("Erro ao repor password:", erro.message);
       res.status(500).json({ erro: "Erro ao repor a palavra-passe." });
+    }
+  });
+
+  /**
+   * @openapi
+   * /api/logout:
+   *   post:
+   *     summary: Termina a sessão actual, limpando o cookie de autenticação
+   *     tags: [Autenticação]
+   *     responses:
+   *       200: { description: Sessão terminada }
+   */
+  app.post("/api/logout", (req, res) => {
+    res.clearCookie("token", { ...OPCOES_COOKIE_SESSAO, maxAge: undefined });
+    res.json({ mensagem: "Sessão terminada." });
+  });
+
+  /**
+   * @openapi
+   * /api/me:
+   *   get:
+   *     summary: Devolve o utilizador autenticado actual — usado pela SPA para confirmar a sessão do cookie httpOnly ao carregar
+   *     tags: [Autenticação]
+   *     responses:
+   *       200: { description: Utilizador autenticado, content: { application/json: { schema: { type: object, properties: { utilizador: { $ref: '#/components/schemas/Utilizador' } } } } } }
+   *       401: { description: Não autenticado }
+   */
+  app.get("/api/me", autenticar, async (req, res) => {
+    try {
+      const [[utilizador]] = await db.query(
+        "SELECT id, nome, email, papel, curso, numero_estudante, telefone, avatar_url FROM usuarios WHERE id = ?",
+        [req.utilizador.id]
+      );
+      if (!utilizador) {
+        return res.status(401).json({ erro: "Utilizador já não existe." });
+      }
+      utilizador.avatar_url = paraUrlAbsoluto(utilizador.avatar_url);
+      res.json({ utilizador });
+    } catch (erro) {
+      console.error("Erro ao buscar utilizador actual:", erro.message);
+      res.status(500).json({ erro: "Falha ao buscar utilizador." });
     }
   });
 };

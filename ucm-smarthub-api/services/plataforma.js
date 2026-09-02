@@ -1,13 +1,32 @@
 const db = require("../config/db");
 const { paraUrlAbsoluto } = require("../utils/urls");
 
+// getConfiguracoes() é chamado em quase todos os pedidos (incluindo no
+// fileFilter do multer, a cada upload) para ler uma linha que quase nunca
+// muda — cache-se em memória, com invalidação explícita sempre que a
+// configuração é escrita (ver invalidarCacheConfig(), chamado nas rotas de
+// escrita em routes/config.js), em vez de reconsultar a BD em cada pedido.
+let configCache = null;
+
+function invalidarCacheConfig() {
+  configCache = null;
+}
+
 async function getConfiguracoes() {
+  // Cache desligada em testes: cada teste mocka a BD com uma configuração
+  // diferente e espera vê-la reflectida de imediato, sem partilhar estado
+  // entre casos de teste através de uma cache a nível de módulo.
+  const cacheActiva = process.env.NODE_ENV !== "test";
+  if (cacheActiva && configCache) return configCache;
+
   const [[config]] = await db.query("SELECT * FROM configuracoes WHERE id = 1");
   if (!config) return {};
   // logo_url é guardado como caminho relativo — converte-se aqui, num único
   // sítio, para que todos os consumidores (rotas, emails) recebam sempre um
   // URL absoluto correcto face ao domínio ACTUAL da instância.
-  return { ...config, logo_url: paraUrlAbsoluto(config.logo_url) };
+  const resultado = { ...config, logo_url: paraUrlAbsoluto(config.logo_url) };
+  if (cacheActiva) configCache = resultado;
+  return resultado;
 }
 
 async function getCursos() {
@@ -37,4 +56,4 @@ async function getEstatisticas() {
   return { total_materiais, total_utilizadores, total_mensagens, total_pdfs, total_videos, materiais_hoje };
 }
 
-module.exports = { getConfiguracoes, getCursos, getEstatisticas };
+module.exports = { getConfiguracoes, getCursos, getEstatisticas, invalidarCacheConfig };

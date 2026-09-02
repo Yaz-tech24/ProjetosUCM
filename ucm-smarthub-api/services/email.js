@@ -7,6 +7,14 @@
  */
 const nodemailer = require("nodemailer");
 
+// Escapa nome/título de utilizador antes de os inserir no HTML do email —
+// sem isto, um nome ou título com marcação (ex: "<a href=...>") alterava o
+// email realmente recebido pelo destinatário.
+const escapeHtml = (valor) =>
+  String(valor ?? "").replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  }[c]));
+
 let transporte;
 let tentouCriar = false;
 
@@ -28,6 +36,11 @@ function getTransporte() {
 }
 
 const REMETENTE = () => process.env.SMTP_FROM || process.env.SMTP_USER;
+
+function emailConfigurado() {
+  const { SMTP_HOST, SMTP_USER, SMTP_PASS } = process.env;
+  return Boolean(SMTP_HOST && SMTP_USER && SMTP_PASS);
+}
 
 async function enviarEmail({ to, subject, html }) {
   const t = getTransporte();
@@ -65,22 +78,24 @@ function layout(nomePlataforma, corPrimaria, corDestaque, conteudoHtml, logoUrl)
 }
 
 async function enviarBoasVindas({ to, nome, nomePlataforma, corPrimaria, corDestaque, logoUrl }) {
+  const nomeSeguro = escapeHtml(nome);
   return enviarEmail({
     to,
     subject: `Bem-vindo(a) à ${nomePlataforma}!`,
     html: layout(nomePlataforma, corPrimaria, corDestaque, `
-      <p>Olá, ${nome},</p>
+      <p>Olá, ${nomeSeguro},</p>
       <p>A tua conta na <strong>${nomePlataforma}</strong> foi criada com sucesso. Já podes entrar e começar a explorar os materiais disponíveis.</p>
     `, logoUrl),
   });
 }
 
 async function enviarRecuperacaoPassword({ to, nome, link, nomePlataforma, corPrimaria, corDestaque, logoUrl }) {
+  const nomeSeguro = escapeHtml(nome);
   return enviarEmail({
     to,
     subject: `Repor palavra-passe — ${nomePlataforma}`,
     html: layout(nomePlataforma, corPrimaria, corDestaque, `
-      <p>Olá, ${nome},</p>
+      <p>Olá, ${nomeSeguro},</p>
       <p>Recebemos um pedido para repor a tua palavra-passe. Este link é válido por 30 minutos:</p>
       <p style="text-align:center;margin:28px 0;">
         <a href="${link}" style="background:${corDestaque};color:#04122e;text-decoration:none;font-weight:800;padding:12px 28px;border-radius:12px;display:inline-block;">Repor palavra-passe</a>
@@ -91,12 +106,14 @@ async function enviarRecuperacaoPassword({ to, nome, link, nomePlataforma, corPr
 }
 
 async function enviarModeracaoMaterial({ to, nome, titulo, aprovado, nomePlataforma, corPrimaria, corDestaque, logoUrl }) {
+  const nomeSeguro = escapeHtml(nome);
+  const tituloSeguro = escapeHtml(titulo);
   return enviarEmail({
     to,
     subject: aprovado ? `O teu material foi aprovado — ${nomePlataforma}` : `O teu material foi rejeitado — ${nomePlataforma}`,
     html: layout(nomePlataforma, corPrimaria, corDestaque, `
-      <p>Olá, ${nome},</p>
-      <p>O material <strong>"${titulo}"</strong> que submeteste foi ${
+      <p>Olá, ${nomeSeguro},</p>
+      <p>O material <strong>"${tituloSeguro}"</strong> que submeteste foi ${
         aprovado
           ? '<strong style="color:#059669">aprovado</strong> e já está disponível no repositório.'
           : '<strong style="color:#dc2626">rejeitado</strong> pela moderação.'
@@ -105,4 +122,4 @@ async function enviarModeracaoMaterial({ to, nome, titulo, aprovado, nomePlatafo
   });
 }
 
-module.exports = { enviarEmail, enviarBoasVindas, enviarRecuperacaoPassword, enviarModeracaoMaterial };
+module.exports = { enviarEmail, enviarBoasVindas, enviarRecuperacaoPassword, enviarModeracaoMaterial, emailConfigurado };

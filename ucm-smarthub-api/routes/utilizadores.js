@@ -47,7 +47,7 @@ module.exports = function registarRotasUtilizadores(app) {
   app.get("/api/admin/utilizadores", autenticar, apenasAdmin, async (req, res) => {
     try {
       const [utilizadores] = await db.query(
-        "SELECT id, nome, email, papel, curso, avatar_url, data_criacao FROM usuarios ORDER BY data_criacao DESC"
+        "SELECT id, nome, email, papel, curso, numero_estudante, telefone, avatar_url, data_criacao FROM usuarios ORDER BY data_criacao DESC"
       );
       res.json(utilizadores.map(u => ({ ...u, avatar_url: paraUrlAbsoluto(u.avatar_url) })));
     } catch (erro) {
@@ -58,7 +58,7 @@ module.exports = function registarRotasUtilizadores(app) {
 
   app.post("/api/admin/utilizadores", autenticar, apenasAdmin, validar(schemaUtilizadorAdmin), async (req, res) => {
     try {
-      const { nome, email, senha, papel, curso } = req.body;
+      const { nome, email, senha, papel, curso, numero_estudante, telefone } = req.body;
 
       const config = await getConfiguracoes();
       if (!emailComDominioPermitido(email, config.dominios_email_permitidos)) {
@@ -80,8 +80,8 @@ module.exports = function registarRotasUtilizadores(app) {
       let resultado;
       try {
         [resultado] = await db.query(
-          "INSERT INTO usuarios (nome, email, senha, curso, papel) VALUES (?, ?, ?, ?, ?)",
-          [nome, email, senhaCriptografada, cursoValido, papel]
+          "INSERT INTO usuarios (nome, email, senha, curso, papel, numero_estudante, telefone) VALUES (?, ?, ?, ?, ?, ?, ?)",
+          [nome, email, senhaCriptografada, cursoValido, papel, numero_estudante || null, telefone || null]
         );
       } catch (erroInsert) {
         // Mesma condição de corrida do registo público — ver comentário em routes/auth.js.
@@ -93,7 +93,7 @@ module.exports = function registarRotasUtilizadores(app) {
 
       res.status(201).json({
         mensagem: "Conta criada com sucesso!",
-        utilizador: { id: resultado.insertId, nome, email, papel, curso: cursoValido },
+        utilizador: { id: resultado.insertId, nome, email, papel, curso: cursoValido, numero_estudante: numero_estudante || null, telefone: telefone || null },
       });
 
       mailer.enviarBoasVindas({

@@ -2,7 +2,7 @@ const path = require("path");
 const fs = require("fs");
 
 const db = require("../config/db");
-const { getConfiguracoes, getCursos } = require("../services/plataforma");
+const { getConfiguracoes, getCursos, invalidarCacheConfig } = require("../services/plataforma");
 const { paraUrlAbsoluto } = require("../utils/urls");
 const validar = require("../middleware/validar");
 const { autenticar, apenasAdmin } = require("../middleware/auth");
@@ -81,6 +81,7 @@ module.exports = function registarRotasConfig(app) {
         ]
       );
 
+      invalidarCacheConfig();
       res.json({ mensagem: "Configuração actualizada com sucesso!", configuracoes: await getConfiguracoes() });
     } catch (erro) {
       console.error("Erro ao actualizar configuração:", erro.message);
@@ -114,6 +115,7 @@ module.exports = function registarRotasConfig(app) {
       const configAntiga = await getConfiguracoes();
       const caminhoRelativo = `/uploads/${req.file.filename}`;
       await db.query("UPDATE configuracoes SET logo_url = ? WHERE id = 1", [caminhoRelativo]);
+      invalidarCacheConfig();
 
       if (configAntiga.logo_url) {
         fs.unlink(path.join(uploadsDir, path.basename(configAntiga.logo_url)), () => {});
@@ -130,6 +132,7 @@ module.exports = function registarRotasConfig(app) {
     try {
       const config = await getConfiguracoes();
       await db.query("UPDATE configuracoes SET logo_url = NULL WHERE id = 1");
+      invalidarCacheConfig();
       if (config.logo_url) {
         fs.unlink(path.join(uploadsDir, path.basename(config.logo_url)), () => {});
       }

@@ -7,6 +7,8 @@ const { app } = require("../server");
 
 const JWT_SECRET = process.env.JWT_SECRET || "ucm_smarthub_dev_secret_mude_em_producao";
 const tokenEstudante = jwt.sign({ id: 1, papel: "estudante", nome: "Ana", curso: "Geral" }, JWT_SECRET, { expiresIn: "1h" });
+const tokenOutroEstudante = jwt.sign({ id: 2, papel: "estudante", nome: "Bruno", curso: "Geral" }, JWT_SECRET, { expiresIn: "1h" });
+const tokenAdmin = jwt.sign({ id: 99, papel: "admin", nome: "Admin", curso: "Geral" }, JWT_SECRET, { expiresIn: "1h" });
 
 function mockSql(regrasPorOrdem) {
   vi.spyOn(db, "query").mockImplementation((sql) => {
@@ -113,5 +115,45 @@ describe("POST /api/materiais", () => {
       .attach("arquivo", Buffer.from("%PDF-1.4 conteúdo de teste"), { filename: "teste.pdf", contentType: "application/pdf" });
     expect(res.status).toBe(201);
     expect(res.body.id_novo_material).toBe(7);
+  });
+});
+
+describe("DELETE /api/materiais/:id", () => {
+  beforeEach(() => { vi.restoreAllMocks(); });
+
+  it("rejeita pedidos sem autenticação", async () => {
+    const res = await request(app).delete("/api/materiais/5");
+    expect(res.status).toBe(401);
+  });
+
+  it("devolve 404 quando o material não existe", async () => {
+    mockSql([[/SELECT autor_id, url_arquivo FROM materiais/, [[]]]]);
+    const res = await request(app).delete("/api/materiais/999").set("Authorization", `Bearer ${tokenEstudante}`);
+    expect(res.status).toBe(404);
+  });
+
+  it("rejeita quando quem pede não é o autor nem admin", async () => {
+    mockSql([[/SELECT autor_id, url_arquivo FROM materiais/, [[{ autor_id: 1, url_arquivo: "/uploads/x.pdf" }]]]]);
+    const res = await request(app).delete("/api/materiais/5").set("Authorization", `Bearer ${tokenOutroEstudante}`);
+    expect(res.status).toBe(403);
+    expect(res.body.erro).toMatch(/administrador/);
+  });
+
+  it("permite ao autor remover o próprio material", async () => {
+    mockSql([
+      [/SELECT autor_id, url_arquivo FROM materiais/, [[{ autor_id: 1, url_arquivo: "/uploads/x.pdf" }]]],
+      [/DELETE FROM materiais/, [{ affectedRows: 1 }]],
+    ]);
+    const res = await request(app).delete("/api/materiais/5").set("Authorization", `Bearer ${tokenEstudante}`);
+    expect(res.status).toBe(200);
+  });
+
+  it("permite a um admin remover material de outro utilizador", async () => {
+    mockSql([
+      [/SELECT autor_id, url_arquivo FROM materiais/, [[{ autor_id: 1, url_arquivo: "/uploads/x.pdf" }]]],
+      [/DELETE FROM materiais/, [{ affectedRows: 1 }]],
+    ]);
+    const res = await request(app).delete("/api/materiais/5").set("Authorization", `Bearer ${tokenAdmin}`);
+    expect(res.status).toBe(200);
   });
 });

@@ -84,7 +84,7 @@ module.exports = function registarRotasMateriais(app) {
       if (cadeira) { where += " AND m.cadeira = ?";   params.push(cadeira); }
 
       const [materiais] = await db.query(
-        `SELECT m.id, m.titulo, m.cadeira, m.tipo, m.url_arquivo, m.data_upload, m.status, u.nome AS autor
+        `SELECT m.id, m.titulo, m.cadeira, m.tipo, m.url_arquivo, m.data_upload, m.status, m.autor_id, u.nome AS autor
          FROM materiais m
          JOIN usuarios u ON m.autor_id = u.id
          ${where}
@@ -128,7 +128,7 @@ module.exports = function registarRotasMateriais(app) {
     try {
       const materialId = parseInt(req.params.id, 10);
       const [resultado] = await db.query(
-        `SELECT m.id, m.titulo, m.cadeira, m.tipo, m.url_arquivo, m.data_upload, m.status, u.nome AS autor
+        `SELECT m.id, m.titulo, m.cadeira, m.tipo, m.url_arquivo, m.data_upload, m.status, m.autor_id, u.nome AS autor
          FROM materiais m
          JOIN usuarios u ON m.autor_id = u.id
          WHERE m.status = 'aprovado' AND m.id = ?`,
@@ -376,6 +376,48 @@ Responde APENAS com as 3 notas numeradas. Sem introdução, sem conclusão.`;
       limparFicheiroOrfao();
       console.error("Erro ao gravar material:", erro.message);
       res.status(500).json({ erro: "Erro ao gravar ficheiro na base de dados." });
+    }
+  });
+
+  /**
+   * @openapi
+   * /api/materiais/{id}:
+   *   delete:
+   *     summary: Remove um material — só quem o enviou originalmente ou um administrador
+   *     tags: [Materiais]
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema: { type: integer }
+   *     responses:
+   *       200: { description: Material removido }
+   *       403: { description: Sem permissão para remover este material, content: { application/json: { schema: { $ref: '#/components/schemas/Erro' } } } }
+   *       404: { description: Material não encontrado }
+   */
+  app.delete("/api/materiais/:id", autenticar, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (!id) return res.status(400).json({ erro: "ID inválido." });
+
+      const [[material]] = await db.query("SELECT autor_id, url_arquivo FROM materiais WHERE id = ?", [id]);
+      if (!material) return res.status(404).json({ erro: "Material não encontrado." });
+
+      const ehAutor = material.autor_id === req.utilizador.id;
+      const ehAdmin = req.utilizador.papel === "admin";
+      if (!ehAutor && !ehAdmin) {
+        return res.status(403).json({ erro: "Só quem enviou este material ou um administrador o pode remover." });
+      }
+
+      await db.query("DELETE FROM materiais WHERE id = ?", [id]);
+      if (material.url_arquivo) {
+        const fileName = path.basename(material.url_arquivo);
+        fs.unlink(path.join(uploadsDir, fileName), () => {});
+      }
+      res.json({ mensagem: "Material removido com sucesso." });
+    } catch (erro) {
+      console.error("Erro ao remover material:", erro.message);
+      res.status(500).json({ erro: "Erro ao remover material." });
     }
   });
 

@@ -4,7 +4,7 @@ import { describe, it, expect } from "vitest";
 // importam directamente de schemas/, sem tocar em server.js nem na BD.
 const {
   schemaRegisto, schemaUtilizadorAdmin, schemaLogin, schemaMaterial, schemaConfig, schemaCurso,
-  schemaPerfilNome, schemaPerfilSenha, schemaEsqueciSenha, schemaReporSenha,
+  schemaPerfilDados, schemaPerfilSenha, schemaEsqueciSenha, schemaReporSenha,
   emailComDominioPermitido,
 } = require("../schemas");
 
@@ -14,7 +14,7 @@ describe("schemaRegisto", () => {
       nome: "  Ana  ", email: " Ana@Teste.COM ", senha: "senha1234", curso: "Geral",
     });
     expect(r.success).toBe(true);
-    expect(r.data).toEqual({ nome: "Ana", email: "ana@teste.com", senha: "senha1234", curso: "Geral" });
+    expect(r.data).toEqual({ nome: "Ana", email: "ana@teste.com", senha: "senha1234", curso: "Geral", numero_estudante: "", telefone: "" });
   });
 
   it("ignora um campo 'papel' enviado pelo cliente (não pode ser forçado via API)", () => {
@@ -121,11 +121,18 @@ describe("schemaConfig", () => {
   });
 });
 
-describe("schemaCurso / schemaPerfilNome", () => {
+describe("schemaCurso / schemaPerfilDados", () => {
   it("exigem nome não vazio", () => {
     expect(schemaCurso.safeParse({ nome: "Informática" }).success).toBe(true);
     expect(schemaCurso.safeParse({ nome: "" }).success).toBe(false);
-    expect(schemaPerfilNome.safeParse({ nome: "" }).success).toBe(false);
+    expect(schemaPerfilDados.safeParse({ nome: "" }).success).toBe(false);
+  });
+
+  it("numero_estudante e telefone são opcionais, sem bloquear por dados inválidos", () => {
+    expect(schemaPerfilDados.safeParse({ nome: "Ana" }).success).toBe(true);
+    const r = schemaPerfilDados.safeParse({ nome: "Ana", numero_estudante: "12345", telefone: "+258 84 000 0000" });
+    expect(r.success).toBe(true);
+    expect(r.data.numero_estudante).toBe("12345");
   });
 });
 

@@ -20,6 +20,8 @@ CREATE TABLE IF NOT EXISTS usuarios (
   avatar_url          VARCHAR(255) DEFAULT NULL,
   reset_token         VARCHAR(255) DEFAULT NULL,
   reset_token_expira  DATETIME DEFAULT NULL,
+  numero_estudante    VARCHAR(50) DEFAULT NULL,
+  telefone            VARCHAR(30) DEFAULT NULL,
   PRIMARY KEY (id),
   UNIQUE KEY email (email)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

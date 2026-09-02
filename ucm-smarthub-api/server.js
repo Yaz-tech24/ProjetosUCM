@@ -12,6 +12,7 @@ const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const compression = require("compression");
+const cookieParser = require("cookie-parser");
 const path = require("path");
 const http = require("http");
 const socketIo = require("socket.io");
@@ -64,10 +65,22 @@ app.use(helmet({
 }));
 app.use(compression());
 app.use(express.json());
+app.use(cookieParser());
 app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec, { customSiteTitle: "SmartHub API — Documentação" }));
 
 // Serve ficheiros da pasta uploads
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+// X-Frame-Options: SAMEORIGIN (definido pelo helmet acima) bloqueia o
+// <iframe> do visualizador de PDF sempre que o frontend está numa origem
+// diferente da API — acontece sempre em desenvolvimento local (frontend na
+// porta 5173, API na 5000, portas diferentes = origens diferentes) e é
+// exactamente a mesma razão pela qual crossOriginResourcePolicy já está
+// como "cross-origin" acima. Removido só aqui: estes ficheiros são conteúdo
+// estático já validado no upload, sem dados de sessão — ao contrário do
+// resto da aplicação, onde a protecção contra clickjacking continua activa.
+app.use("/uploads", (req, res, next) => {
+  res.removeHeader("X-Frame-Options");
+  next();
+}, express.static(path.join(__dirname, "uploads")));
 
 // ─── Rotas — cada módulo regista os seus próprios endpoints em `app` ──────
 require("./routes/auth")(app);
@@ -126,6 +139,16 @@ async function runMigrations() {
   }
   try {
     await db.query(`ALTER TABLE usuarios ADD COLUMN reset_token_expira DATETIME NULL`);
+  } catch {
+    // Coluna já existe — ignorar
+  }
+  try {
+    await db.query(`ALTER TABLE usuarios ADD COLUMN numero_estudante VARCHAR(50) NULL`);
+  } catch {
+    // Coluna já existe — ignorar
+  }
+  try {
+    await db.query(`ALTER TABLE usuarios ADD COLUMN telefone VARCHAR(30) NULL`);
   } catch {
     // Coluna já existe — ignorar
   }
@@ -243,4 +266,9 @@ if (require.main === module) {
   process.on("SIGINT", () => encerrar("SIGINT"));
 }
 
-module.exports = { app };
+// `server` também é exportado (além de `app`) para que os testes de
+// integração do Socket.IO (ver __tests__/socketChat.test.js) possam fazer
+// server.listen(0) numa porta efémera — um socket.io-client real não
+// consegue ligar-se só com o `app` do Express, precisa de um servidor HTTP
+// a ouvir de facto.
+module.exports = { app, server };

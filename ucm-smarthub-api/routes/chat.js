@@ -1,4 +1,5 @@
 const jwt = require("jsonwebtoken");
+const cookie = require("cookie");
 
 const db = require("../config/db");
 const { getConfiguracoes } = require("../services/plataforma");
@@ -87,19 +88,43 @@ Pergunta do estudante: ${mensagem}`;
   // ==========================================
   // SOCKET.IO — CHAT ENTRE ESTUDANTES (SALAS POR CURSO)
   // ==========================================
-  // Autenticação da ligação: o cliente envia o JWT em `auth.token` (ver
-  // Chat.jsx). Sem isto, qualquer cliente ligado directamente ao socket.io
-  // (fora da app) podia enviar `userId`/`userName` arbitrários e falsificar
-  // a identidade de outro utilizador no chat — o token verificado aqui é a
-  // ÚNICA fonte de identidade usada em sendMessage, nunca o payload do evento.
+  // Autenticação da ligação: o browser envia o JWT automaticamente através
+  // do cookie httpOnly (ver Chat.jsx, `io(url, { withCredentials: true })`) —
+  // o handshake do socket.io não passa pelo cookie-parser do Express, por
+  // isso o cabeçalho Cookie é lido e interpretado aqui manualmente. `auth.token`
+  // fica como alternativa para clientes não-browser que liguem directamente.
+  // Sem isto, qualquer cliente ligado directamente ao socket.io (fora da app)
+  // podia enviar `userId`/`userName` arbitrários e falsificar a identidade de
+  // outro utilizador no chat — o token verificado aqui é a ÚNICA fonte de
+  // identidade usada em sendMessage, nunca o payload do evento.
   io.use((socket, next) => {
-    const token = socket.handshake.auth?.token;
-    if (!token) return next(new Error("Autenticação necessária."));
+    // Uma excepção aqui dentro (ex: um cabeçalho Cookie malformado) derrubava
+    // o processo Node inteiro — isto corre fora do try/catch global do Express,
+    // por ser middleware do socket.io, não uma rota HTTP normal. Uma ligação de
+    // um só cliente nunca deve poder tirar o serviço do ar para todos os outros.
+    let tokenCookie = null;
+    try {
+      const cookiesBrutos = socket.handshake.headers.cookie;
+      tokenCookie = cookiesBrutos ? cookie.parseCookie(cookiesBrutos).token : null;
+    } catch {
+      // Cookie malformado — ignora-se, cai para o token explícito (se houver).
+    }
+    const token = tokenCookie || socket.handshake.auth?.token;
+    if (!token) {
+      const erro = new Error("Autenticação necessária.");
+      erro.data = { codigo: "auth_necessaria" };
+      return next(erro);
+    }
     try {
       socket.utilizador = jwt.verify(token, JWT_SECRET);
       next();
     } catch {
-      next(new Error("Token inválido ou expirado."));
+      // `data.codigo` é o que o cliente usa para decidir a mensagem a
+      // mostrar (Chat.jsx) — mais robusto do que comparar o texto exacto de
+      // `error.message`, que quebra silenciosamente se este texto mudar.
+      const erro = new Error("Token inválido ou expirado.");
+      erro.data = { codigo: "token_invalido" };
+      next(erro);
     }
   });
 

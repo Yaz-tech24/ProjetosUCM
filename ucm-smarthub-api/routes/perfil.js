@@ -7,7 +7,7 @@ const { paraUrlAbsoluto } = require("../utils/urls");
 const validar = require("../middleware/validar");
 const { autenticar } = require("../middleware/auth");
 const { uploadsDir, uploadAvatar } = require("../middleware/upload");
-const { schemaPerfilNome, schemaPerfilSenha } = require("../schemas");
+const { schemaPerfilDados, schemaPerfilSenha } = require("../schemas");
 
 module.exports = function registarRotasPerfil(app) {
   // ==========================================
@@ -17,24 +17,28 @@ module.exports = function registarRotasPerfil(app) {
    * @openapi
    * /api/perfil:
    *   put:
-   *     summary: Actualiza o nome do próprio perfil
+   *     summary: Actualiza o nome, número de identificação institucional e telefone do próprio perfil
    *     tags: [Perfil]
    *     requestBody:
    *       required: true
    *       content:
    *         application/json:
-   *           schema: { type: object, required: [nome], properties: { nome: { type: string } } }
+   *           schema: { type: object, required: [nome], properties: { nome: { type: string }, numero_estudante: { type: string }, telefone: { type: string } } }
    *     responses:
    *       200:
    *         description: Perfil actualizado
    *         content: { application/json: { schema: { type: object, properties: { utilizador: { $ref: '#/components/schemas/Utilizador' } } } } }
    *       401: { description: Não autenticado }
    */
-  app.put("/api/perfil", autenticar, validar(schemaPerfilNome), async (req, res) => {
+  app.put("/api/perfil", autenticar, validar(schemaPerfilDados), async (req, res) => {
     try {
-      await db.query("UPDATE usuarios SET nome = ? WHERE id = ?", [req.body.nome, req.utilizador.id]);
+      const { nome, numero_estudante, telefone } = req.body;
+      await db.query(
+        "UPDATE usuarios SET nome = ?, numero_estudante = ?, telefone = ? WHERE id = ?",
+        [nome, numero_estudante || null, telefone || null, req.utilizador.id]
+      );
       const [[utilizador]] = await db.query(
-        "SELECT id, nome, email, papel, curso, avatar_url FROM usuarios WHERE id = ?",
+        "SELECT id, nome, email, papel, curso, numero_estudante, telefone, avatar_url FROM usuarios WHERE id = ?",
         [req.utilizador.id]
       );
       utilizador.avatar_url = paraUrlAbsoluto(utilizador.avatar_url);

@@ -73,7 +73,15 @@ ou, se não corresponder ao propósito:
 {"conforme": false, "motivo": "razão curta e específica em português"}`;
 
   try {
-    const model = cliente.getGenerativeModel({ model: GEMINI_MODELS[0] });
+    // responseMimeType força o Gemini a devolver JSON puro (sem markdown à
+    // volta) — mais fiável do que confiar só na instrução do prompt. A
+    // extracção por regex abaixo mantém-se como rede de segurança, para o
+    // caso (raro, mas visto na prática) de a resposta vir na mesma envolta
+    // em texto extra.
+    const model = cliente.getGenerativeModel({
+      model: GEMINI_MODELS[0],
+      generationConfig: { responseMimeType: "application/json" },
+    });
     const result = await model.generateContent(prompt);
     const texto = result.response.text().trim();
     const jsonMatch = texto.match(/\{[\s\S]*\}/);
