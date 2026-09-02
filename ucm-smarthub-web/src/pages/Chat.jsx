@@ -5,6 +5,17 @@ import { Send, Users, ShieldAlert, Trash2 } from 'lucide-react';
 import { useConfig } from '../context/ConfigContext';
 import { analisarMensagem, mensagemAviso } from '../utils/filtroChat';
 
+/* "Hoje" / "Ontem" / data por extenso — para separar visualmente mensagens de dias diferentes */
+const rotuloDia = (timestamp) => {
+  const data = new Date(timestamp);
+  const hoje = new Date();
+  const ontem = new Date(hoje); ontem.setDate(hoje.getDate() - 1);
+  const mesmoDia = (a, b) => a.toDateString() === b.toDateString();
+  if (mesmoDia(data, hoje)) return "Hoje";
+  if (mesmoDia(data, ontem)) return "Ontem";
+  return data.toLocaleDateString("pt-PT", { day: "numeric", month: "long", year: data.getFullYear() !== hoje.getFullYear() ? "numeric" : undefined });
+};
+
 const Chat = ({ usuarioLogado }) => {
   const { config, cursos } = useConfig();
   const nomesCursos = useMemo(() => cursos.map(c => c.nome), [cursos]);
@@ -18,6 +29,7 @@ const Chat = ({ usuarioLogado }) => {
   const messagesEndRef = useRef(null);
   const socketRef      = useRef(null);
   const avisoTimer     = useRef(null);
+  const confirmDeleteRef = useRef(null);
 
   /* Selecciona a sala do próprio curso assim que a lista de cursos carrega */
   useEffect(() => {
@@ -25,16 +37,17 @@ const Chat = ({ usuarioLogado }) => {
     setCursoActivo(nomesCursos.includes(usuarioLogado?.curso) ? usuarioLogado.curso : nomesCursos[0]);
   }, [cursoActivo, nomesCursos, usuarioLogado]);
 
-  /* Liga o socket uma única vez, ao montar — o token vai em `auth`, é como
-     o servidor confirma quem realmente está a enviar cada mensagem (ver
-     io.use() em routes/chat.js), em vez de confiar no que o cliente diga. */
+  /* Liga o socket uma única vez, ao montar — withCredentials envia o cookie
+     httpOnly de sessão automaticamente, é como o servidor confirma quem
+     realmente está a enviar cada mensagem (ver io.use() em routes/chat.js),
+     em vez de confiar no que o cliente diga. */
   useEffect(() => {
     const apiBase = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace('/api', '');
-    const sock = io(apiBase, { auth: { token: localStorage.getItem('token') } });
+    const sock = io(apiBase, { withCredentials: true });
     socketRef.current = sock;
 
     const handleConnectError = (err) => {
-      mostrarAviso(err?.message === 'Token inválido ou expirado.'
+      mostrarAviso(err?.data?.codigo === 'token_invalido'
         ? 'Sessão expirada — inicie sessão novamente para usar o chat.'
         : 'Não foi possível ligar ao chat.');
     };
@@ -69,16 +82,21 @@ const Chat = ({ usuarioLogado }) => {
     sock.on('message', handleMessage);
     sock.on('messageDeleted', handleDeleted);
 
+    // AbortController evita que a resposta de uma sala anterior (mais lenta)
+    // chegue depois da actual e substitua as suas mensagens — ao trocar de
+    // curso rapidamente, o cleanup abaixo cancela o pedido em curso antes do
+    // próximo efeito arrancar.
+    const controller = new AbortController();
     const load = async () => {
       setLoadingMessages(true);
       setMessages([]);
       try {
-        const res = await api.get(`/chat/messages?curso=${encodeURIComponent(cursoActivo)}`);
+        const res = await api.get(`/chat/messages?curso=${encodeURIComponent(cursoActivo)}`, { signal: controller.signal });
         setMessages(res.data || []);
       } catch (err) {
-        console.error('Erro ao carregar mensagens:', err);
+        if (err.code !== 'ERR_CANCELED') console.error('Erro ao carregar mensagens:', err);
       } finally {
-        setLoadingMessages(false);
+        if (!controller.signal.aborted) setLoadingMessages(false);
       }
     };
     load();
@@ -86,12 +104,24 @@ const Chat = ({ usuarioLogado }) => {
     return () => {
       sock.off('message', handleMessage);
       sock.off('messageDeleted', handleDeleted);
+      controller.abort();
     };
   }, [cursoActivo]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  /* Acessibilidade do modal de confirmação: foca-o ao abrir e fecha com Esc */
+  useEffect(() => {
+    if (confirmDelete === null) return;
+    confirmDeleteRef.current?.focus();
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') setConfirmDelete(null);
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [confirmDelete]);
 
   const apagarMensagem = async (id) => {
     try {
@@ -147,14 +177,22 @@ const Chat = ({ usuarioLogado }) => {
     {/* Modal de confirmação de apagar */}
     {confirmDelete !== null && (
       <div className="fixed inset-0 z-50 flex items-center justify-center px-4"
-        style={{ background: "rgba(var(--color-navy-abyss-rgb),0.55)", backdropFilter: "blur(8px)" }}>
-        <div className="w-full max-w-sm rounded-[28px] p-8 animate-scale-in"
-          style={{ background: "var(--surface-card)", boxShadow: "0 30px 90px rgba(var(--color-navy-deep-rgb),0.30)" }}>
+        style={{ background: "rgba(var(--color-navy-abyss-rgb),0.55)", backdropFilter: "blur(8px)" }}
+        onClick={() => setConfirmDelete(null)}>
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="chat-apagar-titulo"
+          ref={confirmDeleteRef}
+          tabIndex={-1}
+          onClick={e => e.stopPropagation()}
+          className="w-full max-w-sm rounded-[28px] p-8 animate-scale-in"
+          style={{ background: "var(--surface-card)", boxShadow: "0 30px 90px rgba(var(--color-navy-deep-rgb),0.30)", outline: "none" }}>
           <div className="w-14 h-14 rounded-[18px] grid place-items-center mx-auto mb-5"
             style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.20)" }}>
             <Trash2 size={26} style={{ color: "#ef4444" }} />
           </div>
-          <h3 style={{ fontSize: 17, fontWeight: 900, color: "var(--text-heading)", textAlign: "center", marginBottom: 8 }}>
+          <h3 id="chat-apagar-titulo" style={{ fontSize: 17, fontWeight: 900, color: "var(--text-heading)", textAlign: "center", marginBottom: 8 }}>
             Apagar mensagem?
           </h3>
           <p style={{ fontSize: 13, color: "var(--text-muted)", textAlign: "center", lineHeight: 1.6, marginBottom: 24 }}>
@@ -273,6 +311,8 @@ const Chat = ({ usuarioLogado }) => {
 
       {/* Mensagens */}
       <main
+        aria-live="polite"
+        aria-relevant="additions"
         className="flex-1 overflow-y-auto p-6 space-y-4"
         style={{
           background: `
@@ -307,8 +347,24 @@ const Chat = ({ usuarioLogado }) => {
         ) : (
           messages.map((msg, index) => {
             const isOwn = msg.userId === usuarioLogado?.id;
+            const diaAnterior = index > 0 ? rotuloDia(messages[index - 1].timestamp) : null;
+            const diaActual = rotuloDia(msg.timestamp);
+            const mostrarSeparador = diaActual !== diaAnterior;
             return (
-              <div key={msg.id ?? index} className={`group flex items-end gap-2 ${isOwn ? 'justify-end' : 'justify-start'}`}>
+              <React.Fragment key={msg.id ?? index}>
+              {mostrarSeparador && (
+                <div className="flex items-center gap-3 py-1">
+                  <div style={{ flex: 1, height: 1, background: "var(--border-subtle-strong)" }} />
+                  <span
+                    className="shrink-0 rounded-full px-3.5 py-1 text-[11px] font-bold uppercase"
+                    style={{ background: "var(--surface-card)", border: "1px solid var(--border-subtle-strong)", color: "var(--text-faint)", letterSpacing: "0.15em" }}
+                  >
+                    {diaActual}
+                  </span>
+                  <div style={{ flex: 1, height: 1, background: "var(--border-subtle-strong)" }} />
+                </div>
+              )}
+              <div className={`group flex items-end gap-2 ${isOwn ? 'justify-end' : 'justify-start'}`}>
                 {/* Avatar para mensagens de outros */}
                 {!isOwn && (
                   <div
@@ -397,6 +453,7 @@ const Chat = ({ usuarioLogado }) => {
                   </button>
                 )}
               </div>
+              </React.Fragment>
             );
           })
         )}

@@ -2,29 +2,10 @@ import React, { useState } from "react";
 import api from "../services/api";
 import {
   User, Mail, GraduationCap, ShieldCheck, Lock, Upload, Trash2,
-  Save, CheckCircle, AlertTriangle, X, KeyRound,
+  Save, KeyRound, IdCard, Phone,
 } from "lucide-react";
 import { useConfig } from "../context/ConfigContext";
-
-/* Toast de notificação — mesmo padrão usado em Admin.jsx */
-const Toast = ({ message, type, onClose }) => {
-  if (!message) return null;
-  const cor = type === 'error' ? "#ef4444" : "#10b981";
-  return (
-    <div
-      className="fixed top-6 right-6 z-50 flex items-center gap-3 rounded-2xl px-5 py-4 animate-fade-in"
-      style={{ background: "var(--surface-card)", borderLeft: `3px solid ${cor}`, border: `1px solid var(--border-subtle-strong)`, borderLeftWidth: 3, borderLeftColor: cor, color: "var(--text-heading)", boxShadow: "0 10px 40px rgba(0,0,0,0.16)" }}
-    >
-      {type === 'error'
-        ? <AlertTriangle size={18} style={{ color: "#ef4444", flexShrink: 0 }} />
-        : <CheckCircle size={18} style={{ color: "#10b981", flexShrink: 0 }} />}
-      <span style={{ fontSize: 14, fontWeight: 600 }}>{message}</span>
-      <button onClick={onClose} style={{ opacity: 0.45, marginLeft: 8, color: "var(--text-heading)" }} className="hover:opacity-80 transition-opacity">
-        <X size={15} />
-      </button>
-    </div>
-  );
-};
+import Toast from "../components/Toast";
 
 /* Cartão base reutilizado nas 3 secções */
 const Cartao = ({ icon: Icon, titulo, subtitulo, children }) => (
@@ -82,6 +63,8 @@ const Perfil = ({ usuarioLogado, onUpdateUsuario }) => {
   const { config } = useConfig();
 
   const [nome, setNome]           = useState(usuarioLogado?.nome || "");
+  const [numeroEstudante, setNumeroEstudante] = useState(usuarioLogado?.numero_estudante || "");
+  const [telefone, setTelefone]   = useState(usuarioLogado?.telefone || "");
   const [savingNome, setSavingNome] = useState(false);
 
   const [senhaActual, setSenhaActual] = useState("");
@@ -98,11 +81,11 @@ const Perfil = ({ usuarioLogado, onUpdateUsuario }) => {
     if (!nome.trim()) return;
     setSavingNome(true);
     try {
-      const res = await api.put("/perfil", { nome: nome.trim() });
+      const res = await api.put("/perfil", { nome: nome.trim(), numero_estudante: numeroEstudante, telefone });
       onUpdateUsuario(res.data.utilizador);
-      showToast("Nome actualizado com sucesso!");
+      showToast("Dados actualizados com sucesso!");
     } catch (err) {
-      showToast(err.response?.data?.erro || "Erro ao actualizar nome.", "error");
+      showToast(err.response?.data?.erro || "Erro ao actualizar os dados.", "error");
     } finally {
       setSavingNome(false);
     }
@@ -243,6 +226,10 @@ const Perfil = ({ usuarioLogado, onUpdateUsuario }) => {
           <form onSubmit={handleSalvarNome} className="space-y-4">
             <Campo label="Nome completo" icon={<User size={16} />} type="text" value={nome} onChange={e => setNome(e.target.value)} required />
             <Campo label="Email" icon={<Mail size={16} />} type="email" value={usuarioLogado.email} disabled readOnly />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Campo label="Número de estudante" icon={<IdCard size={16} />} type="text" value={numeroEstudante} onChange={e => setNumeroEstudante(e.target.value)} />
+              <Campo label="Telefone" icon={<Phone size={16} />} type="tel" value={telefone} onChange={e => setTelefone(e.target.value)} />
+            </div>
             <div className="flex justify-end">
               <BotaoPrimario type="submit" loading={savingNome}>
                 <Save size={16} /> Guardar alterações

@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import api, { isFavorito, toggleFavorito } from "../services/api";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, ExternalLink, DownloadCloud, Sparkles, RotateCcw, Heart, Share2 } from "lucide-react";
+import { ArrowLeft, ExternalLink, DownloadCloud, Sparkles, RotateCcw, Heart, Share2, Trash2 } from "lucide-react";
 import { useConfig } from "../context/ConfigContext";
+import Toast from "../components/Toast";
 
 /* ── Renderiza o resumo estruturado devolvido pela IA ── */
 const SummaryRenderer = ({ text }) => {
@@ -59,41 +60,77 @@ const SummaryRenderer = ({ text }) => {
   );
 };
 
-const Visualizador = () => {
+/* Deriva o MIME type do vídeo a partir da extensão real do ficheiro —
+   os uploads podem ser mp4/webm/ogg/mov (ver tipos_ficheiro_permitidos em Admin.jsx). */
+const EXTENSAO_PARA_MIME = { mp4: "video/mp4", webm: "video/webm", ogg: "video/ogg", mov: "video/quicktime" };
+const getVideoMimeType = (url) => {
+  if (!url) return "video/mp4";
+  const semQuery = url.split(/[?#]/)[0];
+  const ext = semQuery.split('.').pop()?.toLowerCase();
+  return EXTENSAO_PARA_MIME[ext] || "video/mp4";
+};
+
+const Visualizador = ({ usuarioLogado }) => {
   const { config } = useConfig();
   const { id } = useParams();
   const navigate = useNavigate();
 
   const [material,       setMaterial]       = useState(null);
   const [loading,        setLoading]        = useState(true);
+  const [erroCarregar,   setErroCarregar]   = useState(null); // 'nao_encontrado' | 'ligacao' | null
   const [summary,        setSummary]        = useState('');
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError,   setSummaryError]   = useState(null);
   const [fav,            setFav]            = useState(false);
   const [copiado,        setCopiado]        = useState(false);
+  const [confirmRemover, setConfirmRemover] = useState(false);
+  const [removendo,      setRemovendo]      = useState(false);
+  const [toast,          setToast]          = useState({ message: '', type: '' });
 
+  const summaryAbortRef = useRef(null);
+
+  /* AbortController evita que uma resposta antiga (de um "id" anterior, se o
+     utilizador navegar rapidamente entre materiais) sobrescreva o estado actual. */
   useEffect(() => {
-    api.get(`/materiais/${id}`)
+    const controller = new AbortController();
+    setLoading(true);
+    setErroCarregar(null);
+    api.get(`/materiais/${id}`, { signal: controller.signal })
       .then(res => { setMaterial(res.data); setFav(isFavorito(res.data.id)); })
-      .catch(() => setMaterial(null))
-      .finally(() => setLoading(false));
+      .catch(err => {
+        if (err.code === 'ERR_CANCELED' || err.name === 'CanceledError' || err.name === 'AbortError') return;
+        setMaterial(null);
+        // Distingue "não existe" de "não foi possível verificar" — mostrar a
+        // mesma mensagem para os dois esconde uma falha de rede real atrás
+        // de um "não encontrado" que sugere (erradamente) que o link está morto.
+        setErroCarregar(err.response?.status === 404 ? 'nao_encontrado' : 'ligacao');
+      })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
   }, [id]);
 
   const fetchSummary = useCallback(async () => {
     if (!material) return;
+    summaryAbortRef.current?.abort();
+    const controller = new AbortController();
+    summaryAbortRef.current = controller;
     setSummaryLoading(true);
     setSummaryError(null);
     try {
-      const res = await api.get(`/materiais/${id}/resumo`);
+      const res = await api.get(`/materiais/${id}/resumo`, { signal: controller.signal });
       setSummary(res.data.resumo || 'Resumo não disponível.');
-    } catch {
+    } catch (err) {
+      if (err.code === 'ERR_CANCELED' || err.name === 'CanceledError' || err.name === 'AbortError') return;
       setSummaryError('Não foi possível gerar o resumo no momento.');
     } finally {
-      setSummaryLoading(false);
+      if (!controller.signal.aborted) setSummaryLoading(false);
     }
   }, [material, id]);
 
   useEffect(() => { if (material) fetchSummary(); }, [material, fetchSummary]);
+
+  /* Cancela o pedido de resumo em curso ao desmontar (ex: utilizador navega para outra página). */
+  useEffect(() => () => summaryAbortRef.current?.abort(), []);
 
   const handleToggleFav = () => {
     const novo = toggleFavorito(material.id);
@@ -118,6 +155,31 @@ const Visualizador = () => {
       .catch(() => {}); // permissão negada — sem crash
   };
 
+  const podeRemover = usuarioLogado && material && (usuarioLogado.papel === "admin" || material.autor_id === usuarioLogado.id);
+
+  const confirmarRemocao = async () => {
+    setRemovendo(true);
+    try {
+      await api.delete(`/materiais/${material.id}`);
+      navigate('/repositorio');
+    } catch (err) {
+      setToast({ message: err.response?.data?.erro || "Erro ao remover material.", type: "error" });
+      setConfirmRemover(false);
+    } finally {
+      setRemovendo(false);
+    }
+  };
+
+  /* Acessibilidade do modal de confirmação: foca-o ao abrir e fecha com Esc */
+  const confirmRemoverRef = useRef(null);
+  useEffect(() => {
+    if (!confirmRemover) return;
+    confirmRemoverRef.current?.focus();
+    const onKeyDown = (e) => { if (e.key === 'Escape') setConfirmRemover(false); };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [confirmRemover]);
+
   if (loading) {
     return (
       <div className="h-full flex flex-col items-center justify-center p-8 gap-4">
@@ -128,22 +190,40 @@ const Visualizador = () => {
   }
 
   if (!material) {
+    const ligacaoFalhou = erroCarregar === 'ligacao';
     return (
       <div className="h-full flex flex-col items-center justify-center p-8 text-center gap-5 animate-fade-in">
         <div className="w-24 h-24 rounded-[28px] grid place-items-center" style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.18)" }}>
           <DownloadCloud size={38} style={{ color: "#ef4444" }} />
         </div>
-        <h2 style={{ fontSize: 26, fontWeight: 900, color: "var(--text-heading)" }}>Material não encontrado</h2>
-        <p style={{ fontSize: 14, color: "var(--text-muted)" }}>Este recurso não existe no repositório.</p>
-        <button
-          onClick={() => navigate('/repositorio')}
-          className="inline-flex items-center gap-2 rounded-2xl px-6 py-3 text-sm font-bold text-white transition-all duration-200 mt-2"
-          style={{ background: "linear-gradient(135deg,var(--color-navy-deep),var(--color-navy-mid))", boxShadow: "0 6px 22px rgba(var(--color-navy-deep-rgb),0.35)" }}
-          onMouseEnter={e => (e.currentTarget.style.transform = "translateY(-2px)")}
-          onMouseLeave={e => (e.currentTarget.style.transform = "")}
-        >
-          <ArrowLeft size={16} /> Voltar ao Repositório
-        </button>
+        <h2 style={{ fontSize: 26, fontWeight: 900, color: "var(--text-heading)" }}>
+          {ligacaoFalhou ? "Não foi possível carregar" : "Material não encontrado"}
+        </h2>
+        <p style={{ fontSize: 14, color: "var(--text-muted)" }}>
+          {ligacaoFalhou
+            ? "Falha de ligação ao servidor. Verifique a sua ligação e tente novamente."
+            : "Este recurso não existe no repositório."}
+        </p>
+        <div className="flex items-center gap-3">
+          {ligacaoFalhou && (
+            <button
+              onClick={() => navigate(0)}
+              className="inline-flex items-center gap-2 rounded-2xl px-6 py-3 text-sm font-bold transition-all duration-200 mt-2"
+              style={{ background: "var(--surface-card)", border: "1.5px solid var(--border-subtle-strong)", color: "var(--color-navy-mid)" }}
+            >
+              Tentar novamente
+            </button>
+          )}
+          <button
+            onClick={() => navigate('/repositorio')}
+            className="inline-flex items-center gap-2 rounded-2xl px-6 py-3 text-sm font-bold text-white transition-all duration-200 mt-2"
+            style={{ background: "linear-gradient(135deg,var(--color-navy-deep),var(--color-navy-mid))", boxShadow: "0 6px 22px rgba(var(--color-navy-deep-rgb),0.35)" }}
+            onMouseEnter={e => (e.currentTarget.style.transform = "translateY(-2px)")}
+            onMouseLeave={e => (e.currentTarget.style.transform = "")}
+          >
+            <ArrowLeft size={16} /> Voltar ao Repositório
+          </button>
+        </div>
       </div>
     );
   }
@@ -152,6 +232,8 @@ const Visualizador = () => {
   const isPDF   = material.tipo === "PDF";
 
   return (
+    <>
+    <Toast message={toast.message} type={toast.type} onClose={() => setToast({ message: '', type: '' })} />
     <div className="animate-fade-in h-full flex flex-col xl:flex-row gap-7">
 
       {/* ─── Coluna esquerda ─── */}
@@ -209,6 +291,18 @@ const Visualizador = () => {
                 <DownloadCloud size={16} /> Download PDF
               </a>
             )}
+
+            {/* Remover (só o autor ou um admin) */}
+            {podeRemover && (
+              <button
+                onClick={() => setConfirmRemover(true)}
+                className="inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-bold transition-all duration-200"
+                style={{ background: "rgba(239,68,68,0.09)", border: "1.5px solid rgba(239,68,68,0.28)", color: "#dc2626" }}
+                title="Remover material"
+              >
+                <Trash2 size={16} /> Remover
+              </button>
+            )}
           </div>
         </div>
 
@@ -219,7 +313,7 @@ const Visualizador = () => {
         >
           {isVideo ? (
             <video controls className="w-full" style={{ minHeight: "50vh", background: "#000" }} autoPlay>
-              <source src={material.url_arquivo} type="video/mp4" />
+              <source src={material.url_arquivo} type={getVideoMimeType(material.url_arquivo)} />
               O seu navegador não suporta a visualização deste vídeo.
             </video>
           ) : isPDF ? (
@@ -306,6 +400,7 @@ const Visualizador = () => {
                 onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.18)", e.currentTarget.style.color = "#fff")}
                 onMouseLeave={e => (e.currentTarget.style.background = "rgba(255,255,255,0.09)", e.currentTarget.style.color = "rgba(255,255,255,0.55)")}
                 title="Regenerar resumo"
+                aria-label="Regenerar resumo"
               >
                 <RotateCcw size={15} className={summaryLoading ? 'animate-spin' : ''} />
               </button>
@@ -351,6 +446,47 @@ const Visualizador = () => {
         </div>
       </div>
     </div>
+
+    {/* Modal de confirmação de remoção — só o autor ou um admin chegam aqui */}
+    {confirmRemover && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center px-4"
+        style={{ background: "rgba(var(--color-navy-abyss-rgb),0.55)", backdropFilter: "blur(8px)" }}
+        onClick={() => setConfirmRemover(false)}>
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="confirm-remover-material-titulo"
+          ref={confirmRemoverRef}
+          tabIndex={-1}
+          onClick={e => e.stopPropagation()}
+          className="w-full max-w-sm rounded-[28px] p-8 animate-scale-in"
+          style={{ background: "var(--surface-card)", boxShadow: "0 30px 90px rgba(var(--color-navy-deep-rgb),0.30)", outline: "none" }}>
+          <div className="w-14 h-14 rounded-[18px] grid place-items-center mx-auto mb-5"
+            style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.20)" }}>
+            <Trash2 size={26} style={{ color: "#ef4444" }} />
+          </div>
+          <h3 id="confirm-remover-material-titulo" style={{ fontSize: 17, fontWeight: 900, color: "var(--text-heading)", textAlign: "center", marginBottom: 8 }}>
+            Remover &quot;{material.titulo}&quot;?
+          </h3>
+          <p style={{ fontSize: 13, color: "var(--text-muted)", textAlign: "center", lineHeight: 1.6, marginBottom: 24 }}>
+            Esta acção é permanente — o material deixa de estar disponível no repositório.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <button onClick={() => setConfirmRemover(false)} disabled={removendo}
+              className="rounded-2xl px-4 py-3 text-sm font-bold transition-all disabled:opacity-60"
+              style={{ background: "var(--surface-hover)", border: "1.5px solid var(--border-subtle-strong)", color: "var(--text-body)" }}>
+              Cancelar
+            </button>
+            <button onClick={confirmarRemocao} disabled={removendo}
+              className="rounded-2xl px-4 py-3 text-sm font-bold text-white transition-all disabled:opacity-60"
+              style={{ background: "linear-gradient(135deg,#dc2626,#ef4444)", boxShadow: "0 6px 20px rgba(239,68,68,0.35)" }}>
+              {removendo ? "A remover..." : "Remover"}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 };
 

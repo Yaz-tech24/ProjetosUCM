@@ -1,11 +1,12 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import api from "../services/api";
 import {
   ShieldCheck, CheckCircle, XCircle, Clock, AlertTriangle, X, MessageCircle, Trash2,
-  Settings, Upload, Plus, Save, Sparkles, Users, UserPlus, Mail, GraduationCap, Lock,
+  Settings, Upload, Plus, Save, Sparkles, Users, UserPlus, Mail, GraduationCap, Lock, Database,
 } from "lucide-react";
 import { useConfig } from "../context/ConfigContext";
 import { aplicarPaleta } from "../utils/palette";
+import Toast from "../components/Toast";
 
 const TIPOS_FICHEIRO_OPCOES = [
   { valor: "pdf",  label: "PDF" },
@@ -15,36 +16,21 @@ const TIPOS_FICHEIRO_OPCOES = [
   { valor: "mov",  label: "QuickTime (.mov)" },
 ];
 
-/* Toast de notificação */
-const Toast = ({ message, type, onClose }) => {
-  if (!message) return null;
-  const cor = type === 'error' ? "#ef4444" : type === 'warn' ? "#f59e0b" : "#10b981";
-  return (
-    <div
-      className="fixed top-6 right-6 z-50 flex items-center gap-3 rounded-2xl px-5 py-4 animate-fade-in"
-      style={{
-        background: "var(--surface-card)",
-        border: "1px solid var(--border-subtle-strong)",
-        borderLeftWidth: 3,
-        borderLeftColor: cor,
-        color: "var(--text-heading)",
-        boxShadow: "0 10px 40px rgba(0,0,0,0.16)",
-      }}
-    >
-      {type === 'success'
-        ? <CheckCircle size={18} style={{ color: "#10b981", flexShrink: 0 }} />
-        : <AlertTriangle size={18} style={{ color: type === 'warn' ? "#f59e0b" : "#ef4444", flexShrink: 0 }} />
-      }
-      <span style={{ fontSize: 14, fontWeight: 600 }}>{message}</span>
-      <button onClick={onClose} style={{ opacity: 0.45, marginLeft: 8, color: "var(--text-heading)" }} className="hover:opacity-80 transition-opacity">
-        <X size={15} />
-      </button>
-    </div>
-  );
-};
-
 /* Modal de confirmação */
 const ConfirmModal = ({ message, onConfirm, onCancel }) => {
+  const cancelBtnRef = useRef(null);
+  const onCancelRef = useRef(onCancel);
+  useEffect(() => { onCancelRef.current = onCancel; }, [onCancel]);
+
+  /* Foca o botão "Cancelar" ao abrir e permite fechar com Escape. */
+  useEffect(() => {
+    if (!message) return;
+    cancelBtnRef.current?.focus();
+    const handleKeyDown = (e) => { if (e.key === 'Escape') onCancelRef.current(); };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [message]);
+
   if (!message) return null;
   return (
     <div
@@ -52,6 +38,9 @@ const ConfirmModal = ({ message, onConfirm, onCancel }) => {
       style={{ background: "rgba(var(--color-navy-abyss-rgb),0.55)", backdropFilter: "blur(8px)" }}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="confirm-modal-title"
         className="w-full max-w-sm rounded-[28px] p-8 animate-scale-in"
         style={{
           background: "var(--surface-card)",
@@ -65,7 +54,7 @@ const ConfirmModal = ({ message, onConfirm, onCancel }) => {
         >
           <AlertTriangle size={30} style={{ color: "#ef4444" }} />
         </div>
-        <h3 style={{ fontSize: 18, fontWeight: 900, color: "var(--text-heading)", textAlign: "center", marginBottom: 8 }}>
+        <h3 id="confirm-modal-title" style={{ fontSize: 18, fontWeight: 900, color: "var(--text-heading)", textAlign: "center", marginBottom: 8 }}>
           Confirmar acção
         </h3>
         <p style={{ fontSize: 14, color: "var(--text-muted)", textAlign: "center", lineHeight: 1.65, marginBottom: 28 }}>
@@ -73,6 +62,7 @@ const ConfirmModal = ({ message, onConfirm, onCancel }) => {
         </p>
         <div className="grid grid-cols-2 gap-3">
           <button
+            ref={cancelBtnRef}
             onClick={onCancel}
             className="rounded-2xl px-5 py-3 text-sm font-bold transition-all duration-200"
             style={{ background: "var(--surface-hover)", border: "1.5px solid var(--border-subtle-strong)", color: "var(--text-body)" }}
@@ -101,9 +91,10 @@ const ConfirmModal = ({ message, onConfirm, onCancel }) => {
 
 const Admin = ({ usuarioLogado }) => {
   const { config, cursos, refetchConfig } = useConfig();
-  const [aba, setAba]           = useState('materiais'); // 'materiais' | 'chat' | 'config'
+  const [aba, setAba]           = useState('materiais'); // 'materiais' | 'chat' | 'utilizadores' | 'config'
   const [pendentes, setPendentes] = useState([]);
   const [loading, setLoading]   = useState(true);
+  const [sistemaStatus, setSistemaStatus] = useState(null);
   const [toast, setToast]       = useState({ message: '', type: '' });
   const [confirm, setConfirm]   = useState({ message: '', id: null, tipo: 'material' });
 
@@ -155,27 +146,41 @@ const Admin = ({ usuarioLogado }) => {
     setTimeout(() => setToast({ message: '', type: '' }), 4500);
   }, []);
 
+  /* Refs dos AbortController activos — cancelam uma resposta antiga antes de
+     um novo pedido ao mesmo endpoint, e são todos cancelados ao desmontar. */
+  const pendentesAbortRef = useRef(null);
+  const mensagensAbortRef = useRef(null);
+  const statusAbortRef    = useRef(null);
+
   const fetchPendentes = useCallback(async () => {
+    pendentesAbortRef.current?.abort();
+    const controller = new AbortController();
+    pendentesAbortRef.current = controller;
     try {
-      const res = await api.get("/admin/pendentes");
+      const res = await api.get("/admin/pendentes", { signal: controller.signal });
       setPendentes(res.data || []);
     } catch (err) {
+      if (err.code === 'ERR_CANCELED' || err.name === 'CanceledError' || err.name === 'AbortError') return;
       console.error("Erro ao buscar pendentes:", err);
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) setLoading(false);
     }
   }, []);
 
   const fetchMensagens = useCallback(async (curso = '') => {
+    mensagensAbortRef.current?.abort();
+    const controller = new AbortController();
+    mensagensAbortRef.current = controller;
     setLoadingChat(true);
     try {
       const url = curso ? `/admin/mensagens?curso=${encodeURIComponent(curso)}` : '/admin/mensagens';
-      const res = await api.get(url);
+      const res = await api.get(url, { signal: controller.signal });
       setMensagens(res.data || []);
-    } catch {
+    } catch (err) {
+      if (err.code === 'ERR_CANCELED' || err.name === 'CanceledError' || err.name === 'AbortError') return;
       showToast('Erro ao carregar mensagens.', 'error');
     } finally {
-      setLoadingChat(false);
+      if (!controller.signal.aborted) setLoadingChat(false);
     }
   }, [showToast]);
 
@@ -183,7 +188,21 @@ const Admin = ({ usuarioLogado }) => {
     if (usuarioLogado?.papel === "admin") {
       fetchPendentes();
       fetchMensagens();
+      statusAbortRef.current?.abort();
+      const controller = new AbortController();
+      statusAbortRef.current = controller;
+      api.get("/admin/status", { signal: controller.signal })
+        .then(res => setSistemaStatus(res.data))
+        .catch(err => {
+          if (err.code === 'ERR_CANCELED' || err.name === 'CanceledError' || err.name === 'AbortError') return;
+          setSistemaStatus(null);
+        });
     }
+    return () => {
+      pendentesAbortRef.current?.abort();
+      mensagensAbortRef.current?.abort();
+      statusAbortRef.current?.abort();
+    };
   }, [usuarioLogado, fetchPendentes, fetchMensagens]);
 
   useEffect(() => {
@@ -448,6 +467,29 @@ const Admin = ({ usuarioLogado }) => {
               </div>
             </div>
           </div>
+
+          {/* Estado dos serviços integrados — BD, IA, Email */}
+          {sistemaStatus && (
+            <div className="relative flex flex-wrap gap-2.5 mt-6 pt-6" style={{ borderTop: "1px solid rgba(255,255,255,0.10)" }}>
+              {[
+                { label: "Base de Dados", icon: Database, ok: sistemaStatus.bd === 'ligada', okText: 'Ligada', badText: 'Inacessível' },
+                { label: "IA Gemini", icon: Sparkles, ok: sistemaStatus.ia === 'configurada', okText: 'Configurada', badText: 'Não configurada' },
+                { label: "Email (SMTP)", icon: Mail, ok: sistemaStatus.email === 'configurada', okText: 'Configurado', badText: 'Não configurado' },
+              ].map(({ label, icon: Icon, ok, okText, badText }) => (
+                <div key={label}
+                  className="inline-flex items-center gap-2.5 rounded-2xl px-4 py-2.5"
+                  style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.13)", backdropFilter: "blur(8px)" }}
+                >
+                  <div className="w-2 h-2 rounded-full shrink-0" style={ok
+                    ? { background: "#34d399", boxShadow: "0 0 8px rgba(52,211,153,0.80)" }
+                    : { background: "#f59e0b", boxShadow: "0 0 8px rgba(245,158,11,0.60)" }} />
+                  <Icon size={14} style={{ color: "rgba(255,255,255,0.55)" }} />
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.75)" }}>{label}</span>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: ok ? "#6ee7b7" : "#fcd34d" }}>{ok ? okText : badText}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
 
         {/* ═══ ABAS ════════════════════════════════════════════════ */}
@@ -742,6 +784,7 @@ const Admin = ({ usuarioLogado }) => {
                         className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 rounded-xl p-2"
                         style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.20)", color: "#ef4444" }}
                         title="Apagar mensagem"
+                        aria-label="Apagar mensagem"
                       >
                         <Trash2 size={15} />
                       </button>
@@ -851,7 +894,9 @@ const Admin = ({ usuarioLogado }) => {
                         </div>
                         <div className="min-w-0 flex-1">
                           <p style={{ fontSize: 14, fontWeight: 700, color: "var(--text-heading)" }} className="truncate">{u.nome}</p>
-                          <p style={{ fontSize: 12, color: "var(--text-faint)" }} className="truncate">{u.email} · {u.curso}</p>
+                          <p style={{ fontSize: 12, color: "var(--text-faint)" }} className="truncate">
+                            {[u.email, u.curso, u.numero_estudante, u.telefone].filter(Boolean).join(' · ')}
+                          </p>
                         </div>
                         <span className="rounded-full px-3 py-1.5 text-[10px] font-black uppercase shrink-0"
                           style={{
@@ -867,6 +912,7 @@ const Admin = ({ usuarioLogado }) => {
                             className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 rounded-xl p-2"
                             style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.20)", color: "#ef4444" }}
                             title="Remover utilizador"
+                            aria-label={`Remover utilizador ${u.nome}`}
                           >
                             <Trash2 size={15} />
                           </button>
@@ -1131,6 +1177,7 @@ const Admin = ({ usuarioLogado }) => {
                         className="rounded-full p-1 transition-colors"
                         style={{ color: "var(--text-faint)" }}
                         title="Remover curso"
+                        aria-label={`Remover curso ${c.nome}`}
                       >
                         <X size={13} />
                       </button>

@@ -8,7 +8,7 @@ const SpeechRecognitionAPI =
     ? window.SpeechRecognition || window.webkitSpeechRecognition
     : null;
 
-const Chatbot = ({ usuarioLogado }) => {
+const Chatbot = ({ usuarioLogado, chatOpen: chatOpenProp, setChatOpen: setChatOpenProp }) => {
   const { config } = useConfig();
   const primeiroNome = usuarioLogado?.nome?.split(" ")[0] || "";
   const curso = usuarioLogado?.curso || "";
@@ -17,7 +17,12 @@ const Chatbot = ({ usuarioLogado }) => {
     ? `Olá, ${primeiroNome}! Sou o assistente académico da ${config.nome_plataforma}.${curso ? ` Estou preparado para te ajudar com ${curso} e qualquer outra matéria.` : ""} Faz-me uma pergunta sobre um conceito, exercício ou tema de estudo.`
     : `Olá! Sou o assistente académico da ${config.nome_plataforma}. Posso explicar conceitos, ajudar em exercícios ou preparar-te para exames. O que queres estudar?`;
 
-  const [chatOpen, setChatOpen]     = useState(false);
+  // O estado de aberto/fechado pode ser controlado externamente (ex: Layout.jsx,
+  // para permitir que outras páginas como o Dashboard abram o assistente), com
+  // fallback para estado local caso nenhum controlo seja passado.
+  const [chatOpenLocal, setChatOpenLocal] = useState(false);
+  const chatOpen    = chatOpenProp ?? chatOpenLocal;
+  const setChatOpen = setChatOpenProp ?? setChatOpenLocal;
   const [chatInput, setChatInput]   = useState("");
   const [isTyping, setIsTyping]     = useState(false);
   const [isListening, setIsListening] = useState(false);
@@ -177,6 +182,7 @@ const Chatbot = ({ usuarioLogado }) => {
               <button
                 onClick={() => { if (voiceEnabled) window.speechSynthesis?.cancel(); setVoiceEnabled(v => !v); }}
                 title={voiceEnabled ? "Desactivar voz" : "Activar voz"}
+                aria-label={voiceEnabled ? "Desactivar voz" : "Activar voz"}
                 className="w-9 h-9 rounded-xl grid place-items-center transition-all duration-200"
                 style={voiceEnabled
                   ? { background: "linear-gradient(135deg, var(--color-gold-dark), var(--color-gold))", color: "var(--color-navy-deep)", boxShadow: "0 0 14px rgba(var(--color-gold-rgb),0.55)" }
@@ -189,6 +195,7 @@ const Chatbot = ({ usuarioLogado }) => {
               {/* Fechar */}
               <button
                 onClick={() => setChatOpen(false)}
+                aria-label="Fechar assistente de IA"
                 className="w-9 h-9 rounded-xl grid place-items-center transition-all duration-200"
                 style={{ background: "rgba(255,255,255,0.09)", color: "rgba(255,255,255,0.45)" }}
                 onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.18)", e.currentTarget.style.color = "#fff")}
@@ -203,6 +210,8 @@ const Chatbot = ({ usuarioLogado }) => {
           <div
             className="flex-1 px-5 py-4 overflow-y-auto flex flex-col gap-4"
             style={{ background: "#f8faff" }}
+            aria-live="polite"
+            aria-relevant="additions"
           >
             {chatMessages.map((msg, i) => (
               <div
@@ -327,6 +336,7 @@ const Chatbot = ({ usuarioLogado }) => {
               <button
                 onClick={toggleListening}
                 disabled={isTyping}
+                aria-label={isListening ? "Parar gravação de voz" : "Falar com o assistente"}
                 className="p-2.5 rounded-xl transition-all duration-200 shrink-0"
                 style={isListening
                   ? {
@@ -349,6 +359,7 @@ const Chatbot = ({ usuarioLogado }) => {
             <button
               onClick={handleSend}
               disabled={isTyping || isListening}
+              aria-label="Enviar mensagem"
               className="p-2.5 rounded-xl transition-all duration-200 shrink-0 disabled:opacity-40"
               style={{
                 background: "linear-gradient(135deg, var(--color-gold-dark), var(--color-gold), var(--color-gold-light))",
@@ -367,6 +378,8 @@ const Chatbot = ({ usuarioLogado }) => {
       {/* ─── FAB principal ─── */}
       <button
         onClick={() => setChatOpen(!chatOpen)}
+        aria-label={chatOpen ? "Fechar assistente de IA" : "Abrir assistente de IA"}
+        aria-expanded={chatOpen}
         className="relative w-16 h-16 rounded-[22px] flex items-center justify-center transition-all duration-300"
         style={{
           background: chatOpen

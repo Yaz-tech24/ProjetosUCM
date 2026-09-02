@@ -1,14 +1,15 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import api, { getFavoritos, toggleFavorito } from "../services/api";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Search, Plus, X, ChevronLeft, ChevronRight,
-  Upload, BookOpen, PlayCircle, FileText, Filter, Heart, CheckCircle,
+  Upload, BookOpen, PlayCircle, FileText, Filter, Heart, CheckCircle, Trash2,
 } from "lucide-react";
 import { useConfig } from "../context/ConfigContext";
+import Toast from "../components/Toast";
 
-/* Card de material com botão de favorito */
-const MaterialCard = ({ m, onClick, favs, onToggleFav }) => {
+/* Card de material com botão de favorito e (para o autor ou um admin) de remover */
+const MaterialCard = ({ m, onClick, favs, onToggleFav, podeRemover, onRemover }) => {
   const isFav = favs.includes(m.id);
   return (
     <article
@@ -41,20 +42,37 @@ const MaterialCard = ({ m, onClick, favs, onToggleFav }) => {
             {m.tipo}
           </div>
 
-          {/* Botão de favorito */}
-          <button
-            onClick={e => { e.stopPropagation(); onToggleFav(m.id); }}
-            className="w-9 h-9 rounded-xl grid place-items-center transition-all duration-200"
-            style={isFav
-              ? { background: "rgba(239,68,68,0.10)", border: "1px solid rgba(239,68,68,0.25)", color: "#ef4444" }
-              : { background: "var(--surface-hover)", border: "1px solid var(--border-subtle-strong)", color: "var(--text-faint)" }
-            }
-            onMouseEnter={e => !isFav && (e.currentTarget.style.color = "#ef4444", e.currentTarget.style.borderColor = "rgba(239,68,68,0.25)")}
-            onMouseLeave={e => !isFav && (e.currentTarget.style.color = "var(--text-faint)", e.currentTarget.style.borderColor = "var(--border-subtle-strong)")}
-            title={isFav ? "Remover dos favoritos" : "Adicionar aos favoritos"}
-          >
-            <Heart size={15} fill={isFav ? "#ef4444" : "none"} />
-          </button>
+          <div className="flex items-center gap-2">
+            {podeRemover && (
+              <button
+                onClick={e => { e.stopPropagation(); onRemover(m); }}
+                className="w-9 h-9 rounded-xl grid place-items-center transition-all duration-200"
+                style={{ background: "var(--surface-hover)", border: "1px solid var(--border-subtle-strong)", color: "var(--text-faint)" }}
+                onMouseEnter={e => (e.currentTarget.style.color = "#ef4444", e.currentTarget.style.borderColor = "rgba(239,68,68,0.25)", e.currentTarget.style.background = "rgba(239,68,68,0.10)")}
+                onMouseLeave={e => (e.currentTarget.style.color = "var(--text-faint)", e.currentTarget.style.borderColor = "var(--border-subtle-strong)", e.currentTarget.style.background = "var(--surface-hover)")}
+                title="Remover material"
+                aria-label={`Remover material "${m.titulo}"`}
+              >
+                <Trash2 size={15} />
+              </button>
+            )}
+
+            {/* Botão de favorito */}
+            <button
+              onClick={e => { e.stopPropagation(); onToggleFav(m.id); }}
+              className="w-9 h-9 rounded-xl grid place-items-center transition-all duration-200"
+              style={isFav
+                ? { background: "rgba(239,68,68,0.10)", border: "1px solid rgba(239,68,68,0.25)", color: "#ef4444" }
+                : { background: "var(--surface-hover)", border: "1px solid var(--border-subtle-strong)", color: "var(--text-faint)" }
+              }
+              onMouseEnter={e => !isFav && (e.currentTarget.style.color = "#ef4444", e.currentTarget.style.borderColor = "rgba(239,68,68,0.25)")}
+              onMouseLeave={e => !isFav && (e.currentTarget.style.color = "var(--text-faint)", e.currentTarget.style.borderColor = "var(--border-subtle-strong)")}
+              title={isFav ? "Remover dos favoritos" : "Adicionar aos favoritos"}
+              aria-label={isFav ? "Remover dos favoritos" : "Adicionar aos favoritos"}
+            >
+              <Heart size={15} fill={isFav ? "#ef4444" : "none"} />
+            </button>
+          </div>
         </div>
 
         <h3
@@ -86,7 +104,7 @@ const MaterialCard = ({ m, onClick, favs, onToggleFav }) => {
   );
 };
 
-const Repositorio = () => {
+const Repositorio = ({ usuarioLogado }) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { config, cursos } = useConfig();
@@ -107,6 +125,12 @@ const Repositorio = () => {
   const [uploadSucesso,   setUploadSucesso]   = useState(false);
   const [uploadPublicado, setUploadPublicado] = useState(false);
   const [favs,            setFavs]            = useState(getFavoritos);
+  const [debouncedBusca,  setDebouncedBusca]  = useState(buscaTermo);
+  const [aRemover,        setARemover]        = useState(null); // material seleccionado para confirmar remoção
+  const [removendo,       setRemovendo]       = useState(false);
+  const [toast,           setToast]           = useState({ message: '', type: '' });
+
+  const abortControllerRef = useRef(null);
 
   const TIPOS_MATERIAL_DISPONIVEIS = useMemo(() => {
     const tiposPermitidos = (config.tipos_ficheiro_permitidos || '').split(',');
@@ -116,28 +140,47 @@ const Repositorio = () => {
     ];
   }, [config.tipos_ficheiro_permitidos]);
 
+  /* Debounce da pesquisa: só actualiza o termo usado no pedido 350ms depois
+     de o utilizador parar de escrever — evita disparar um pedido por tecla. */
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedBusca(buscaTermo), 350);
+    return () => clearTimeout(t);
+  }, [buscaTermo]);
+
   const fetchMateriais = useCallback(async (page = 1) => {
+    // Cancela qualquer pedido anterior ainda em curso — garante que uma
+    // resposta antiga (ex: de uma pesquisa já ultrapassada) nunca sobrescreve
+    // o resultado de um pedido mais recente.
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     setLoading(true);
     try {
       const params = new URLSearchParams({ page, limit: 12 });
-      if (buscaTermo.trim())        params.set('busca',   buscaTermo.trim());
+      if (debouncedBusca.trim())    params.set('busca',   debouncedBusca.trim());
       if (filtroTipo !== 'Todos')   params.set('tipo',    filtroTipo);
       if (filtroCadeira !== 'Todas') params.set('cadeira', filtroCadeira);
 
-      const res = await api.get(`/materiais?${params}`);
+      const res = await api.get(`/materiais?${params}`, { signal: controller.signal });
       setMateriais(res.data.materiais || []);
       setTotalPages(res.data.pagination?.totalPages || 1);
       setTotalResultados(res.data.pagination?.total || 0);
       setCurrentPage(page);
-    } catch {
+    } catch (err) {
+      if (err.code === 'ERR_CANCELED' || err.name === 'CanceledError' || err.name === 'AbortError') return;
       // mantém lista vazia — erro de rede não quebra a página
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) setLoading(false);
     }
-  }, [buscaTermo, filtroTipo, filtroCadeira]);
+  }, [debouncedBusca, filtroTipo, filtroCadeira]);
 
-  /* Recarrega ao mudar qualquer filtro */
-  useEffect(() => { fetchMateriais(1); }, [fetchMateriais]);
+  /* Recarrega ao mudar qualquer filtro; cancela o pedido em curso ao mudar
+     de filtro novamente ou ao desmontar a página. */
+  useEffect(() => {
+    fetchMateriais(1);
+    return () => abortControllerRef.current?.abort();
+  }, [fetchMateriais]);
 
   /* Pré-selecciona o primeiro curso disponível no formulário de upload */
   useEffect(() => {
@@ -191,6 +234,46 @@ const Repositorio = () => {
     setFavs(getFavoritos());
   };
 
+  const podeRemover = (m) => usuarioLogado && (usuarioLogado.papel === "admin" || m.autor_id === usuarioLogado.id);
+
+  const confirmarRemocao = async () => {
+    if (!aRemover) return;
+    setRemovendo(true);
+    try {
+      await api.delete(`/materiais/${aRemover.id}`);
+      setMateriais(prev => prev.filter(m => m.id !== aRemover.id));
+      setTotalResultados(prev => Math.max(0, prev - 1));
+      setToast({ message: "Material removido com sucesso.", type: "success" });
+      setARemover(null);
+    } catch (err) {
+      setToast({ message: err.response?.data?.erro || "Erro ao remover material.", type: "error" });
+      setARemover(null);
+    } finally {
+      setRemovendo(false);
+    }
+  };
+
+  /* Acessibilidade do modal de confirmação de remoção */
+  const confirmRemoverRef = useRef(null);
+  useEffect(() => {
+    if (!aRemover) return;
+    confirmRemoverRef.current?.focus();
+    const handleKeyDown = (e) => { if (e.key === 'Escape') setARemover(null); };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [aRemover]);
+
+  /* Acessibilidade do modal de upload: foca o botão de fechar ao abrir
+     e permite fechar com a tecla Escape. */
+  const uploadModalCloseRef = useRef(null);
+  useEffect(() => {
+    if (!showUploadModal) return;
+    uploadModalCloseRef.current?.focus();
+    const handleKeyDown = (e) => { if (e.key === 'Escape') setShowUploadModal(false); };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [showUploadModal]);
+
   /* Filtro de cadeira agora é server-side — materiais já chegam filtrados */
   const materiaisFiltrados = materiais;
 
@@ -198,6 +281,8 @@ const Repositorio = () => {
 
   return (
     <div className="space-y-8 animate-fade-in">
+
+      <Toast message={toast.message} type={toast.type} onClose={() => setToast({ message: '', type: '' })} />
 
       {/* Toast de upload enviado */}
       {uploadSucesso && (
@@ -214,7 +299,7 @@ const Repositorio = () => {
                 : "O admin irá rever e publicar em breve."}
             </p>
           </div>
-          <button onClick={() => setUploadSucesso(false)} style={{ opacity: 0.45, marginLeft: 8, background: "none", border: "none", cursor: "pointer" }}>
+          <button onClick={() => setUploadSucesso(false)} aria-label="Fechar notificação" style={{ opacity: 0.45, marginLeft: 8, background: "none", border: "none", cursor: "pointer" }}>
             <X size={15} />
           </button>
         </div>
@@ -347,6 +432,8 @@ const Repositorio = () => {
                 favs={favs}
                 onToggleFav={handleToggleFav}
                 onClick={() => navigate(`/video/${m.id}`)}
+                podeRemover={podeRemover(m)}
+                onRemover={setARemover}
               />
             ))
           )}
@@ -386,15 +473,23 @@ const Repositorio = () => {
       {/* ═══ MODAL UPLOAD ══════════════════════════════════════════ */}
       {showUploadModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6" style={{ background: "rgba(var(--color-navy-abyss-rgb),0.60)", backdropFilter: "blur(8px)" }}>
-          <div className="w-full max-w-2xl overflow-hidden rounded-[36px] animate-scale-in" style={{ background: "var(--surface-card)", boxShadow: "0 40px 120px rgba(var(--color-navy-abyss-rgb),0.50)" }}>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="upload-modal-title"
+            className="w-full max-w-2xl overflow-hidden rounded-[36px] animate-scale-in"
+            style={{ background: "var(--surface-card)", boxShadow: "0 40px 120px rgba(var(--color-navy-abyss-rgb),0.50)" }}
+          >
             <div className="relative flex items-center justify-between gap-4 px-8 py-7 text-white" style={{ background: "linear-gradient(135deg,var(--color-navy-deep),var(--color-navy-mid),var(--color-navy-bright))" }}>
               <div className="absolute top-0 inset-x-0" style={{ height: 3, background: "linear-gradient(90deg, transparent, var(--color-gold-dark), var(--color-gold), var(--color-gold-light), transparent)", opacity: 0.85 }} />
               <div>
                 <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.38em", color: "rgba(var(--color-blue-sky-rgb),0.65)", textTransform: "uppercase", marginBottom: 4 }}>Enviar Material</p>
-                <h2 style={{ fontSize: 24, fontWeight: 900 }}>Submeta o seu conteúdo</h2>
+                <h2 id="upload-modal-title" style={{ fontSize: 24, fontWeight: 900 }}>Submeta o seu conteúdo</h2>
               </div>
               <button
+                ref={uploadModalCloseRef}
                 onClick={() => setShowUploadModal(false)}
+                aria-label="Fechar formulário de envio"
                 className="rounded-full p-3 transition-all duration-200"
                 style={{ background: "rgba(255,255,255,0.10)", border: "1px solid rgba(255,255,255,0.14)" }}
                 onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.22)")}
@@ -482,6 +577,46 @@ const Repositorio = () => {
                 <Upload size={17} /> Enviar para Aprovação
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ MODAL CONFIRMAR REMOÇÃO ══════════════════════════════ */}
+      {aRemover && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4"
+          style={{ background: "rgba(var(--color-navy-abyss-rgb),0.55)", backdropFilter: "blur(8px)" }}
+          onClick={() => setARemover(null)}>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="confirm-remover-titulo"
+            ref={confirmRemoverRef}
+            tabIndex={-1}
+            onClick={e => e.stopPropagation()}
+            className="w-full max-w-sm rounded-[28px] p-8 animate-scale-in"
+            style={{ background: "var(--surface-card)", boxShadow: "0 30px 90px rgba(var(--color-navy-deep-rgb),0.30)", outline: "none" }}>
+            <div className="w-14 h-14 rounded-[18px] grid place-items-center mx-auto mb-5"
+              style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.20)" }}>
+              <Trash2 size={26} style={{ color: "#ef4444" }} />
+            </div>
+            <h3 id="confirm-remover-titulo" style={{ fontSize: 17, fontWeight: 900, color: "var(--text-heading)", textAlign: "center", marginBottom: 8 }}>
+              Remover &quot;{aRemover.titulo}&quot;?
+            </h3>
+            <p style={{ fontSize: 13, color: "var(--text-muted)", textAlign: "center", lineHeight: 1.6, marginBottom: 24 }}>
+              Esta acção é permanente — o material deixa de estar disponível no repositório.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <button onClick={() => setARemover(null)} disabled={removendo}
+                className="rounded-2xl px-4 py-3 text-sm font-bold transition-all disabled:opacity-60"
+                style={{ background: "var(--surface-hover)", border: "1.5px solid var(--border-subtle-strong)", color: "var(--text-body)" }}>
+                Cancelar
+              </button>
+              <button onClick={confirmarRemocao} disabled={removendo}
+                className="rounded-2xl px-4 py-3 text-sm font-bold text-white transition-all disabled:opacity-60"
+                style={{ background: "linear-gradient(135deg,#dc2626,#ef4444)", boxShadow: "0 6px 20px rgba(239,68,68,0.35)" }}>
+                {removendo ? "A remover..." : "Remover"}
+              </button>
+            </div>
           </div>
         </div>
       )}

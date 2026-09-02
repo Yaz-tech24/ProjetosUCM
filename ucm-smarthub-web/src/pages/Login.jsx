@@ -1,25 +1,40 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import api from "../services/api";
 import { useNavigate } from "react-router-dom";
 import {
   BookOpen, User, Lock, Mail, GraduationCap, MapPin, Info,
   ArrowRight, Library, MessageCircle, Sparkles, CheckCircle,
-  AlertCircle, Menu, X,
+  AlertCircle, Menu, X, IdCard, Phone,
 } from "lucide-react";
 import { useConfig } from "../context/ConfigContext";
 import { FacebookIcon, InstagramIcon, LinkedinIcon } from "../components/SocialIcons";
 
 /* ─── Painel "Sobre" — mostra a informação real e editável pelo admin
    (nome, propósito, localização, contacto) em vez de links falsos ─── */
-const SobreModal = ({ config, onClose }) => (
+const SobreModal = ({ config, onClose }) => {
+  const modalRef = useRef(null);
+
+  useEffect(() => {
+    modalRef.current?.focus();
+    const onKeyDown = (e) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
+  return (
   <div
     className="fixed inset-0 z-[100] flex items-center justify-center px-4"
     style={{ background: "rgba(var(--color-navy-abyss-rgb),0.55)", backdropFilter: "blur(8px)" }}
     onClick={onClose}
   >
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="sobre-modal-titulo"
+      ref={modalRef}
+      tabIndex={-1}
       className="w-full max-w-md rounded-[28px] p-8 animate-scale-in"
-      style={{ background: "#fff", border: "1px solid rgba(var(--color-navy-mid-rgb),0.08)", boxShadow: "0 30px 90px rgba(var(--color-navy-deep-rgb),0.30)" }}
+      style={{ background: "#fff", border: "1px solid rgba(var(--color-navy-mid-rgb),0.08)", boxShadow: "0 30px 90px rgba(var(--color-navy-deep-rgb),0.30)", outline: "none" }}
       onClick={e => e.stopPropagation()}
     >
       <div className="flex items-start justify-between mb-5">
@@ -30,9 +45,9 @@ const SobreModal = ({ config, onClose }) => (
               ? <img src={config.logo_url} alt={config.nome_plataforma} className="w-full h-full object-contain rounded-2xl" />
               : <BookOpen size={22} />}
           </div>
-          <h3 style={{ fontSize: 19, fontWeight: 900, color: "var(--color-navy-deep)" }}>{config.nome_plataforma}</h3>
+          <h3 id="sobre-modal-titulo" style={{ fontSize: 19, fontWeight: 900, color: "var(--color-navy-deep)" }}>{config.nome_plataforma}</h3>
         </div>
-        <button onClick={onClose} style={{ color: "#94a3b8" }}><X size={18} /></button>
+        <button onClick={onClose} aria-label="Fechar" style={{ color: "#94a3b8" }}><X size={18} /></button>
       </div>
 
       {config.descricao_proposito && (
@@ -63,7 +78,8 @@ const SobreModal = ({ config, onClose }) => (
       )}
     </div>
   </div>
-);
+  );
+};
 
 /* ─── Card flutuante no painel hero ─── */
 const FloatCard = ({ icon: Icon, label, value, delay, style }) => (
@@ -126,6 +142,8 @@ const Login = ({ onLogin }) => {
   const [email,            setEmail]            = useState("");
   const [senha,            setSenha]            = useState("");
   const [curso,            setCurso]            = useState("");
+  const [numeroEstudante,  setNumeroEstudante]  = useState("");
+  const [telefone,         setTelefone]         = useState("");
   const [stats,            setStats]            = useState(null);
   const [emailRecuperacao, setEmailRecuperacao] = useState("");
 
@@ -168,10 +186,12 @@ const Login = ({ onLogin }) => {
     setMensagem({ texto: "", tipo: "" });
     setLoading(true);
     try {
-      await api.post("/register", { nome, email, senha, curso });
+      await api.post("/register", { nome, email, senha, curso, numero_estudante: numeroEstudante, telefone });
       setMensagem({ texto: "Conta criada! Faça login para entrar.", tipo: "sucesso" });
       setIsRegistering(false);
       setSenha("");
+      setNumeroEstudante("");
+      setTelefone("");
     } catch (err) {
       setMensagem({ texto: err.response?.data?.erro || "Erro ao registar.", tipo: "erro" });
     } finally { setLoading(false); }
@@ -182,8 +202,10 @@ const Login = ({ onLogin }) => {
     setMensagem({ texto: "", tipo: "" });
     setLoading(true);
     try {
+      // O backend define o cookie httpOnly de sessão na própria resposta —
+      // nada a guardar aqui além do perfil (usado só para UI, nunca para
+      // decisões de autorização, que o servidor sempre re-valida pelo cookie).
       const res = await api.post("/login", { email, senha });
-      localStorage.setItem("token", res.data.token);
       onLogin(res.data.utilizador);
       navigate("/dashboard");
     } catch (err) {
@@ -253,8 +275,8 @@ const Login = ({ onLogin }) => {
         }
 
         /* nav / footer links */
-        .lp-navlink { font-size:13px; font-weight:500; color:rgba(var(--color-navy-mid-rgb),.65); text-decoration:none; transition:color .2s; }
-        .lp-navlink:hover { color:var(--color-navy-deep); }
+        .lp-navlink { font-size:13px; font-weight:500; color:var(--text-muted); text-decoration:none; transition:color .2s; }
+        .lp-navlink:hover { color:var(--text-heading); }
         .lp-footlink { font-size:11px; color:#64748b; text-decoration:none; transition:color .2s; }
         .lp-footlink:hover { color:var(--color-navy-deep); }
         .lp-social { color:#94a3b8; transition:color .2s; }
@@ -271,7 +293,7 @@ const Login = ({ onLogin }) => {
           background: `
             radial-gradient(ellipse at 8%  8%,  rgba(var(--color-gold-rgb),.07)   0%, transparent 35%),
             radial-gradient(ellipse at 92% 92%, rgba(0,51,102,.07)    0%, transparent 35%),
-            var(--color-ice)
+            var(--surface-page)
           `,
           position: "relative",
         }}
@@ -311,7 +333,7 @@ const Login = ({ onLogin }) => {
             position:"relative", zIndex:30, flexShrink:0,
             display:"flex", alignItems:"center", justifyContent:"space-between",
             padding:"14px 40px",
-            background:"rgba(var(--color-ice-rgb),.90)",
+            background:"var(--surface-card-glass)",
             backdropFilter:"blur(24px)", WebkitBackdropFilter:"blur(24px)",
             borderBottom:"1px solid rgba(var(--color-navy-mid-rgb),.09)",
             boxShadow:"0 1px 20px rgba(var(--color-navy-mid-rgb),.05)",
@@ -333,7 +355,7 @@ const Login = ({ onLogin }) => {
                 : <BookOpen size={20} strokeWidth={1.7} />}
             </div>
             <div style={{ lineHeight:1 }}>
-              <span style={{ display:"block", fontSize:18, fontWeight:900, color:"var(--color-navy-deep)", letterSpacing:"-.02em" }}>{config.nome_plataforma}</span>
+              <span style={{ display:"block", fontSize:18, fontWeight:900, color:"var(--text-heading)", letterSpacing:"-.02em" }}>{config.nome_plataforma}</span>
             </div>
           </div>
 
@@ -351,7 +373,9 @@ const Login = ({ onLogin }) => {
           <button
             className="lg:hidden"
             onClick={() => setMobileMenu(m => !m)}
-            style={{ background:"none", border:"none", cursor:"pointer", padding:4, color:"var(--color-navy-deep)" }}
+            aria-label={mobileMenu ? "Fechar menu" : "Abrir menu"}
+            aria-expanded={mobileMenu}
+            style={{ background:"none", border:"none", cursor:"pointer", padding:4, color:"var(--text-heading)" }}
           >
             {mobileMenu ? <X size={22} /> : <Menu size={22} />}
           </button>
@@ -363,7 +387,7 @@ const Login = ({ onLogin }) => {
             className="lg:hidden"
             style={{
               position:"relative", zIndex:25,
-              background:"rgba(var(--color-ice-rgb),.97)", backdropFilter:"blur(16px)",
+              background:"var(--surface-card-glass)", backdropFilter:"blur(16px)",
               borderBottom:"1px solid rgba(var(--color-navy-mid-rgb),.08)",
               padding:"18px 40px", display:"flex", flexDirection:"column", gap:18,
               boxShadow:"0 8px 32px rgba(var(--color-navy-mid-rgb),.10)",
@@ -591,6 +615,14 @@ const Login = ({ onLogin }) => {
                         {cursos.map(c => <option key={c.id} value={c.nome}>{c.nome}</option>)}
                       </select>
                     </div>
+
+                    <InputField icon={<IdCard size={17} />}
+                      type="text" placeholder="Número de estudante (opcional)"
+                      value={numeroEstudante} onChange={e => setNumeroEstudante(e.target.value)} />
+
+                    <InputField icon={<Phone size={17} />}
+                      type="tel" placeholder="Telefone (opcional)"
+                      value={telefone} onChange={e => setTelefone(e.target.value)} />
                   </>
                 )}
 
@@ -668,13 +700,13 @@ const Login = ({ onLogin }) => {
             display:"flex", alignItems:"center", justifyContent:"space-between",
             flexWrap:"wrap", gap:12,
             padding:"13px 40px",
-            background:"rgba(var(--color-ice-rgb),.90)",
+            background:"var(--surface-card-glass)",
             backdropFilter:"blur(24px)", WebkitBackdropFilter:"blur(24px)",
             borderTop:"1px solid rgba(var(--color-navy-mid-rgb),.09)",
           }}
         >
           <div>
-            <p style={{ fontSize:11, color:"var(--color-navy-deep)", fontWeight:700, marginBottom:2 }}>{config.nome_plataforma}</p>
+            <p style={{ fontSize:11, color:"var(--text-heading)", fontWeight:700, marginBottom:2 }}>{config.nome_plataforma}</p>
             {(config.localizacao || config.contacto_email) && (
               <p style={{ fontSize:10, color:"#94a3b8" }}>
                 {[config.localizacao, config.contacto_email].filter(Boolean).join(' · ')}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { BookOpen, Home, Library, ShieldCheck, Search, MessageCircle, LogOut, Bell, X, FileText, PlayCircle, Sun, Moon } from 'lucide-react';
 import Chatbot from './Chatbot';
@@ -21,7 +21,25 @@ const Layout = ({ usuarioLogado, onLogout }) => {
   const [notifOpen,    setNotifOpen]    = useState(false);
   const [notifMats,    setNotifMats]    = useState([]);
   const [notifLoading, setNotifLoading] = useState(false);
+  const [chatOpen,     setChatOpen]     = useState(false);
   const notifRef = useRef(null);
+  const searchInputRef = useRef(null);
+
+  /* Contexto disponibilizado às páginas filhas (via <Outlet context>) para
+     que possam abrir o assistente de IA flutuante — ex: o atalho no Dashboard. */
+  const outletContext = useMemo(() => ({ openChatbot: () => setChatOpen(true) }), []);
+
+  /* Atalho global Ctrl+K / Cmd+K — foca a pesquisa a partir de qualquer página */
+  useEffect(() => {
+    const handler = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, []);
 
   /* Carrega os 5 materiais mais recentes para as notificações */
   const loadNotifs = async () => {
@@ -268,13 +286,25 @@ const Layout = ({ usuarioLogado, onLogout }) => {
                 >
                   <Search size={17} style={{ color: "var(--text-faint)", flexShrink: 0 }} />
                   <input
+                    ref={searchInputRef}
                     type="text"
                     value={searchTerm}
                     onChange={e => setSearchTerm(e.target.value)}
-                    placeholder="Pesquisar materiais... (Enter)"
+                    placeholder="Pesquisar materiais..."
                     className="bg-transparent outline-none text-sm w-full"
                     style={{ color: "var(--text-heading)" }}
                   />
+                  <kbd
+                    className="hidden sm:inline-flex items-center justify-center shrink-0"
+                    style={{
+                      fontSize: 10, fontWeight: 700, fontFamily: "inherit",
+                      color: "var(--text-faint)", background: "var(--surface-hover)",
+                      border: "1px solid var(--border-subtle-strong)", borderRadius: 6,
+                      padding: "3px 6px", lineHeight: 1,
+                    }}
+                  >
+                    Ctrl K
+                  </kbd>
                 </div>
               </form>
 
@@ -286,6 +316,7 @@ const Layout = ({ usuarioLogado, onLogout }) => {
                 onMouseEnter={e => (e.currentTarget.style.background = "var(--color-navy-mid)", e.currentTarget.style.color = "var(--color-gold)")}
                 onMouseLeave={e => (e.currentTarget.style.background = "var(--surface-card-glass)", e.currentTarget.style.color = "var(--text-muted)")}
                 title={tema === 'escuro' ? 'Mudar para modo claro' : 'Mudar para modo escuro'}
+                aria-label={tema === 'escuro' ? 'Mudar para modo claro' : 'Mudar para modo escuro'}
               >
                 {tema === 'escuro' ? <Sun size={18} /> : <Moon size={18} />}
               </button>
@@ -299,6 +330,7 @@ const Layout = ({ usuarioLogado, onLogout }) => {
                   onMouseEnter={e => (e.currentTarget.style.background = "var(--color-navy-mid)", e.currentTarget.style.color = "var(--color-gold)")}
                   onMouseLeave={e => !notifOpen && (e.currentTarget.style.background = "var(--surface-card-glass)", e.currentTarget.style.color = "var(--text-muted)")}
                   title="Materiais recentes"
+                  aria-label="Ver materiais recentes"
                 >
                   <Bell size={18} />
                 </button>
@@ -310,7 +342,7 @@ const Layout = ({ usuarioLogado, onLogout }) => {
                     <div className="flex items-center justify-between px-5 py-4"
                       style={{ borderBottom: "1px solid rgba(var(--color-navy-mid-rgb),0.07)", background: "linear-gradient(135deg,var(--color-navy-deep),var(--color-navy-mid))" }}>
                       <span style={{ fontSize: 13, fontWeight: 800, color: "#fff" }}>Materiais Recentes</span>
-                      <button onClick={() => setNotifOpen(false)} style={{ color: "rgba(255,255,255,0.50)", background: "none", border: "none", cursor: "pointer" }}>
+                      <button onClick={() => setNotifOpen(false)} aria-label="Fechar notificações" style={{ color: "rgba(255,255,255,0.50)", background: "none", border: "none", cursor: "pointer" }}>
                         <X size={15} />
                       </button>
                     </div>
@@ -366,10 +398,10 @@ const Layout = ({ usuarioLogado, onLogout }) => {
             transparent
           `
         }}>
-          <Outlet />
+          <Outlet context={outletContext} />
         </div>
 
-        {config.ia_activada && <Chatbot usuarioLogado={usuarioLogado} />}
+        {config.ia_activada && <Chatbot usuarioLogado={usuarioLogado} chatOpen={chatOpen} setChatOpen={setChatOpen} />}
       </main>
     </div>
   );

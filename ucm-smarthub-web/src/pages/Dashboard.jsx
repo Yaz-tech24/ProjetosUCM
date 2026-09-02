@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import api, { getFavoritos } from "../services/api";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useOutletContext } from "react-router-dom";
 import {
   Library, PlayCircle, FileText, ChevronRight,
   Sparkles, ArrowRight, MessageCircle, TrendingUp,
@@ -75,6 +75,7 @@ const Dashboard = ({ usuarioLogado }) => {
   const [stats, setStats]               = useState(null);
   const [favMateriais, setFavMateriais] = useState([]);
   const navigate = useNavigate();
+  const { openChatbot } = useOutletContext() || {};
 
   useEffect(() => {
     /* Materiais recentes */
@@ -216,12 +217,12 @@ const Dashboard = ({ usuarioLogado }) => {
       {/* ═══ ACESSO RÁPIDO ═════════════════════════════════════════ */}
       <section className="grid gap-4 sm:grid-cols-3">
         {[
-          { icon: Library,       label: "Repositório",   desc: "Materiais aprovados", path: "/repositorio", bg: "linear-gradient(135deg,var(--color-navy-deep),var(--color-navy-mid))", glow: "rgba(var(--color-navy-mid-rgb),0.40)" },
-          ...(config.chat_activado ? [{ icon: MessageCircle, label: "Chat", desc: "Turma em tempo real", path: "/chat", bg: "linear-gradient(135deg,#0a3d62,var(--color-blue-accent))", glow: "rgba(var(--color-blue-accent-rgb),0.35)" }] : []),
-          ...(config.ia_activada ? [{ icon: Sparkles, label: "Assistente IA", desc: "IA de estudo activa", path: "/repositorio", bg: "linear-gradient(135deg,#3b0764,#7c3aed)", glow: "rgba(124,58,237,0.35)" }] : []),
-        ].map(({ icon: Icon, label, desc, path, bg, glow }) => (
+          { icon: Library,       label: "Repositório",   desc: "Materiais aprovados", onClick: () => navigate("/repositorio"), bg: "linear-gradient(135deg,var(--color-navy-deep),var(--color-navy-mid))", glow: "rgba(var(--color-navy-mid-rgb),0.40)" },
+          ...(config.chat_activado ? [{ icon: MessageCircle, label: "Chat", desc: "Turma em tempo real", onClick: () => navigate("/chat"), bg: "linear-gradient(135deg,#0a3d62,var(--color-blue-accent))", glow: "rgba(var(--color-blue-accent-rgb),0.35)" }] : []),
+          ...(config.ia_activada ? [{ icon: Sparkles, label: "Assistente IA", desc: "IA de estudo activa", onClick: () => openChatbot?.(), bg: "linear-gradient(135deg,#3b0764,#7c3aed)", glow: "rgba(124,58,237,0.35)" }] : []),
+        ].map(({ icon: Icon, label, desc, onClick, bg, glow }) => (
           <button
-            key={label} onClick={() => navigate(path)}
+            key={label} onClick={onClick}
             className="group flex items-center gap-4 rounded-[24px] p-5 text-left transition-all duration-300"
             style={{
               background: "var(--surface-card-glass)",

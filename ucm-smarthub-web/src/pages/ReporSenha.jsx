@@ -44,7 +44,7 @@ const ReporSenha = () => {
         background: `
           radial-gradient(ellipse at 8%  8%,  rgba(var(--color-gold-rgb),.07)   0%, transparent 35%),
           radial-gradient(ellipse at 92% 92%, rgba(0,51,102,.07)    0%, transparent 35%),
-          var(--color-ice)
+          var(--surface-page)
         `,
         padding: "2rem",
       }}
