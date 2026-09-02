@@ -1,4 +1,6 @@
-FROM node:20-bookworm-slim
+# Node 22, não 20: o pacote "cookie" (usado na sessão por cookie httpOnly)
+# exige Node >=22 — com Node 20, "npm ci" falhava a validar o lock file.
+FROM node:22-bookworm-slim
 
 WORKDIR /app
 

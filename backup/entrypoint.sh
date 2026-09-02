@@ -9,4 +9,7 @@ set -e
 env | grep -E '^(DB_NAME|DB_PASSWORD)=' > /etc/backup.env
 chmod 600 /etc/backup.env
 
-exec cron -f
+# O pacote cronie instala o binário como "crond" (com "d"), não "cron", e a
+# flag de "correr em primeiro plano" é "-n", não "-f" (essa é do BusyBox/
+# Debian cron) — confirmado directamente na imagem antes de fechar isto.
+exec crond -n

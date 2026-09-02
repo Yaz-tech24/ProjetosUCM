@@ -17,16 +17,20 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD no .env — sem isto o MySQL arrancaria com password vazia.}
       MYSQL_DATABASE: ${DB_NAME:-ucm_smarthub}
-      # Só para o healthcheck abaixo: os clientes mysql/mysqladmin lêem
-      # MYSQL_PWD automaticamente, o que evita pôr a password como argumento
-      # de "-p..." — visível a qualquer processo que corra "docker inspect"
-      # ou "ps" dentro do container (argv é sempre legível, env var não).
-      MYSQL_PWD: ${DB_PASSWORD}
     volumes:
       - db_data:/var/lib/mysql
       - ./ucm-smarthub-api/init-db:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot"]
+      # MYSQL_PWD só aqui, prefixado inline ao próprio comando do healthcheck
+      # — não no bloco "environment:" acima. Estar lá contaminava também o
+      # processo principal (PID 1, o entrypoint oficial do MySQL), que faz as
+      # suas próprias chamadas internas a mysql/mysqladmin durante o primeiro
+      # arranque (antes de MYSQL_ROOT_PASSWORD estar sequer aplicada) — essas
+      # chamadas herdavam o MYSQL_PWD e enviavam uma password onde o
+      # entrypoint esperava uma ligação sem password, partindo a
+      # inicialização a meio (root ficava permanentemente sem password).
+      # Confirmado ao reproduzir o arranque completo antes de fechar isto.
+      test: ["CMD-SHELL", "MYSQL_PWD=$$MYSQL_ROOT_PASSWORD mysqladmin ping -h localhost -uroot"]
       interval: 10s
       timeout: 5s
       retries: 10
