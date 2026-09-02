@@ -1,0 +1,3 @@
+# Formato do cron de sistema (cronie): min hora dia mês dia-semana utilizador comando
+# Todos os dias às 03:00 — mesma hora sugerida antigamente para o crontab manual.
+0 3 * * * root /usr/local/bin/backup-cron.sh >> /backups/cron.log 2>&1

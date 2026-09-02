@@ -61,13 +61,9 @@ Definir `DOMAIN=localhost` no `.env` e aceder a `https://localhost/` — o Caddy
 
 ### Backups
 
-`./backup-db.sh` cria uma cópia comprimida da base de dados em `backups/` (mantém as últimas 14). Para automatizar diariamente no servidor:
+O serviço `backup` do `docker-compose.yml` corre um cron dentro da própria stack e cria automaticamente, todos os dias às 03:00, uma cópia comprimida da base de dados em `backups/` (mantém as últimas 14) — não é preciso nenhum crontab manual no servidor, basta que a stack esteja de pé (`docker compose up -d`).
 
-```bash
-crontab -e
-# adicionar:
-0 3 * * * cd /caminho/para/o/projecto && ./backup-db.sh >> backups/backup.log 2>&1
-```
+`./backup-db.sh` continua disponível para criar um backup manual/pontual a qualquer momento, na mesma pasta `backups/` e com a mesma política de retenção.
 
 Para restaurar um backup:
 

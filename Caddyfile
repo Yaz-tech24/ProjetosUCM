@@ -1,3 +1,10 @@
+{
+	# Directiva de terceiros (módulo caddy-ratelimit, compilado na imagem
+	# custom em ./caddy/Dockerfile) — o Caddyfile precisa de saber onde a
+	# encaixar na ordem fixa das directivas nativas.
+	order rate_limit before basicauth
+}
+
 {$DOMAIN} {
 	# HTTPS automático (Let's Encrypt) para um domínio público real; para
 	# "localhost" ou um IP, o Caddy usa a sua própria CA interna em vez disso
@@ -9,6 +16,19 @@
 	# API, ficheiros carregados (uploads) e o chat em tempo real (Socket.IO)
 	# ficam todos no mesmo domínio que o frontend — evita CORS por completo.
 	handle /api/* {
+		# Travão básico por IP, à frente do rate limiting já existente ao
+		# nível do Express — não o substitui, é só uma rede de segurança
+		# contra uma inundação de pedidos antes de chegarem ao Node.
+		# 100 pedidos/min é bastante acima do uso normal (a app já limita
+		# com mais precisão dentro do Express) — só corta picos grosseiros.
+		# Requer o módulo mholt/caddy-ratelimit — ver ./caddy/Dockerfile.
+		rate_limit {
+			zone api_zone {
+				key {remote_host}
+				events 100
+				window 1m
+			}
+		}
 		reverse_proxy api:5000
 	}
 	handle /uploads/* {

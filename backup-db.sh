@@ -4,8 +4,10 @@
 #
 # Para restaurar: gunzip -c backups/ficheiro.sql.gz | docker compose exec -T db mysql -uroot -p"$DB_PASSWORD" "$DB_NAME"
 #
-# Sugestão para automatizar diariamente (crontab -e no servidor):
-#   0 3 * * * cd /caminho/para/o/projecto && ./backup-db.sh >> backups/backup.log 2>&1
+# A agenda diária já corre sozinha dentro da própria stack — ver o serviço
+# "backup" no docker-compose.yml (backup/Dockerfile, backup/crontab), que
+# faz exactamente isto às 03:00 todos os dias, sem precisar de crontab no
+# host. Este script continua disponível para backups manuais/pontuais.
 
 set -e
 cd "$(dirname "$0")"

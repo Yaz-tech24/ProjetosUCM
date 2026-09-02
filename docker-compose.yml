@@ -1,3 +1,15 @@
+# Nota sobre "deploy.resources.limits": confirmado empiricamente (Docker
+# Compose v2, CLI "docker compose", fora do modo swarm) que estes limites
+# SÃO aplicados directamente ao container por "docker compose up" — não é
+# preciso "docker stack deploy" nem swarm activo. Os valores abaixo são
+# pontos de partida conservadores para uma VPS pequena; ajuste-os ao
+# hardware real do servidor onde isto correr.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   db:
     image: mysql:8
@@ -5,14 +17,25 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD no .env — sem isto o MySQL arrancaria com password vazia.}
       MYSQL_DATABASE: ${DB_NAME:-ucm_smarthub}
+      # Só para o healthcheck abaixo: os clientes mysql/mysqladmin lêem
+      # MYSQL_PWD automaticamente, o que evita pôr a password como argumento
+      # de "-p..." — visível a qualquer processo que corra "docker inspect"
+      # ou "ps" dentro do container (argv é sempre legível, env var não).
+      MYSQL_PWD: ${DB_PASSWORD}
     volumes:
       - db_data:/var/lib/mysql
       - ./ucm-smarthub-api/init-db:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${DB_PASSWORD}"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot"]
       interval: 10s
       timeout: 5s
       retries: 10
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+    logging: *default-logging
 
   api:
     build: ./ucm-smarthub-api
@@ -45,6 +68,12 @@ services:
     # Se preferir expor a API directamente (sem o Caddy à frente), descomente:
     # ports:
     #   - "5000:5000"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+    logging: *default-logging
 
   web:
     build:
@@ -57,9 +86,27 @@ services:
     # Sem "ports": servido através do Caddy, não publicado directamente.
     # ports:
     #   - "80:80"
+    # Mesmo healthcheck já definido na imagem (ucm-smarthub-web/Dockerfile) —
+    # repetido aqui para ficar visível/ajustável ao nível do compose, como
+    # já acontece com "db" e "caddy".
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:80 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+    logging: *default-logging
 
   caddy:
-    image: caddy:2-alpine
+    # Imagem custom (./caddy/Dockerfile) em vez de "caddy:2-alpine" — só
+    # acrescenta o módulo caddy-ratelimit para o travão por IP em /api/*
+    # no Caddyfile (ver comentários lá). Testado com "caddy validate".
+    build: ./caddy
     restart: unless-stopped
     depends_on:
       - api
@@ -79,6 +126,36 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+    logging: *default-logging
+
+  backup:
+    # Backups diários automáticos, dentro da própria stack — substitui a
+    # sugestão antiga de crontab manual no host (ver backup/README abaixo
+    # e comentário em backup-db.sh). Liga-se directamente ao "db" via
+    # mysqldump; não precisa do socket Docker nem de exec noutro container.
+    build: ./backup
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_NAME: ${DB_NAME:-ucm_smarthub}
+      DB_PASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD no .env.}
+    volumes:
+      # Mesma pasta usada pelo backup-db.sh manual — os 14 backups mais
+      # recentes (de qualquer uma das duas origens) são mantidos.
+      - ./backups:/backups
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
+    logging: *default-logging
 
 volumes:
   db_data:

@@ -8,3 +8,5 @@
 # sejam commitados a partir do Windows, senão o shebang (#!/bin/sh) falha.
 *.sh text eol=lf
 Caddyfile text eol=lf
+Dockerfile text eol=lf
+backup/crontab text eol=lf
