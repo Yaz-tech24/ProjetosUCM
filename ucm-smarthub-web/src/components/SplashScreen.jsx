@@ -115,7 +115,7 @@ const SplashScreen = ({ onDone }) => {
 
       {/* Conteúdo principal */}
       <div
-        className="relative flex flex-col items-center gap-8"
+        className="relative flex flex-col items-center gap-5 sm:gap-8 px-6 w-full max-w-md"
         style={{
           opacity:   visible ? 1 : 0,
           transform: visible ? "translateY(0)" : "translateY(20px)",
@@ -123,13 +123,16 @@ const SplashScreen = ({ onDone }) => {
         }}
       >
         {/* Logo com anéis rotativos */}
-        <div className="relative flex items-center justify-center">
+        <div
+          className="relative flex items-center justify-center"
+          style={{ "--logo-size": "clamp(56px, min(16vw, 16vh), 88px)" }}
+        >
 
           {/* Anel externo — rotação lenta */}
           <div
             className="absolute rounded-full border border-dashed"
             style={{
-              width: 144, height: 144,
+              width: "calc(var(--logo-size) * 1.636)", height: "calc(var(--logo-size) * 1.636)",
               borderColor: "rgba(var(--color-gold-rgb),0.20)",
               animation: "spin-slow 12s linear infinite",
             }}
@@ -139,7 +142,7 @@ const SplashScreen = ({ onDone }) => {
           <div
             className="absolute rounded-full border"
             style={{
-              width: 120, height: 120,
+              width: "calc(var(--logo-size) * 1.364)", height: "calc(var(--logo-size) * 1.364)",
               borderColor: "rgba(var(--color-blue-sky-rgb),0.18)",
               borderStyle: "dashed",
               animation: "spin-reverse 8s linear infinite",
@@ -150,30 +153,32 @@ const SplashScreen = ({ onDone }) => {
           <div
             className="absolute rounded-full border border-[var(--color-gold)]/25"
             style={{
-              width: 104, height: 104,
+              width: "calc(var(--logo-size) * 1.182)", height: "calc(var(--logo-size) * 1.182)",
               animation: "ring-pulse 2.2s ease-in-out infinite",
             }}
           />
 
           {/* Ícone central */}
           <div
-            className="relative w-[88px] h-[88px] rounded-[26px] grid place-items-center text-[var(--color-navy)]"
+            className="relative rounded-[22%] grid place-items-center text-[var(--color-navy)]"
             style={{
+              width: "var(--logo-size)", height: "var(--logo-size)",
               background: "linear-gradient(135deg, var(--color-gold-dark) 0%, var(--color-gold) 50%, var(--color-gold-light) 100%)",
               animation: "glow-logo 2.5s ease-in-out infinite",
             }}
           >
             {config.logo_url
-              ? <img src={config.logo_url} alt={config.nome_plataforma} className="w-full h-full object-contain rounded-[26px]" />
-              : <BookOpen size={42} strokeWidth={1.6} />}
+              ? <img src={config.logo_url} alt={config.nome_plataforma} className="w-full h-full object-contain rounded-[22%]" />
+              : <BookOpen className="w-1/2 h-1/2" strokeWidth={1.6} />}
           </div>
         </div>
 
         {/* Marca */}
-        <div className="text-center space-y-2" style={{ animation: "fade-up 0.6s 0.2s both" }}>
+        <div className="text-center space-y-2 w-full" style={{ animation: "fade-up 0.6s 0.2s both" }}>
           <h1
-            className="text-[3.4rem] font-black text-white tracking-tight leading-none"
+            className="font-black text-white tracking-tight leading-none break-words"
             style={{
+              fontSize: "clamp(1.9rem, 7vw, 3.4rem)",
               textShadow: "0 0 50px rgba(var(--color-gold-rgb),0.30)",
               fontFamily: "Inter, sans-serif",
             }}
@@ -181,14 +186,14 @@ const SplashScreen = ({ onDone }) => {
             {config.nome_plataforma}
           </h1>
           {config.tagline && (
-            <p className="text-sm font-light tracking-widest" style={{ color: "rgba(var(--color-blue-sky-rgb),0.55)" }}>
+            <p className="text-xs sm:text-sm font-light tracking-widest break-words px-2" style={{ color: "rgba(var(--color-blue-sky-rgb),0.55)" }}>
               {config.tagline}
             </p>
           )}
         </div>
 
         {/* Barra de progresso premium */}
-        <div className="flex flex-col items-center gap-3 w-56" style={{ animation: "fade-up 0.6s 0.4s both" }}>
+        <div className="flex flex-col items-center gap-3 w-full max-w-[14rem]" style={{ animation: "fade-up 0.6s 0.4s both" }}>
           <div
             className="w-full h-[5px] rounded-full overflow-hidden"
             style={{ background: "rgba(255,255,255,0.10)" }}
@@ -206,7 +211,7 @@ const SplashScreen = ({ onDone }) => {
             />
           </div>
           <p
-            className="text-[10px] font-mono uppercase tracking-[0.5em]"
+            className="text-[9px] sm:text-[10px] font-mono uppercase tracking-[0.4em] sm:tracking-[0.5em] text-center"
             style={{ color: "rgba(var(--color-blue-sky-rgb),0.35)" }}
           >
             A iniciar sistema...
@@ -214,9 +219,9 @@ const SplashScreen = ({ onDone }) => {
         </div>
       </div>
 
-      {/* Rodapé */}
+      {/* Rodapé — oculto em ecrãs muito baixos (ex: telemóvel em paisagem) para não sobrepor o conteúdo */}
       <p
-        className="absolute bottom-8 text-[10px] font-medium tracking-widest"
+        className="hidden [@media(min-height:420px)]:block absolute bottom-4 sm:bottom-8 text-[9px] sm:text-[10px] font-medium tracking-widest text-center px-4"
         style={{ color: "rgba(255,255,255,0.15)" }}
       >
         © {new Date().getFullYear()} {config.nome_plataforma}
