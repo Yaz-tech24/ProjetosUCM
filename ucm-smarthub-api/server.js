@@ -23,6 +23,7 @@ const swaggerUi = require("swagger-ui-express");
 const db = require("./config/db");
 const swaggerSpec = require("./swagger");
 const { genAI } = require("./services/ia");
+const { autenticar, apenasAdmin } = require("./middleware/auth");
 
 const app = express();
 const server = http.createServer(app);
@@ -66,7 +67,10 @@ app.use(helmet({
 app.use(compression());
 app.use(express.json());
 app.use(cookieParser());
-app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec, { customSiteTitle: "SmartHub API — Documentação" }));
+// Só admins — o schema completo (incluindo rotas de moderação/gestão de
+// utilizadores) não deve ficar publicamente indexável/descobrível numa
+// plataforma em produção com dados reais de estudantes.
+app.use("/api/docs", autenticar, apenasAdmin, swaggerUi.serve, swaggerUi.setup(swaggerSpec, { customSiteTitle: "SmartHub API — Documentação" }));
 
 // Serve ficheiros da pasta uploads
 // X-Frame-Options: SAMEORIGIN (definido pelo helmet acima) bloqueia o
@@ -164,6 +168,34 @@ async function runMigrations() {
     await db.query(`ALTER TABLE configuracoes ADD COLUMN dominios_email_permitidos VARCHAR(255) NULL`);
   } catch {
     // Coluna já existe — ignorar
+  }
+  // Cache do resumo por IA — sem isto, abrir o mesmo material duas vezes (ou só
+  // recarregar a página) reextraía o PDF e pagava outra chamada ao Gemini para
+  // devolver exactamente o mesmo texto. Só se gera de novo quando o utilizador
+  // pede explicitamente ("Regenerar resumo").
+  try {
+    await db.query(`ALTER TABLE materiais ADD COLUMN resumo_texto MEDIUMTEXT NULL`);
+  } catch {
+    // Coluna já existe — ignorar
+  }
+  try {
+    await db.query(`ALTER TABLE materiais ADD COLUMN resumo_gerado_em DATETIME NULL`);
+  } catch {
+    // Coluna já existe — ignorar
+  }
+
+  // Índices — quase todas as leituras de materiais filtram por status e ordenam
+  // por data_upload, e o histórico/moderação de chat filtra por curso e ordena
+  // por timestamp; sem índice, cada uma dessas consultas varre a tabela inteira.
+  try {
+    await db.query(`CREATE INDEX idx_materiais_status_data ON materiais (status, data_upload)`);
+  } catch {
+    // Índice já existe — ignorar
+  }
+  try {
+    await db.query(`CREATE INDEX idx_mensagens_curso_timestamp ON mensagens_estudantes (curso, timestamp)`);
+  } catch {
+    // Índice já existe — ignorar
   }
 
   await db.query(`

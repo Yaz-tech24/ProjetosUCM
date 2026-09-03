@@ -157,3 +157,41 @@ describe("DELETE /api/materiais/:id", () => {
     expect(res.status).toBe(200);
   });
 });
+
+describe("GET /api/materiais/:id/resumo", () => {
+  beforeEach(() => { vi.restoreAllMocks(); });
+
+  it("rejeita pedidos sem autenticação", async () => {
+    const res = await request(app).get("/api/materiais/1/resumo");
+    expect(res.status).toBe(401);
+  });
+
+  it("devolve 503 quando os resumos por IA estão desactivados", async () => {
+    mockSql([[/FROM configuracoes/, [[{ ia_activada: false }]]]]);
+    const res = await request(app).get("/api/materiais/1/resumo").set("Authorization", `Bearer ${tokenEstudante}`);
+    expect(res.status).toBe(503);
+  });
+
+  it("devolve 404 quando o material não existe ou não está aprovado", async () => {
+    mockSql([
+      [/FROM configuracoes/, [[{ ia_activada: true }]]],
+      [/FROM materiais m/, [[]]],
+    ]);
+    const res = await request(app).get("/api/materiais/999/resumo").set("Authorization", `Bearer ${tokenEstudante}`);
+    expect(res.status).toBe(404);
+  });
+
+  // Determinístico em qualquer ambiente: um resumo em cache é devolvido sem
+  // sequer chegar à chamada à IA, por isso não depende de GEMINI_API_KEY estar
+  // configurada (ao contrário do caminho de geração, coberto por
+  // rotas-chat-ia.test.js apenas até ao ponto comum a todos os ambientes).
+  it("devolve o resumo em cache sem gerar um novo", async () => {
+    mockSql([
+      [/FROM configuracoes/, [[{ ia_activada: true }]]],
+      [/FROM materiais m/, [[{ id: 1, titulo: "T", cadeira: "Geral", tipo: "PDF", url_arquivo: "/uploads/x.pdf", resumo_texto: "Resumo já em cache.", autor: "Ana" }]]],
+    ]);
+    const res = await request(app).get("/api/materiais/1/resumo").set("Authorization", `Bearer ${tokenEstudante}`);
+    expect(res.status).toBe(200);
+    expect(res.body.resumo).toBe("Resumo já em cache.");
+  });
+});

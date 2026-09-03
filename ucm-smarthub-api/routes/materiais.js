@@ -150,21 +150,25 @@ module.exports = function registarRotasMateriais(app) {
    * @openapi
    * /api/materiais/{id}/resumo:
    *   get:
-   *     summary: Gera (ou devolve) o resumo por IA de um material
+   *     summary: Gera (ou devolve do cache) o resumo por IA de um material
    *     tags: [Materiais]
    *     parameters:
    *       - in: path
    *         name: id
    *         required: true
    *         schema: { type: integer }
+   *       - in: query
+   *         name: forcar
+   *         schema: { type: string, enum: ["true"] }
+   *         description: Ignora o cache e gera um resumo novo (usado pelo botão "Regenerar resumo").
    *     responses:
    *       200: { description: Resumo gerado, content: { application/json: { schema: { type: object, properties: { resumo: { type: string } } } } } }
    *       404: { description: Material não encontrado }
    *       503: { description: IA desactivada pelo administrador }
    */
-  // limitarChat aqui também: esta rota volta a extrair o PDF e a chamar o Gemini a
-  // cada pedido (sem cache), tal como as rotas de chat — sem limite, "Regenerar
-  // resumo" podia ser martelado num loop apertado a custo real e ilimitado.
+  // limitarChat aqui também: gerar (não devolver do cache) volta a extrair o PDF
+  // e a chamar o Gemini — sem limite, "Regenerar resumo" podia ser martelado
+  // num loop apertado a custo real e ilimitado.
   app.get("/api/materiais/:id/resumo", autenticar, limitarChat, async (req, res) => {
     try {
       const config = await getConfiguracoes();
@@ -174,7 +178,7 @@ module.exports = function registarRotasMateriais(app) {
 
       const materialId = parseInt(req.params.id, 10);
       const [resultado] = await db.query(
-        `SELECT m.id, m.titulo, m.cadeira, m.tipo, m.url_arquivo, u.nome AS autor
+        `SELECT m.id, m.titulo, m.cadeira, m.tipo, m.url_arquivo, m.resumo_texto, u.nome AS autor
          FROM materiais m
          JOIN usuarios u ON m.autor_id = u.id
          WHERE m.status = 'aprovado' AND m.id = ?`,
@@ -186,6 +190,15 @@ module.exports = function registarRotasMateriais(app) {
       }
 
       const material = resultado[0];
+
+      // Cache: o mesmo material devolve o mesmo resumo enquanto ninguém pedir
+      // explicitamente para o regenerar — poupa reextrair o PDF e pagar outra
+      // chamada ao Gemini de cada vez que alguém simplesmente abre a página.
+      const forcarRegeneracao = req.query.forcar === "true";
+      if (material.resumo_texto && !forcarRegeneracao) {
+        return res.status(200).json({ resumo: material.resumo_texto });
+      }
+
       let resumoTexto = "";
 
       if (material.tipo === "PDF") {
@@ -311,6 +324,13 @@ Responde APENAS com as 3 notas numeradas. Sem introdução, sem conclusão.`;
 
         resumoTexto = await gerarResumoIA(promptResumo, fallback);
       }
+
+      // Best-effort: uma falha a guardar o cache não deve impedir a resposta
+      // de chegar ao estudante, só significa que a próxima visita gera de novo.
+      db.query(
+        "UPDATE materiais SET resumo_texto = ?, resumo_gerado_em = NOW() WHERE id = ?",
+        [resumoTexto, materialId]
+      ).catch(erroCache => console.error("Erro ao guardar cache do resumo:", erroCache.message));
 
       res.status(200).json({ resumo: resumoTexto });
     } catch (erro) {

@@ -113,7 +113,7 @@ const Visualizador = ({ usuarioLogado }) => {
     return () => controller.abort();
   }, [id]);
 
-  const fetchSummary = useCallback(async () => {
+  const fetchSummary = useCallback(async (forcar = false) => {
     if (!material) return;
     summaryAbortRef.current?.abort();
     const controller = new AbortController();
@@ -121,7 +121,9 @@ const Visualizador = ({ usuarioLogado }) => {
     setSummaryLoading(true);
     setSummaryError(null);
     try {
-      const res = await api.get(`/materiais/${id}/resumo`, { signal: controller.signal });
+      // Sem forcar: o backend devolve o resumo já gerado antes (cache), se existir
+      // — só recalcula (e volta a pagar a IA) quando o utilizador pede "Regenerar".
+      const res = await api.get(`/materiais/${id}/resumo${forcar ? '?forcar=true' : ''}`, { signal: controller.signal });
       setSummary(res.data.resumo || 'Resumo não disponível.');
     } catch (err) {
       if (err.code === 'ERR_CANCELED' || err.name === 'CanceledError' || err.name === 'AbortError') return;
@@ -423,7 +425,7 @@ const Visualizador = ({ usuarioLogado }) => {
                 </div>
               </div>
               <button
-                onClick={fetchSummary}
+                onClick={() => fetchSummary(true)}
                 disabled={summaryLoading}
                 className="w-10 h-10 rounded-xl grid place-items-center transition-all duration-200 disabled:opacity-40"
                 style={{ background: "rgba(255,255,255,0.09)", border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.55)" }}
@@ -450,7 +452,7 @@ const Visualizador = ({ usuarioLogado }) => {
                 <div className="flex flex-col items-center gap-3 text-center py-8 rounded-[18px]"
                   style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>
                   <p style={{ fontSize: 14, color: "#fca5a5", lineHeight: 1.65 }}>{summaryError}</p>
-                  <button onClick={fetchSummary}
+                  <button onClick={() => fetchSummary()}
                     className="rounded-xl px-4 py-2 text-xs font-bold transition-all"
                     style={{ background: "rgba(255,255,255,0.10)", border: "1px solid rgba(255,255,255,0.18)", color: "rgba(255,255,255,0.70)" }}
                     onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.18)"}

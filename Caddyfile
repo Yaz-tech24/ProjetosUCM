@@ -47,5 +47,10 @@
 		X-Frame-Options "SAMEORIGIN"
 		X-Content-Type-Options "nosniff"
 		Referrer-Policy "strict-origin-when-cross-origin"
+		# O helmet do Express só aplica HSTS às respostas de /api e /uploads —
+		# a app (HTML/JS servido pelo nginx em web:80) nunca a recebia. Aqui,
+		# fora de qualquer "handle", aplica-se a toda a resposta deste site
+		# block, frontend incluído.
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 	}
 }

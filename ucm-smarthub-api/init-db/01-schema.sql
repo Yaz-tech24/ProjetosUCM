@@ -37,8 +37,11 @@ CREATE TABLE IF NOT EXISTS materiais (
   status         VARCHAR(20) DEFAULT 'pendente',
   ia_sinalizado  TINYINT(1) NOT NULL DEFAULT 0,
   ia_motivo      TEXT,
+  resumo_texto     MEDIUMTEXT DEFAULT NULL,
+  resumo_gerado_em DATETIME DEFAULT NULL,
   PRIMARY KEY (id),
   KEY autor_id (autor_id),
+  KEY idx_materiais_status_data (status, data_upload),
   CONSTRAINT materiais_ibfk_1 FOREIGN KEY (autor_id) REFERENCES usuarios (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -50,5 +53,6 @@ CREATE TABLE IF NOT EXISTS mensagens_estudantes (
   curso       VARCHAR(100) NOT NULL DEFAULT 'Geral',
   PRIMARY KEY (id),
   KEY user_id (user_id),
+  KEY idx_mensagens_curso_timestamp (curso, `timestamp`),
   CONSTRAINT mensagens_estudantes_ibfk_1 FOREIGN KEY (user_id) REFERENCES usuarios (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
