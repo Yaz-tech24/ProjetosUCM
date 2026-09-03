@@ -3,7 +3,7 @@ const cookie = require("cookie");
 
 const db = require("../config/db");
 const { getConfiguracoes } = require("../services/plataforma");
-const { genAI } = require("../services/ia");
+const { genAI, gerarResumoIA } = require("../services/ia");
 const { autenticar, apenasAdmin, JWT_SECRET } = require("../middleware/auth");
 const { limitarChat } = require("../middleware/rateLimiters");
 const { analisarMensagem, mensagemAviso } = require("../utils/filtroChat");
@@ -110,10 +110,13 @@ Contexto da sessão:
 
 Pergunta do estudante: ${mensagem}`;
 
-      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-
-      const result = await model.generateContent(prompt);
-      const resposta = result.response.text();
+      // gerarResumoIA tenta vários modelos por ordem (ver GEMINI_MODELS em services/ia.js)
+      // em vez de um único modelo fixo — um modelo específico a falhar (quota, descontinuado,
+      // instabilidade pontual da Google) já não derruba o assistente inteiro, ao contrário
+      // do que acontecia aqui antes com uma chamada directa a "gemini-2.5-flash" sem rede
+      // de segurança nenhuma.
+      const fallback = "Não consegui obter uma resposta neste momento. Tente novamente dentro de instantes.";
+      const resposta = await gerarResumoIA(prompt, fallback);
       res.status(200).json({ resposta });
     } catch (erro) {
       console.error("Erro na IA chat:", erro.message);

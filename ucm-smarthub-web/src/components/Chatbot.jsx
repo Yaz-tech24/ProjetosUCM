@@ -89,8 +89,9 @@ const Chatbot = ({ usuarioLogado, chatOpen: chatOpenProp, setChatOpen: setChatOp
       const botText = res.data.resposta;
       setChatMessages(prev => [...prev, { sender: "bot", text: botText }]);
       speakText(botText);
-    } catch {
-      setChatMessages(prev => [...prev, { sender: "bot", text: "Não consegui obter resposta neste momento. Verifica a ligação ou tenta de novo em alguns segundos." }]);
+    } catch (err) {
+      const erroTexto = err.response?.data?.erro || "Não consegui obter resposta neste momento. Verifica a ligação ou tenta de novo em alguns segundos.";
+      setChatMessages(prev => [...prev, { sender: "bot", text: erroTexto }]);
     } finally {
       setIsTyping(false);
     }
