@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import api, { isFavorito, toggleFavorito } from "../services/api";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, ExternalLink, DownloadCloud, Sparkles, RotateCcw, Heart, Share2, Trash2 } from "lucide-react";
+import { ArrowLeft, ExternalLink, DownloadCloud, Sparkles, RotateCcw, Heart, Share2, Trash2, Send, MessageCircle } from "lucide-react";
 import { useConfig } from "../context/ConfigContext";
 import Toast from "../components/Toast";
 
@@ -86,8 +86,12 @@ const Visualizador = ({ usuarioLogado }) => {
   const [confirmRemover, setConfirmRemover] = useState(false);
   const [removendo,      setRemovendo]      = useState(false);
   const [toast,          setToast]          = useState({ message: '', type: '' });
+  const [chatMessages,   setChatMessages]   = useState([]);
+  const [chatInput,      setChatInput]      = useState('');
+  const [chatEnviando,   setChatEnviando]   = useState(false);
 
   const summaryAbortRef = useRef(null);
+  const chatEndRef      = useRef(null);
 
   /* AbortController evita que uma resposta antiga (de um "id" anterior, se o
      utilizador navegar rapidamente entre materiais) sobrescreva o estado actual. */
@@ -131,6 +135,32 @@ const Visualizador = ({ usuarioLogado }) => {
 
   /* Cancela o pedido de resumo em curso ao desmontar (ex: utilizador navega para outra página). */
   useEffect(() => () => summaryAbortRef.current?.abort(), []);
+
+  /* Limpa a conversa ao trocar de material — perguntas sobre o PDF anterior não
+     fazem sentido a seguir a uma navegação para outro documento. */
+  useEffect(() => { setChatMessages([]); setChatInput(''); }, [id]);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [chatMessages, chatEnviando]);
+
+  const handleEnviarChat = async (e) => {
+    e.preventDefault();
+    const texto = chatInput.trim();
+    if (!texto || chatEnviando) return;
+    setChatMessages(prev => [...prev, { autor: 'utilizador', texto }]);
+    setChatInput('');
+    setChatEnviando(true);
+    try {
+      const res = await api.post(`/materiais/${id}/chat`, { mensagem: texto });
+      setChatMessages(prev => [...prev, { autor: 'ia', texto: res.data.resposta }]);
+    } catch (err) {
+      const erroTexto = err.response?.data?.erro || 'Não foi possível responder agora. Tente novamente.';
+      setChatMessages(prev => [...prev, { autor: 'ia', texto: erroTexto }]);
+    } finally {
+      setChatEnviando(false);
+    }
+  };
 
   const handleToggleFav = () => {
     const novo = toggleFavorito(material.id);
@@ -438,6 +468,69 @@ const Visualizador = ({ usuarioLogado }) => {
                 </div>
               )}
             </div>
+
+            {/* Chat de acompanhamento — perguntas dirigidas à IA sobre este material específico */}
+            {summary && !summaryLoading && !summaryError && (
+              <div style={{ marginTop: 20, paddingTop: 18, borderTop: "1px solid rgba(255,255,255,0.10)" }}>
+                <div className="flex items-center gap-2 mb-3">
+                  <MessageCircle size={14} style={{ color: "var(--color-gold)" }} />
+                  <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.30em", color: "rgba(var(--color-blue-sky-rgb),0.55)", textTransform: "uppercase" }}>
+                    Perguntar à IA sobre este material
+                  </p>
+                </div>
+
+                {chatMessages.length > 0 && (
+                  <div
+                    className="space-y-2.5 overflow-y-auto pr-1 mb-3"
+                    style={{ maxHeight: 260, scrollbarWidth: "thin", scrollbarColor: "rgba(255,255,255,0.12) transparent" }}
+                  >
+                    {chatMessages.map((msg, i) => (
+                      <div key={i} style={{ display: "flex", justifyContent: msg.autor === 'utilizador' ? "flex-end" : "flex-start" }}>
+                        <div
+                          className="max-w-[88%] px-3.5 py-2.5 rounded-2xl"
+                          style={msg.autor === 'utilizador'
+                            ? { background: "rgba(255,255,255,0.14)", color: "#fff", fontSize: 13, lineHeight: 1.6, borderBottomRightRadius: 5 }
+                            : { background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", color: "rgba(226,232,240,0.90)", fontSize: 13, lineHeight: 1.65, borderBottomLeftRadius: 5, whiteSpace: "pre-wrap" }
+                          }
+                        >
+                          {msg.texto}
+                        </div>
+                      </div>
+                    ))}
+                    {chatEnviando && (
+                      <div className="flex items-center gap-2" style={{ padding: "2px 2px" }}>
+                        <div className="w-3.5 h-3.5 rounded-full border-2 animate-spin" style={{ borderColor: "rgba(255,255,255,0.15)", borderTopColor: "var(--color-gold)" }} />
+                        <span style={{ fontSize: 12, color: "rgba(var(--color-blue-sky-rgb),0.45)" }}>A pensar...</span>
+                      </div>
+                    )}
+                    <div ref={chatEndRef} />
+                  </div>
+                )}
+
+                <form onSubmit={handleEnviarChat} className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={chatInput}
+                    onChange={e => setChatInput(e.target.value)}
+                    placeholder="Ex: explica melhor o segundo conceito..."
+                    disabled={chatEnviando}
+                    className="flex-1 px-3.5 py-2.5 rounded-xl text-sm outline-none transition-all duration-200"
+                    style={{ background: "rgba(255,255,255,0.08)", border: "1.5px solid rgba(255,255,255,0.12)", color: "#fff" }}
+                    onFocus={e => (e.target.style.borderColor = "var(--color-gold)", e.target.style.background = "rgba(255,255,255,0.12)")}
+                    onBlur={e => (e.target.style.borderColor = "rgba(255,255,255,0.12)", e.target.style.background = "rgba(255,255,255,0.08)")}
+                  />
+                  <button
+                    type="submit"
+                    disabled={chatEnviando || !chatInput.trim()}
+                    className="w-10 h-10 rounded-xl grid place-items-center transition-all duration-200 disabled:opacity-40 shrink-0"
+                    style={{ background: "linear-gradient(135deg,var(--color-gold-dark),var(--color-gold))", color: "var(--color-navy-deep)", boxShadow: "0 4px 16px rgba(var(--color-gold-rgb),0.35)" }}
+                    aria-label="Enviar pergunta"
+                  >
+                    <Send size={15} />
+                  </button>
+                </form>
+              </div>
+            )}
 
             <p style={{ fontSize: 11, color: "rgba(var(--color-blue-sky-rgb),0.28)", marginTop: 14, textAlign: "center", lineHeight: 1.5 }}>
               Gerado por IA Gemini · {config.nome_plataforma}

@@ -46,6 +46,38 @@ module.exports = function registarRotasChat(app, io) {
       const utilizadorNome = req.utilizador?.nome || "estudante";
       const utilizadorCurso = req.utilizador?.curso || "";
       const dataHoje = new Date().toLocaleDateString("pt-PT", { weekday: "long", day: "numeric", month: "long" });
+
+      // Contexto do repositório — dá à IA visibilidade sobre o que realmente existe
+      // na plataforma, para poder apontar/recomendar materiais reais em vez de
+      // inventar títulos. Prioriza a disciplina do estudante; completa com os mais
+      // recentes de toda a plataforma se houver poucos resultados nessa disciplina.
+      let materiaisContexto = [];
+      try {
+        if (utilizadorCurso) {
+          const [porCurso] = await db.query(
+            `SELECT titulo, cadeira, tipo FROM materiais
+             WHERE status = 'aprovado' AND cadeira = ?
+             ORDER BY data_upload DESC LIMIT 12`,
+            [utilizadorCurso]
+          );
+          materiaisContexto = porCurso;
+        }
+        if (materiaisContexto.length < 6) {
+          const [recentes] = await db.query(
+            `SELECT titulo, cadeira, tipo FROM materiais
+             WHERE status = 'aprovado'
+             ORDER BY data_upload DESC LIMIT 12`
+          );
+          const titulosExistentes = new Set(materiaisContexto.map(m => m.titulo));
+          materiaisContexto = materiaisContexto.concat(recentes.filter(m => !titulosExistentes.has(m.titulo)));
+        }
+      } catch (erroRepo) {
+        console.error("Erro ao carregar contexto do repositório para o chat:", erroRepo.message);
+      }
+      const listaMateriais = materiaisContexto.length > 0
+        ? materiaisContexto.slice(0, 15).map(m => `- [${m.tipo}] "${m.titulo}" — ${m.cadeira}`).join("\n")
+        : "(Repositório vazio de momento.)";
+
       const prompt = `És o assistente académico de IA oficial da plataforma "${config.nome_plataforma}".
 
 Identidade e tom:
@@ -54,14 +86,20 @@ Identidade e tom:
 - Português europeu, linguagem académica mas acessível
 
 Capacidades:
-- Explicar conceitos de qualquer disciplina com clareza e exemplos concretos
-- Para exercícios matemáticos, físicos ou técnicos: mostra os passos intermédios
+- Explicar conceitos de qualquer disciplina com profundidade real e exemplos concretos
+- Para exercícios matemáticos, físicos ou técnicos: mostra sempre os passos intermédios, não só o resultado
 - Sugerir métodos de estudo, técnicas de memorização e preparação para exames
 - Orientar na estrutura de trabalhos académicos e relatórios
+- Apontar materiais concretos do repositório da plataforma quando forem relevantes para a pergunta
+
+Materiais actualmente disponíveis no repositório (usa APENAS estes ao recomendar ou referir materiais existentes — nunca inventes títulos, autores ou materiais que não estejam nesta lista; se nada aqui for relevante, diz isso claramente):
+${listaMateriais}
 
 Regras de resposta:
-- Extensão: máximo 5 frases corridas OU uma lista de 3 pontos numerados — escolhe o formato mais adequado à pergunta
-- Vai sempre directo ao essencial — sem introduções, sem "Claro que sim!", sem despedidas
+- Explica com a profundidade que a pergunta merece — parágrafos completos, exemplos e, em exercícios, todos os passos do raciocínio; não cortes por brevidade artificial
+- Usa listas numeradas ou com marcadores quando isso tornar a resposta mais clara de seguir
+- Só sê curto quando a pergunta for genuinamente simples (ex: uma definição de uma linha) — nesses casos não estiques a resposta à força
+- Vai directo ao essencial — sem introduções tipo "Claro que sim!", sem despedidas
 - Se não souberes algo com certeza, diz claramente e indica onde pesquisar
 - Nunca inventes factos, datas, autores ou resultados
 - Evita emojis — usa linguagem para transmitir energia e precisão

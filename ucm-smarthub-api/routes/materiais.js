@@ -8,6 +8,7 @@ const { genAI, extractPdfText, gerarResumoIA, verificarConformidadeIA } = requir
 const { paraUrlAbsoluto } = require("../utils/urls");
 const validar = require("../middleware/validar");
 const { autenticar, apenasAdmin } = require("../middleware/auth");
+const { limitarChat } = require("../middleware/rateLimiters");
 const { uploadsDir, upload } = require("../middleware/upload");
 const { schemaMaterial } = require("../schemas");
 
@@ -312,6 +313,102 @@ Responde APENAS com as 3 notas numeradas. Sem introdução, sem conclusão.`;
     } catch (erro) {
       console.error("Erro ao gerar resumo:", erro.message);
       res.status(500).json({ erro: "Falha ao gerar resumo do material." });
+    }
+  });
+
+  /**
+   * @openapi
+   * /api/materiais/{id}/chat:
+   *   post:
+   *     summary: Pergunta de acompanhamento à IA sobre um material específico (baseada no resumo/conteúdo)
+   *     tags: [Materiais]
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema: { type: integer }
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema: { type: object, required: [mensagem], properties: { mensagem: { type: string } } }
+   *     responses:
+   *       200: { description: Resposta da IA, content: { application/json: { schema: { type: object, properties: { resposta: { type: string } } } } } }
+   *       404: { description: Material não encontrado }
+   *       429: { description: Demasiados pedidos }
+   *       503: { description: IA desactivada ou não configurada }
+   */
+  // Reaproveita o limitador do assistente geral — cada pergunta aqui custa o mesmo à
+  // API do Gemini que uma mensagem no chatbot flutuante.
+  app.post("/api/materiais/:id/chat", autenticar, limitarChat, async (req, res) => {
+    try {
+      const { mensagem } = req.body;
+      if (!mensagem || !mensagem.trim()) {
+        return res.status(400).json({ erro: "Mensagem em falta." });
+      }
+
+      const config = await getConfiguracoes();
+      if (!config.ia_activada) {
+        return res.status(503).json({ erro: "Assistente de IA desactivado pelo administrador." });
+      }
+      if (!genAI) {
+        return res.status(503).json({ erro: "Serviço de IA não configurado." });
+      }
+
+      const materialId = parseInt(req.params.id, 10);
+      const [resultado] = await db.query(
+        `SELECT m.id, m.titulo, m.cadeira, m.tipo, m.url_arquivo, u.nome AS autor
+         FROM materiais m
+         JOIN usuarios u ON m.autor_id = u.id
+         WHERE m.status = 'aprovado' AND m.id = ?`,
+        [materialId]
+      );
+      if (resultado.length === 0) {
+        return res.status(404).json({ erro: "Material não encontrado." });
+      }
+      const material = resultado[0];
+
+      // Mesmo texto que alimenta o resumo — assim a conversa mantém-se ancorada
+      // no conteúdo real do documento, não apenas no seu título.
+      let trimmedText = "";
+      if (material.tipo === "PDF") {
+        const fileName = path.basename(material.url_arquivo);
+        const filePath = path.join(uploadsDir, fileName);
+        if (fs.existsSync(filePath)) {
+          try {
+            const pdfText = await extractPdfText(filePath);
+            trimmedText = pdfText.slice(0, 12000);
+          } catch (pdfErro) {
+            console.error("Erro ao extrair texto do PDF para chat:", pdfErro.message);
+          }
+        }
+      }
+      const temTexto = trimmedText.trim().length > 0;
+
+      const utilizadorNome = req.utilizador?.nome || "estudante";
+      const prompt = `És o assistente académico de IA da plataforma "${config.nome_plataforma}", a esclarecer dúvidas de ${utilizadorNome} sobre um material específico do repositório.
+
+Material em análise:
+Título: ${material.titulo}
+Disciplina: ${material.cadeira}
+Tipo: ${material.tipo}
+${temTexto ? `\nConteúdo do documento (extraído do PDF, pode estar incompleto ou truncado):\n${trimmedText}` : "\n(Sem texto extraído deste material — responde com o teu conhecimento da disciplina, deixando claro que não estás a citar o documento directamente.)"}
+
+Regras de resposta:
+- Responde com profundidade real: explica o raciocínio, dá exemplos concretos e, em exercícios, mostra os passos — nunca cortes a resposta artificialmente por ser "longa"
+- Usa parágrafos curtos e, quando ajudar a clareza, listas numeradas ou com marcadores
+- Prioriza sempre o conteúdo do documento acima quando a pergunta for sobre ele; só recorres a conhecimento geral da disciplina quando o documento não cobrir o tema, e dizes isso explicitamente
+- Nunca inventes dados, números ou citações que não estejam no documento
+- Português europeu, tom de tutor — directo, sem introduções nem despedidas desnecessárias
+
+Pergunta do estudante: ${mensagem.trim()}`;
+
+      const fallback = "Não consegui obter uma resposta neste momento. Tente novamente dentro de instantes.";
+      const resposta = await gerarResumoIA(prompt, fallback);
+      res.status(200).json({ resposta });
+    } catch (erro) {
+      console.error("Erro no chat sobre material:", erro.message);
+      res.status(500).json({ erro: "A IA está temporariamente indisponível. Tente novamente em instantes." });
     }
   });
 
