@@ -958,7 +958,7 @@ const Admin = ({ usuarioLogado }) => {
                         style={{ background: "var(--surface-input)", border: "1.5px solid var(--border-subtle-strong)", color: "var(--color-navy-mid)" }}
                       >
                         <Upload size={15} /> {logoUploading ? "A enviar..." : "Carregar logótipo"}
-                        <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" onChange={handleLogoUpload} disabled={logoUploading} className="hidden" />
+                        <input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleLogoUpload} disabled={logoUploading} className="hidden" />
                       </label>
                       {configForm.logo_url && (
                         <button type="button" onClick={handleRemoverLogo} className="text-xs font-semibold" style={{ color: "#dc2626" }}>
