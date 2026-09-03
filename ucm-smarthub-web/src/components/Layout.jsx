@@ -371,7 +371,7 @@ const Layout = ({ usuarioLogado, onLogout }) => {
                 </button>
 
                 {notifOpen && (
-                  <div className="absolute right-0 top-14 z-50 w-80 rounded-[20px] overflow-hidden animate-scale-in"
+                  <div className="absolute right-0 top-14 z-50 w-[min(320px,calc(100vw-2rem))] rounded-[20px] overflow-hidden animate-scale-in"
                     style={{ background: "var(--surface-card)", border: "1px solid var(--border-subtle-strong)", boxShadow: "0 20px 60px rgba(var(--color-navy-mid-rgb),0.18)" }}>
                     {/* Header */}
                     <div className="flex items-center justify-between px-5 py-4"

@@ -36,6 +36,10 @@ const StatCard = ({ icon: Icon, label, value, iconBg, glow, delay }) => (
 const MiniCard = ({ m, onClick }) => (
   <article
     onClick={onClick}
+    role="button"
+    tabIndex={0}
+    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } }}
+    aria-label={`Abrir ${m.titulo}`}
     className="group flex items-center gap-4 rounded-[20px] p-4 cursor-pointer transition-all duration-250"
     style={{
       background: "var(--surface-card-glass)",
@@ -74,12 +78,17 @@ const Dashboard = ({ usuarioLogado }) => {
   const [meusMateriais, setMeusMat]     = useState([]);
   const [stats, setStats]               = useState(null);
   const [favMateriais, setFavMateriais] = useState([]);
+  // Só cobre os dois fetches cujo vazio tem um significado visível para o
+  // utilizador (listas com estado "ainda não há nada") — sem isto, a mensagem
+  // de vazio pisca por uma fracção de segundo em cada visita, mesmo para quem
+  // já tem materiais, antes de os dados reais chegarem.
+  const [loadingInicial, setLoadingInicial] = useState(true);
   const navigate = useNavigate();
   const { openChatbot } = useOutletContext() || {};
 
   useEffect(() => {
     /* Materiais recentes */
-    api.get("/materiais?page=1&limit=3")
+    const pMateriais = api.get("/materiais?page=1&limit=3")
       .then(res => setMateriais(res.data.materiais || []))
       .catch(() => setMateriais([]));
 
@@ -89,9 +98,11 @@ const Dashboard = ({ usuarioLogado }) => {
       .catch(() => setStats({ total_materiais: '--', total_utilizadores: '--', total_pdfs: '--', total_videos: '--' }));
 
     /* Materiais do utilizador */
-    api.get("/meus-materiais")
+    const pMeus = api.get("/meus-materiais")
       .then(res => setMeusMat(res.data || []))
       .catch(() => setMeusMat([]));
+
+    Promise.allSettled([pMateriais, pMeus]).then(() => setLoadingInicial(false));
 
     /* Favoritos */
     const ids = getFavoritos();
@@ -253,7 +264,11 @@ const Dashboard = ({ usuarioLogado }) => {
         <div className="xl:col-span-2 space-y-5">
           <SectionHeader title="Materiais Recentes" icon={Library} onMore={() => navigate('/repositorio')} />
           <div className="space-y-3">
-            {materiais.length === 0 ? (
+            {loadingInicial ? (
+              <div className="flex justify-center py-8">
+                <div className="w-8 h-8 rounded-full border-[3px] animate-spin" style={{ borderColor: "rgba(var(--color-navy-mid-rgb),0.12)", borderTopColor: "var(--color-gold)" }} />
+              </div>
+            ) : materiais.length === 0 ? (
               <EmptyState text="Ainda sem materiais publicados." />
             ) : (
               materiais.map(m => (
@@ -285,7 +300,11 @@ const Dashboard = ({ usuarioLogado }) => {
           {/* Meus uploads */}
           <div className="space-y-4">
             <SectionHeader title="Meus Uploads" icon={Upload} color="#7c3aed" small />
-            {meusMateriais.length === 0 ? (
+            {loadingInicial ? (
+              <div className="flex justify-center py-6">
+                <div className="w-7 h-7 rounded-full border-[3px] animate-spin" style={{ borderColor: "rgba(var(--color-navy-mid-rgb),0.12)", borderTopColor: "var(--color-gold)" }} />
+              </div>
+            ) : meusMateriais.length === 0 ? (
               <div className="rounded-[20px] p-5 text-center" style={{ background: "var(--surface-card)", border: "1px solid var(--border-subtle)" }}>
                 <BookOpen size={24} style={{ color: "var(--text-faint)", margin: "0 auto 8px" }} />
                 <p style={{ fontSize: 13, color: "var(--text-faint)" }}>Ainda não submeteu nenhum material</p>

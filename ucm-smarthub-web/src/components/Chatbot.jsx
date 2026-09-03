@@ -101,7 +101,7 @@ const Chatbot = ({ usuarioLogado, chatOpen: chatOpenProp, setChatOpen: setChatOp
   const handleSend = () => sendMessageWithText(chatInput);
 
   return (
-    <div className="fixed bottom-7 right-7 z-50">
+    <div className="fixed bottom-4 right-4 sm:bottom-7 sm:right-7 z-50">
       <style>{`
         @keyframes fab-glow {
           0%,100% { box-shadow: 0 8px 36px rgba(var(--color-navy-deep-rgb),0.50), 0 0 0 0 rgba(var(--color-gold-rgb),0); }
@@ -124,7 +124,7 @@ const Chatbot = ({ usuarioLogado, chatOpen: chatOpenProp, setChatOpen: setChatOp
       {/* ─── Janela de chat ─── */}
       {chatOpen && (
         <div
-          className="w-[385px] h-[550px] mb-5 flex flex-col overflow-hidden"
+          className="w-[min(385px,calc(100vw-2rem))] h-[min(550px,75vh)] mb-5 flex flex-col overflow-hidden"
           style={{
             borderRadius: 28,
             background: "#fff",

@@ -97,6 +97,7 @@ const Admin = ({ usuarioLogado }) => {
   const [sistemaStatus, setSistemaStatus] = useState(null);
   const [toast, setToast]       = useState({ message: '', type: '' });
   const [confirm, setConfirm]   = useState({ message: '', id: null, tipo: 'material' });
+  const [aprovandoId, setAprovandoId] = useState(null); // id do material a ser aprovado, evita duplo-clique
 
   /* ── Chat moderation state ── */
   const [mensagens,     setMensagens]     = useState([]);
@@ -108,6 +109,7 @@ const Admin = ({ usuarioLogado }) => {
   const [savingConfig,  setSavingConfig]  = useState(false);
   const [logoUploading, setLogoUploading] = useState(false);
   const [novoCurso,     setNovoCurso]     = useState('');
+  const [adicionandoCurso, setAdicionandoCurso] = useState(false);
 
   /* ── Utilizadores state ── */
   const [utilizadores,       setUtilizadores]       = useState([]);
@@ -293,12 +295,16 @@ const Admin = ({ usuarioLogado }) => {
   };
 
   const handleAprovar = async (id) => {
+    if (aprovandoId) return; // evita duplo-clique a aprovar o mesmo (ou outro) material em simultâneo
+    setAprovandoId(id);
     try {
       await api.put(`/admin/materiais/${id}/status`, { acao: 'aprovar' });
       showToast('Material aprovado e publicado no repositório!', 'success');
       fetchPendentes();
     } catch {
       showToast('Erro ao aprovar. Verifique a ligação ao servidor.', 'error');
+    } finally {
+      setAprovandoId(null);
     }
   };
 
@@ -361,7 +367,8 @@ const Admin = ({ usuarioLogado }) => {
 
   const handleAdicionarCurso = async (e) => {
     e.preventDefault();
-    if (!novoCurso.trim()) return;
+    if (!novoCurso.trim() || adicionandoCurso) return;
+    setAdicionandoCurso(true);
     try {
       await api.post('/admin/cursos', { nome: novoCurso.trim() });
       setNovoCurso('');
@@ -369,6 +376,8 @@ const Admin = ({ usuarioLogado }) => {
       await refetchConfig();
     } catch (err) {
       showToast(err.response?.data?.erro || 'Erro ao adicionar curso.', 'error');
+    } finally {
+      setAdicionandoCurso(false);
     }
   };
 
@@ -662,7 +671,8 @@ const Admin = ({ usuarioLogado }) => {
                       {/* Botão Rejeitar */}
                       <button
                         onClick={() => handleRejeitar(m.id)}
-                        className="inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3.5 text-sm font-bold transition-all duration-200"
+                        disabled={aprovandoId === m.id}
+                        className="inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3.5 text-sm font-bold transition-all duration-200 disabled:opacity-50"
                         style={{
                           background: "rgba(239,68,68,0.07)",
                           border: "1.5px solid rgba(239,68,68,0.22)",
@@ -677,7 +687,8 @@ const Admin = ({ usuarioLogado }) => {
                       {/* Botão Aprovar */}
                       <button
                         onClick={() => handleAprovar(m.id)}
-                        className="inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3.5 text-sm font-bold text-white transition-all duration-200"
+                        disabled={aprovandoId === m.id}
+                        className="inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3.5 text-sm font-bold text-white transition-all duration-200 disabled:opacity-70"
                         style={{
                           background: "linear-gradient(135deg, #059669, #10b981)",
                           boxShadow: "0 6px 20px rgba(16,185,129,0.35)",
@@ -685,7 +696,11 @@ const Admin = ({ usuarioLogado }) => {
                         onMouseEnter={e => (e.currentTarget.style.transform = "translateY(-1px)", e.currentTarget.style.boxShadow = "0 10px 28px rgba(16,185,129,0.50)")}
                         onMouseLeave={e => (e.currentTarget.style.transform = "", e.currentTarget.style.boxShadow = "0 6px 20px rgba(16,185,129,0.35)")}
                       >
-                        <CheckCircle size={17} /> Aprovar e Publicar
+                        {aprovandoId === m.id
+                          ? <div className="w-4 h-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
+                          : <CheckCircle size={17} />
+                        }
+                        {aprovandoId === m.id ? "A aprovar..." : "Aprovar e Publicar"}
                       </button>
                     </div>
                   </div>
@@ -1157,10 +1172,10 @@ const Admin = ({ usuarioLogado }) => {
                   <input value={novoCurso} onChange={e => setNovoCurso(e.target.value)} placeholder="Nome do novo curso"
                     className="flex-1 rounded-2xl px-5 py-3.5 text-sm outline-none"
                     style={{ background: "var(--surface-input)", border: "1.5px solid var(--border-subtle-strong)", color: "var(--text-heading)" }} />
-                  <button type="submit"
-                    className="inline-flex items-center gap-2 rounded-2xl px-5 py-3.5 text-sm font-bold text-white shrink-0 transition-all"
+                  <button type="submit" disabled={adicionandoCurso}
+                    className="inline-flex items-center gap-2 rounded-2xl px-5 py-3.5 text-sm font-bold text-white shrink-0 transition-all disabled:opacity-60"
                     style={{ background: "linear-gradient(135deg,var(--color-navy-deep),var(--color-navy-mid))" }}>
-                    <Plus size={16} /> Adicionar
+                    <Plus size={16} /> {adicionandoCurso ? "A adicionar..." : "Adicionar"}
                   </button>
                 </form>
                 <div className="flex flex-wrap gap-2">

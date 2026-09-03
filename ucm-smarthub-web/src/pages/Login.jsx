@@ -609,10 +609,13 @@ const Login = ({ onLogin }) => {
                       <div className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2" style={{ color:"var(--text-faint)" }}>
                         <GraduationCap size={17} />
                       </div>
-                      <select value={curso} onChange={e => setCurso(e.target.value)}
-                        className="w-full rounded-2xl py-4 pl-12 pr-4 text-sm outline-none transition-all duration-200 appearance-none"
+                      <select value={curso} onChange={e => setCurso(e.target.value)} required
+                        disabled={cursos.length === 0}
+                        className="w-full rounded-2xl py-4 pl-12 pr-4 text-sm outline-none transition-all duration-200 appearance-none disabled:opacity-60"
                         style={{ background:"var(--surface-input)", border:"1.5px solid var(--border-subtle-strong)", color:"var(--text-heading)" }}>
-                        {cursos.map(c => <option key={c.id} value={c.nome}>{c.nome}</option>)}
+                        {cursos.length === 0
+                          ? <option value="">A carregar cursos...</option>
+                          : cursos.map(c => <option key={c.id} value={c.nome}>{c.nome}</option>)}
                       </select>
                     </div>
 

@@ -13,6 +13,11 @@ const MaterialCard = ({ m, onClick, favs, onToggleFav, podeRemover, onRemover })
   const isFav = favs.includes(m.id);
   return (
     <article
+      onClick={onClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } }}
+      aria-label={`Abrir ${m.titulo}`}
       className="group relative overflow-hidden rounded-[28px] cursor-pointer transition-all duration-350"
       style={{
         background: "var(--surface-card-glass)",
@@ -76,7 +81,6 @@ const MaterialCard = ({ m, onClick, favs, onToggleFav, podeRemover, onRemover })
         </div>
 
         <h3
-          onClick={onClick}
           className="text-lg font-bold mb-1 leading-snug transition-colors group-hover:text-[var(--color-navy-mid)]"
           style={{ color: "var(--text-heading)" }}
         >
@@ -90,8 +94,7 @@ const MaterialCard = ({ m, onClick, favs, onToggleFav, podeRemover, onRemover })
         </p>
 
         <div
-          onClick={onClick}
-          className="flex items-center justify-between cursor-pointer"
+          className="flex items-center justify-between"
           style={{ borderTop: "1px solid var(--border-subtle)", paddingTop: 14 }}
         >
           <span style={{ fontSize: 11, fontWeight: 700, color: "var(--color-navy-mid)", textTransform: "uppercase", letterSpacing: "0.2em" }}>
@@ -122,6 +125,7 @@ const Repositorio = ({ usuarioLogado }) => {
   const [newMaterial,     setNewMaterial]     = useState({ titulo: "", cadeira: "", tipo: "PDF" });
   const [arquivoReal,     setArquivoReal]     = useState(null);
   const [uploadErro,      setUploadErro]      = useState('');
+  const [enviando,        setEnviando]        = useState(false);
   const [uploadSucesso,   setUploadSucesso]   = useState(false);
   const [uploadPublicado, setUploadPublicado] = useState(false);
   const [favs,            setFavs]            = useState(getFavoritos);
@@ -208,12 +212,14 @@ const Repositorio = ({ usuarioLogado }) => {
 
   const handleUploadSubmit = async (e) => {
     e.preventDefault();
+    if (enviando) return; // evita duplo-envio (duplo clique, ligação lenta)
     if (!arquivoReal) return setUploadErro("Por favor, seleccione um ficheiro.");
     const formData = new FormData();
     formData.append("titulo",  newMaterial.titulo);
     formData.append("cadeira", newMaterial.cadeira);
     formData.append("tipo",    newMaterial.tipo);
     formData.append("arquivo", arquivoReal);
+    setEnviando(true);
     try {
       const res = await api.post("/materiais", formData, { headers: { "Content-Type": "multipart/form-data" } });
       setShowUploadModal(false);
@@ -229,6 +235,8 @@ const Repositorio = ({ usuarioLogado }) => {
       fetchMateriais(1);
     } catch (err) {
       setUploadErro(err.response?.data?.erro || "Erro ao enviar. Verifique o ficheiro e tente novamente.");
+    } finally {
+      setEnviando(false);
     }
   };
 
@@ -572,12 +580,17 @@ const Repositorio = ({ usuarioLogado }) => {
 
               <button
                 type="submit"
-                className="w-full flex items-center justify-center gap-2.5 rounded-full py-4 text-sm font-black uppercase tracking-wider transition-all duration-250"
+                disabled={enviando}
+                className="w-full flex items-center justify-center gap-2.5 rounded-full py-4 text-sm font-black uppercase tracking-wider transition-all duration-250 disabled:opacity-60"
                 style={{ background: "linear-gradient(135deg,var(--color-navy-deep),var(--color-navy-mid))", color: "#fff", boxShadow: "0 8px 28px rgba(var(--color-navy-deep-rgb),0.38)", letterSpacing: "0.10em" }}
-                onMouseEnter={e => (e.currentTarget.style.transform = "translateY(-2px)", e.currentTarget.style.boxShadow = "0 12px 40px rgba(var(--color-navy-deep-rgb),0.50)")}
+                onMouseEnter={e => !enviando && (e.currentTarget.style.transform = "translateY(-2px)", e.currentTarget.style.boxShadow = "0 12px 40px rgba(var(--color-navy-deep-rgb),0.50)")}
                 onMouseLeave={e => (e.currentTarget.style.transform = "", e.currentTarget.style.boxShadow = "0 8px 28px rgba(var(--color-navy-deep-rgb),0.38)")}
               >
-                <Upload size={17} /> Enviar para Aprovação
+                {enviando
+                  ? <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                  : <Upload size={17} />
+                }
+                {enviando ? "A enviar..." : "Enviar para Aprovação"}
               </button>
             </form>
           </div>
