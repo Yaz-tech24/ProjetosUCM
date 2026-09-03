@@ -36,7 +36,12 @@ function criarLimitadorTaxa({ janelaMs, maxTentativas }) {
 }
 
 const limitarLogin = criarLimitadorTaxa({ janelaMs: 15 * 60 * 1000, maxTentativas: 10 });
-const limitarRegisto = criarLimitadorTaxa({ janelaMs: 60 * 60 * 1000, maxTentativas: 8 });
+// Chave por IP: em campus/redes móveis com NAT partilhado, muitos estudantes reais
+// podem aparecer com o mesmo IP — um limite baixo aqui bloqueia turmas inteiras a
+// meio do registo (visto em produção: registos param de ser aceites depois de ~8-10
+// pedidos vindos da mesma rede, muito antes de ser um ataque real). 200/hora continua
+// a impedir scripts de spam em massa sem penalizar picos legítimos de utilizadores.
+const limitarRegisto = criarLimitadorTaxa({ janelaMs: 60 * 60 * 1000, maxTentativas: 200 });
 // Chat de IA — cada pedido custa dinheiro (API do Gemini); sem limite, um utilizador
 // autenticado podia esgotar a quota sozinho.
 const limitarChat = criarLimitadorTaxa({ janelaMs: 60 * 1000, maxTentativas: 15 });
