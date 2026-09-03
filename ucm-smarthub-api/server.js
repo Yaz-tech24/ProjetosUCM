@@ -28,13 +28,17 @@ const { autenticar, apenasAdmin } = require("./middleware/auth");
 const app = express();
 const server = http.createServer(app);
 
-// Atrás do Caddy (docker-compose.yml), o Express só vê o IP interno do
-// proxy em cada pedido — sem isto, req.ip (usado por todos os limitadores
-// de taxa por IP) seria sempre o mesmo, tornando-os efectivamente globais
-// em vez de por-cliente. "1" confia exactamente um hop (o Caddy), que
-// define X-Forwarded-For correctamente; superior ao "true" (que confiaria
-// numa cadeia arbitrária de proxies, mais fácil de contornar).
-app.set("trust proxy", 1);
+// Em produção o pedido passa por DOIS proxies antes de chegar aqui: Traefik
+// (entrypoint público, TLS) e depois o Caddy (docker-compose.yml) — sem
+// confiar nos dois hops, req.ip (usado por todos os limitadores de taxa por
+// IP) resolvia sempre para o IP interno do Traefik, o mesmo para todos os
+// pedidos, tornando os limites efectivamente globais para a plataforma
+// inteira em vez de por-cliente (foi exactamente isto que, com o valor "1"
+// anterior, causou o registo a bloquear ao fim de poucos pedidos combinados
+// de todos os utilizadores). "2" confia exactamente estes dois hops
+// conhecidos; superior a "true" (que confiaria numa cadeia arbitrária de
+// proxies, mais fácil de contornar por spoofing de X-Forwarded-For).
+app.set("trust proxy", 2);
 
 // Origens permitidas: variável de ambiente ou localhost em desenvolvimento
 const CORS_ORIGINS = (process.env.CORS_ORIGINS || "http://localhost:5173,http://localhost:5174")

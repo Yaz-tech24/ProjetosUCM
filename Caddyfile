@@ -5,11 +5,13 @@
 	order rate_limit before basicauth
 }
 
-{$DOMAIN} {
-	# HTTPS automático (Let's Encrypt) para um domínio público real; para
-	# "localhost" ou um IP, o Caddy usa a sua própria CA interna em vez disso
-	# — funciona na mesma, só que o browser mostra o aviso de certificado
-	# não-confiável (normal em desenvolvimento/testes locais).
+:80 {
+	# Este Caddy já não é o ponto de entrada público — o Traefik (partilhado
+	# pelo VPS entre vários projectos, fora deste docker-compose) é que fica
+	# nas portas 80/443 do host, termina o TLS (Let's Encrypt via
+	# certresolver, ver as labels "traefik.*" do serviço caddy no
+	# docker-compose.yml) e encaminha para aqui internamente. Por isso o
+	# Caddy escuta simplesmente em :80, sem domínio nem HTTPS próprios.
 
 	encode gzip
 

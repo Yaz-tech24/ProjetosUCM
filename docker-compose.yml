@@ -117,9 +117,17 @@ services:
       - web
     environment:
       DOMAIN: ${DOMAIN}
-    ports:
-      - "80:80"
-      - "443:443"
+    # Sem portas publicadas de propósito — o Traefik partilhado do VPS (fora
+    # deste projecto) é quem escuta 80/443 no host e encaminha para aqui pela
+    # rede Docker, com base nestas labels. Ver o comentário no topo do
+    # Caddyfile para a cadeia completa Traefik → Caddy → Node.
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.studenthub.rule=Host(`studenthub.tech`) || Host(`www.studenthub.tech`)"
+      - "traefik.http.routers.studenthub.entrypoints=websecure"
+      - "traefik.http.routers.studenthub.tls=true"
+      - "traefik.http.routers.studenthub.tls.certresolver=letsencrypt"
+      - "traefik.http.services.studenthub.loadbalancer.server.port=80"
     healthcheck:
       test: ["CMD", "wget", "--no-check-certificate", "-qO-", "http://127.0.0.1:2019/config/"]
       interval: 30s
