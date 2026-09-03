@@ -3,7 +3,7 @@ const cookie = require("cookie");
 
 const db = require("../config/db");
 const { getConfiguracoes } = require("../services/plataforma");
-const { genAI, gerarResumoIA } = require("../services/ia");
+const { genAI, gerarResumoIA, MENSAGEM_IA_MAX } = require("../services/ia");
 const { autenticar, apenasAdmin, JWT_SECRET } = require("../middleware/auth");
 const { limitarChat } = require("../middleware/rateLimiters");
 const { analisarMensagem, mensagemAviso } = require("../utils/filtroChat");
@@ -33,6 +33,9 @@ module.exports = function registarRotasChat(app, io) {
       const { mensagem } = req.body;
       if (!mensagem || !mensagem.trim()) {
         return res.status(400).json({ erro: "Mensagem em falta." });
+      }
+      if (mensagem.length > MENSAGEM_IA_MAX) {
+        return res.status(400).json({ erro: `Mensagem demasiado longa (máximo ${MENSAGEM_IA_MAX} caracteres).` });
       }
 
       const config = await getConfiguracoes();

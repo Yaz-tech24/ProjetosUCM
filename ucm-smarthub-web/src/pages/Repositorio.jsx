@@ -217,7 +217,10 @@ const Repositorio = ({ usuarioLogado }) => {
     try {
       const res = await api.post("/materiais", formData, { headers: { "Content-Type": "multipart/form-data" } });
       setShowUploadModal(false);
-      setNewMaterial({ titulo: "", cadeira: "Informática", tipo: "PDF" });
+      // "" em vez de um curso fixo — o efeito acima já repõe a partir de cursos[0]
+      // assim que a lista carregar, tal como no estado inicial do formulário; um
+      // valor fixo aqui podia não existir nos cursos configurados desta plataforma.
+      setNewMaterial({ titulo: "", cadeira: "", tipo: "PDF" });
       setArquivoReal(null);
       setUploadErro('');
       setUploadPublicado(res.data.status === "aprovado");

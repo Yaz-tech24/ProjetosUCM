@@ -511,6 +511,7 @@ const Visualizador = ({ usuarioLogado }) => {
                   <input
                     type="text"
                     value={chatInput}
+                    maxLength={4000}
                     onChange={e => setChatInput(e.target.value)}
                     placeholder="Ex: explica melhor o segundo conceito..."
                     disabled={chatEnviando}

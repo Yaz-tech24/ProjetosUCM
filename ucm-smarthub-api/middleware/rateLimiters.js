@@ -43,8 +43,11 @@ const limitarLogin = criarLimitadorTaxa({ janelaMs: 15 * 60 * 1000, maxTentativa
 // a impedir scripts de spam em massa sem penalizar picos legítimos de utilizadores.
 const limitarRegisto = criarLimitadorTaxa({ janelaMs: 60 * 60 * 1000, maxTentativas: 200 });
 // Chat de IA — cada pedido custa dinheiro (API do Gemini); sem limite, um utilizador
-// autenticado podia esgotar a quota sozinho.
-const limitarChat = criarLimitadorTaxa({ janelaMs: 60 * 1000, maxTentativas: 15 });
+// autenticado podia esgotar a quota sozinho. Partilhado por /api/chat, o chat por
+// material e o resumo por IA — e, tal como o registo, chave por IP sofre o mesmo
+// problema de NAT partilhado (campus/rede móvel), por isso o valor é generoso
+// o suficiente para vários estudantes activos na mesma rede em simultâneo.
+const limitarChat = criarLimitadorTaxa({ janelaMs: 60 * 1000, maxTentativas: 30 });
 const limitarEsqueciSenha = criarLimitadorTaxa({ janelaMs: 60 * 60 * 1000, maxTentativas: 5 });
 // O token em si tem 256 bits de entropia (impraticável de adivinhar), mas um
 // limite generoso aqui é defesa em profundidade barata contra automatismos.

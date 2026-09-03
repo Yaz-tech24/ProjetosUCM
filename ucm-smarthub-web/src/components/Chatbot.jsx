@@ -318,6 +318,7 @@ const Chatbot = ({ usuarioLogado, chatOpen: chatOpenProp, setChatOpen: setChatOp
             <input
               type="text"
               value={chatInput}
+              maxLength={4000}
               onChange={e => setChatInput(e.target.value)}
               onKeyDown={e => e.key === "Enter" && handleSend()}
               placeholder={isListening ? "A ouvir..." : "Pergunta algo..."}

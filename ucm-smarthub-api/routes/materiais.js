@@ -4,7 +4,7 @@ const fs = require("fs");
 const db = require("../config/db");
 const mailer = require("../services/email");
 const { getConfiguracoes, getCursos } = require("../services/plataforma");
-const { genAI, extractPdfText, gerarResumoIA, verificarConformidadeIA } = require("../services/ia");
+const { genAI, extractPdfText, gerarResumoIA, verificarConformidadeIA, MENSAGEM_IA_MAX } = require("../services/ia");
 const { paraUrlAbsoluto } = require("../utils/urls");
 const validar = require("../middleware/validar");
 const { autenticar, apenasAdmin } = require("../middleware/auth");
@@ -162,7 +162,10 @@ module.exports = function registarRotasMateriais(app) {
    *       404: { description: Material não encontrado }
    *       503: { description: IA desactivada pelo administrador }
    */
-  app.get("/api/materiais/:id/resumo", autenticar, async (req, res) => {
+  // limitarChat aqui também: esta rota volta a extrair o PDF e a chamar o Gemini a
+  // cada pedido (sem cache), tal como as rotas de chat — sem limite, "Regenerar
+  // resumo" podia ser martelado num loop apertado a custo real e ilimitado.
+  app.get("/api/materiais/:id/resumo", autenticar, limitarChat, async (req, res) => {
     try {
       const config = await getConfiguracoes();
       if (!config.ia_activada) {
@@ -345,6 +348,9 @@ Responde APENAS com as 3 notas numeradas. Sem introdução, sem conclusão.`;
       const { mensagem } = req.body;
       if (!mensagem || !mensagem.trim()) {
         return res.status(400).json({ erro: "Mensagem em falta." });
+      }
+      if (mensagem.length > MENSAGEM_IA_MAX) {
+        return res.status(400).json({ erro: `Mensagem demasiado longa (máximo ${MENSAGEM_IA_MAX} caracteres).` });
       }
 
       const config = await getConfiguracoes();

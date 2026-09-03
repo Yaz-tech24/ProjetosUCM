@@ -98,4 +98,10 @@ ou, se não corresponder ao propósito:
   }
 }
 
-module.exports = { genAI, GEMINI_MODELS, extractPdfText, gerarResumoIA, verificarConformidadeIA };
+// Tecto para qualquer texto livre de estudante que entre directamente num prompt
+// (mensagem do chat geral, pergunta sobre um material). Sem isto, o único limite
+// real era o corpo JSON completo do Express (100 KB) — generoso demais para uma
+// pergunta, e caro em tokens da API do Gemini se abusado dentro do rate limit.
+const MENSAGEM_IA_MAX = 4000;
+
+module.exports = { genAI, GEMINI_MODELS, MENSAGEM_IA_MAX, extractPdfText, gerarResumoIA, verificarConformidadeIA };
