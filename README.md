@@ -43,7 +43,7 @@ Pré-requisitos no servidor: Docker + Docker Compose, e um domínio cujo DNS (re
 
 A stack tem quatro serviços — ver [docker-compose.yml](docker-compose.yml):
 - `db` (MySQL) e `api`/`web` não expõem portas directamente ao exterior.
-- `caddy` é o único ponto de entrada (portas 80/443), serve HTTPS automático (Let's Encrypt) e encaminha `/api/*`, `/uploads/*` e `/socket.io/*` para a API, e tudo o resto para o frontend — mesmo domínio para tudo, sem problemas de CORS.
+- `caddy` encaminha `/api/*`, `/uploads/*` e `/socket.io/*` para a API, e tudo o resto para o frontend — mesmo domínio para tudo, sem problemas de CORS. Por defeito assume um **Traefik partilhado do servidor** (fora deste docker-compose, ver as labels `traefik.*` no serviço `caddy`) como ponto de entrada público real — é o Traefik que fica nas portas 80/443 do host e termina o TLS (Let's Encrypt via `certresolver`); o Caddy escuta só internamente em `:80`. Se estiver a implantar num servidor **sem** Traefik já a correr, troque essas `labels:` por `ports: ["80:80", "443:443"]` no serviço `caddy` para o Caddy voltar a ser o ponto de entrada directo com o seu próprio HTTPS automático — e ajuste `app.set("trust proxy", 2)` para `1` em `server.js` (só um hop nesse caso).
 
 A base de dados MySQL, os ficheiros submetidos (`uploads/`) e os certificados HTTPS persistem em volumes nomeados entre reinícios/deploys.
 
@@ -57,7 +57,7 @@ Definir `DOMAIN=localhost` no `.env` e aceder a `https://localhost/` — o Caddy
 - Sem `GEMINI_API_KEY`, a IA (resumos, chat assistente, moderação automática) fica desactivada — o resto da aplicação continua a funcionar normalmente.
 - Sem as variáveis `SMTP_*`, os emails (boas-vindas, recuperação de password, notificação de moderação) não são enviados — a app regista um aviso e continua.
 - Para actualizar depois de alterações no código: `git pull && docker compose up -d --build`.
-- Se preferir gerir o HTTPS com o seu próprio proxy (Cloudflare, outro nginx, etc.) em vez do Caddy incluído, remova o serviço `caddy` do `docker-compose.yml` e descomente as secções `ports:` dos serviços `api`/`web`. Se o `api` ficar exposto **directamente à Internet sem nenhum proxy à frente**, mude `app.set("trust proxy", 1)` para `false` em `server.js` — com um proxy real (Caddy ou outro) esse "1" garante que os limitadores de taxa vêem o IP verdadeiro de cada cliente em vez do IP interno do proxy; sem proxy nenhum, o mesmo ajuste deixaria um cliente malicioso falsificar o cabeçalho `X-Forwarded-For` para contornar os limites.
+- `app.set("trust proxy", 2)` em `server.js` assume exactamente a cadeia por defeito acima (Traefik + Caddy, dois hops) — é o que faz os limitadores de taxa por IP (registo, login, chat com IA) verem o IP verdadeiro de cada visitante em vez do IP interno de um dos proxies (o que os tornaria, na prática, globais para toda a plataforma em vez de por-visitante). Se mudar a topologia, ajuste este número ao número real de proxies entre a Internet e o `api`: um único proxy à frente (ex: só Caddy, sem Traefik) → `1`; nenhum proxy, `api` exposto directamente → `false`. Um valor a mais do que os hops reais é tão perigoso como a menos — deixa um cliente malicioso falsificar `X-Forwarded-For` para se fazer passar por outro IP e contornar os limites.
 
 ### Backups
 
