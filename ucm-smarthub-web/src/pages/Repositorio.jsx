@@ -97,10 +97,10 @@ const MaterialCard = ({ m, onClick, favs, onToggleFav, podeRemover, onRemover })
           className="flex items-center justify-between"
           style={{ borderTop: "1px solid var(--border-subtle)", paddingTop: 14 }}
         >
-          <span style={{ fontSize: 11, fontWeight: 700, color: "var(--color-navy-mid)", textTransform: "uppercase", letterSpacing: "0.2em" }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-accent)", textTransform: "uppercase", letterSpacing: "0.2em" }}>
             Ver mais
           </span>
-          <ChevronRight size={15} className="transition-transform group-hover:translate-x-1" style={{ color: "var(--color-navy-mid)" }} />
+          <ChevronRight size={15} className="transition-transform group-hover:translate-x-1" style={{ color: "var(--text-accent)" }} />
         </div>
       </div>
     </article>
@@ -423,14 +423,14 @@ const Repositorio = ({ usuarioLogado }) => {
         <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
           {loading ? (
             <div className="col-span-full rounded-[28px] p-14 text-center" style={{ background: "var(--surface-card)", border: "1px solid var(--border-subtle)" }}>
-              <div className="w-10 h-10 rounded-full border-4 animate-spin mx-auto mb-4" style={{ borderColor: "rgba(var(--color-navy-mid-rgb),0.10)", borderTopColor: "var(--color-navy-mid)" }} />
+              <div className="w-10 h-10 rounded-full border-4 animate-spin mx-auto mb-4" style={{ borderColor: "rgba(var(--color-navy-mid-rgb),0.10)", borderTopColor: "var(--text-accent)" }} />
               <p style={{ color: "var(--text-faint)", fontWeight: 600 }}>Carregando materiais...</p>
             </div>
           ) : materiaisFiltrados.length === 0 ? (
             <div className="col-span-full rounded-[28px] p-14 text-center" style={{ border: "2px dashed var(--border-subtle-strong)", background: "var(--surface-card)" }}>
               <p style={{ fontSize: 16, fontWeight: 900, color: "var(--text-faint)" }}>Nenhum material encontrado.</p>
               {buscaTermo && (
-                <button onClick={() => setBuscaTermo('')} className="mt-3 text-sm font-semibold" style={{ color: "var(--color-navy-mid)" }}>
+                <button onClick={() => setBuscaTermo('')} className="mt-3 text-sm font-semibold" style={{ color: "var(--text-accent)" }}>
                   Limpar pesquisa
                 </button>
               )}

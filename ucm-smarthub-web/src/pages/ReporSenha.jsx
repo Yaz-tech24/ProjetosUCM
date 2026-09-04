@@ -74,7 +74,7 @@ const ReporSenha = () => {
               <p style={{ fontSize: 14, color: "var(--text-muted)", marginBottom: 24 }}>
                 Este link de recuperação está incompleto. Peça um novo através da página de entrada.
               </p>
-              <Link to="/" className="inline-flex items-center gap-2 text-sm font-bold" style={{ color: "var(--color-navy-mid)" }}>
+              <Link to="/" className="inline-flex items-center gap-2 text-sm font-bold" style={{ color: "var(--text-accent)" }}>
                 <ArrowLeft size={15} /> Voltar à entrada
               </Link>
             </div>

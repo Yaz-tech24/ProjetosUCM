@@ -289,7 +289,7 @@ const Chat = ({ usuarioLogado }) => {
                 style={active
                   ? {
                       background: "var(--surface-card)",
-                      color: "var(--color-navy-mid)",
+                      color: "var(--text-accent)",
                       borderBottom: "3px solid var(--color-gold)",
                       boxShadow: "0 -2px 12px rgba(var(--color-gold-rgb),0.15)",
                     }
@@ -327,7 +327,7 @@ const Chat = ({ usuarioLogado }) => {
           <div className="flex items-center justify-center py-16">
             <div
               className="w-8 h-8 rounded-full border-4 animate-spin"
-              style={{ borderColor: "rgba(var(--color-navy-mid-rgb),0.10)", borderTopColor: "var(--color-navy-mid)" }}
+              style={{ borderColor: "rgba(var(--color-navy-mid-rgb),0.10)", borderTopColor: "var(--text-accent)" }}
             />
           </div>
         ) : messages.length === 0 ? (

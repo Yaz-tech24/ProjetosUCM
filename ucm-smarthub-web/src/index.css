@@ -54,6 +54,13 @@
   --border-subtle:         rgba(var(--color-navy-mid-rgb),0.08);
   --border-subtle-strong:  rgba(var(--color-navy-mid-rgb),0.14);
   --gradient-accent-text:  linear-gradient(135deg, var(--color-navy-deep), var(--color-navy-mid));
+  /* Para texto/ícones "de destaque" (ex: botões secundários, ícones ao lado
+     de títulos) sobre uma superfície adaptativa (--surface-card/-hover/-input).
+     var(--color-navy-mid) sozinho fica quase invisível em modo escuro, porque
+     é uma cor de marca fixa e essas superfícies escurecem — este token usa a
+     mesma cor de marca em claro, mas troca para o par já usado em
+     --gradient-accent-text no escuro. */
+  --text-accent:           var(--color-navy-mid);
 
   /* ── Estados (aprovado/pendente/rejeitado, toasts, alertas) ── */
   --status-success-bg:     rgba(16,185,129,0.09);  --status-success-text: #065f46; --status-success-border: rgba(16,185,129,0.25);
@@ -77,6 +84,7 @@
     --border-subtle:         rgba(255,255,255,0.08);
     --border-subtle-strong:  rgba(255,255,255,0.14);
     --gradient-accent-text:  linear-gradient(135deg, #eaf2ff, var(--color-blue-sky));
+    --text-accent:           var(--color-blue-sky);
 
     --status-success-bg:     rgba(16,185,129,0.16);  --status-success-text: #6ee7b7; --status-success-border: rgba(16,185,129,0.35);
     --status-warning-bg:     rgba(245,158,11,0.16);  --status-warning-text: #fcd34d; --status-warning-border: rgba(245,158,11,0.35);
@@ -99,6 +107,7 @@
   --border-subtle:         rgba(255,255,255,0.08);
   --border-subtle-strong:  rgba(255,255,255,0.14);
   --gradient-accent-text:  linear-gradient(135deg, #eaf2ff, var(--color-blue-sky));
+  --text-accent:           var(--color-blue-sky);
 
   --status-success-bg:     rgba(16,185,129,0.16);  --status-success-text: #6ee7b7; --status-success-border: rgba(16,185,129,0.35);
   --status-warning-bg:     rgba(245,158,11,0.16);  --status-warning-text: #fcd34d; --status-warning-border: rgba(245,158,11,0.35);

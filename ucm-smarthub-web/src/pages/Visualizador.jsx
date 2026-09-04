@@ -241,7 +241,7 @@ const Visualizador = ({ usuarioLogado }) => {
             <button
               onClick={() => navigate(0)}
               className="inline-flex items-center gap-2 rounded-2xl px-6 py-3 text-sm font-bold transition-all duration-200 mt-2"
-              style={{ background: "var(--surface-card)", border: "1.5px solid var(--border-subtle-strong)", color: "var(--color-navy-mid)" }}
+              style={{ background: "var(--surface-card)", border: "1.5px solid var(--border-subtle-strong)", color: "var(--text-accent)" }}
             >
               Tentar novamente
             </button>
@@ -276,9 +276,9 @@ const Visualizador = ({ usuarioLogado }) => {
           <button
             onClick={() => navigate("/repositorio")}
             className="inline-flex items-center gap-2 rounded-2xl px-5 py-2.5 text-sm font-bold transition-all duration-200"
-            style={{ background: "var(--surface-card)", border: "1.5px solid var(--border-subtle-strong)", color: "var(--color-navy-mid)", boxShadow: "0 2px 10px rgba(var(--color-navy-mid-rgb),0.06)" }}
+            style={{ background: "var(--surface-card)", border: "1.5px solid var(--border-subtle-strong)", color: "var(--text-accent)", boxShadow: "0 2px 10px rgba(var(--color-navy-mid-rgb),0.06)" }}
             onMouseEnter={e => (e.currentTarget.style.background = "var(--color-navy-mid)", e.currentTarget.style.color = "#fff")}
-            onMouseLeave={e => (e.currentTarget.style.background = "var(--surface-card)", e.currentTarget.style.color = "var(--color-navy-mid)")}
+            onMouseLeave={e => (e.currentTarget.style.background = "var(--surface-card)", e.currentTarget.style.color = "var(--text-accent)")}
           >
             <ArrowLeft size={17} /> Voltar
           </button>
@@ -385,7 +385,7 @@ const Visualizador = ({ usuarioLogado }) => {
           <div className="flex flex-wrap gap-3">
             {[
               { label: `📚 ${material.cadeira}`, bg: "var(--surface-hover)",              border: "var(--border-subtle-strong)", color: "var(--text-body)" },
-              { label: `👤 ${material.autor}`,   bg: "rgba(var(--color-navy-mid-rgb),0.06)", border: "rgba(var(--color-navy-mid-rgb),0.12)", color: "var(--color-navy-mid)" },
+              { label: `👤 ${material.autor}`,   bg: "rgba(var(--color-navy-mid-rgb),0.06)", border: "rgba(var(--color-navy-mid-rgb),0.12)", color: "var(--text-accent)" },
               { label: `📅 ${new Date(material.data_upload).toLocaleDateString("pt-PT")}`, bg: "var(--surface-hover)", border: "var(--border-subtle-strong)", color: "var(--text-muted)" },
               { label: material.tipo === 'Vídeo' ? '🎬 Vídeo' : '📄 PDF',    bg: material.tipo === 'Vídeo' ? "#eff6ff" : "#fff1f2", border: material.tipo === 'Vídeo' ? "#bfdbfe" : "#fecdd3", color: material.tipo === 'Vídeo' ? "var(--color-navy-mid)" : "#be123c" },
             ].map(({ label, bg, border, color }) => (

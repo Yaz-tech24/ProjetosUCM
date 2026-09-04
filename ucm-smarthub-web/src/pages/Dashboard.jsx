@@ -344,7 +344,7 @@ const Dashboard = ({ usuarioLogado }) => {
 };
 
 /* Auxiliares de UI */
-const SectionHeader = ({ title, icon: Icon, color = "var(--color-navy-mid)", onMore, small }) => (
+const SectionHeader = ({ title, icon: Icon, color = "var(--text-accent)", onMore, small }) => (
   <div className="flex items-center justify-between">
     <h2
       className="flex items-center gap-2"
@@ -356,7 +356,7 @@ const SectionHeader = ({ title, icon: Icon, color = "var(--color-navy-mid)", onM
       <button
         onClick={onMore}
         className="text-sm font-bold transition-colors"
-        style={{ color: "var(--color-navy-mid)" }}
+        style={{ color: "var(--text-accent)" }}
       >
         Ver todos <ChevronRight size={14} style={{ display: "inline" }} />
       </button>

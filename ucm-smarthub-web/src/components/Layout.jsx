@@ -385,7 +385,7 @@ const Layout = ({ usuarioLogado, onLogout }) => {
                     <div className="py-2">
                       {notifLoading ? (
                         <div className="flex justify-center py-6">
-                          <div className="w-6 h-6 rounded-full border-[3px] animate-spin" style={{ borderColor: "rgba(var(--color-navy-mid-rgb),0.10)", borderTopColor: "var(--color-navy-mid)" }} />
+                          <div className="w-6 h-6 rounded-full border-[3px] animate-spin" style={{ borderColor: "rgba(var(--color-navy-mid-rgb),0.10)", borderTopColor: "var(--text-accent)" }} />
                         </div>
                       ) : notifMats.length === 0 ? (
                         <p className="text-center py-6 text-sm" style={{ color: "var(--text-faint)" }}>Nenhum material disponível.</p>
@@ -411,7 +411,7 @@ const Layout = ({ usuarioLogado, onLogout }) => {
                     <div className="px-4 py-3" style={{ borderTop: "1px solid var(--border-subtle)" }}>
                       <button onClick={() => { navigate('/repositorio'); setNotifOpen(false); }}
                         className="w-full rounded-xl py-2 text-xs font-bold transition-all"
-                        style={{ background: "var(--surface-hover)", color: "var(--color-navy-mid)" }}
+                        style={{ background: "var(--surface-hover)", color: "var(--text-accent)" }}
                         onMouseEnter={e => e.currentTarget.style.background = "var(--color-ice-mid)"}
                         onMouseLeave={e => e.currentTarget.style.background = "var(--surface-hover)"}
                       >

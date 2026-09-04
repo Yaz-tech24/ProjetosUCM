@@ -16,7 +16,7 @@ const Cartao = ({ icon: Icon, titulo, subtitulo, children }) => (
     <div className="flex items-center gap-3 mb-6">
       <div className="w-11 h-11 rounded-2xl grid place-items-center shrink-0"
         style={{ background: "rgba(var(--color-navy-mid-rgb),0.07)", border: "1px solid var(--border-subtle-strong)" }}>
-        <Icon size={19} style={{ color: "var(--color-navy-mid)" }} />
+        <Icon size={19} style={{ color: "var(--text-accent)" }} />
       </div>
       <div>
         <h3 style={{ fontSize: 16, fontWeight: 900, color: "var(--text-heading)" }}>{titulo}</h3>

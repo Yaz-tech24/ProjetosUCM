@@ -684,7 +684,7 @@ const Login = ({ onLogin }) => {
 
               <button onClick={switchMode}
                 className="w-full rounded-2xl py-3.5 text-sm font-bold transition-all duration-200"
-                style={{ background:"var(--surface-hover)", border:"1.5px solid var(--border-subtle-strong)", color:"var(--color-navy-mid)" }}
+                style={{ background:"var(--surface-hover)", border:"1.5px solid var(--border-subtle-strong)", color:"var(--text-accent)" }}
                 onMouseEnter={e => (e.currentTarget.style.background="var(--color-ice-mid)", e.currentTarget.style.borderColor="var(--border-subtle-strong)")}
                 onMouseLeave={e => (e.currentTarget.style.background="var(--surface-hover)", e.currentTarget.style.borderColor="var(--border-subtle-strong)")}
               >

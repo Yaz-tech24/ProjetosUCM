@@ -246,7 +246,7 @@ const Admin = ({ usuarioLogado }) => {
         <h2 style={{ fontSize: 30, fontWeight: 900, color: "var(--text-heading)", marginBottom: 12 }}>Acesso Negado</h2>
         <p style={{ fontSize: 15, color: "var(--text-muted)", maxWidth: 400, lineHeight: 1.65 }}>
           Esta área é reservada a administradores da {config.nome_plataforma}.
-          O seu perfil actual é de <strong style={{ color: "var(--color-navy-mid)" }}>{usuarioLogado?.papel}</strong>.
+          O seu perfil actual é de <strong style={{ color: "var(--text-accent)" }}>{usuarioLogado?.papel}</strong>.
         </p>
       </div>
     );
@@ -529,7 +529,7 @@ const Admin = ({ usuarioLogado }) => {
                 <span className="rounded-full px-2 py-0.5 text-[10px] font-black"
                   style={aba === key
                     ? { background: "rgba(var(--color-gold-rgb),0.22)", color: "var(--color-gold)" }
-                    : { background: "rgba(var(--color-navy-mid-rgb),0.10)", color: "var(--color-navy-mid)" }}>
+                    : { background: "rgba(var(--color-navy-mid-rgb),0.10)", color: "var(--text-accent)" }}>
                   {badge}
                 </span>
               )}
@@ -556,7 +556,7 @@ const Admin = ({ usuarioLogado }) => {
               className="flex items-center gap-2.5"
               style={{ fontSize: 18, fontWeight: 900, color: "var(--text-heading)" }}
             >
-              <Clock size={19} style={{ color: "var(--color-navy-mid)" }} />
+              <Clock size={19} style={{ color: "var(--text-accent)" }} />
               Fila de Aprovação
             </h2>
             <span
@@ -577,7 +577,7 @@ const Admin = ({ usuarioLogado }) => {
               <div className="text-center p-14">
                 <div
                   className="w-12 h-12 rounded-full border-4 animate-spin mx-auto mb-4"
-                  style={{ borderColor: "rgba(var(--color-navy-mid-rgb),0.10)", borderTopColor: "var(--color-navy-mid)" }}
+                  style={{ borderColor: "rgba(var(--color-navy-mid-rgb),0.10)", borderTopColor: "var(--text-accent)" }}
                 />
                 <p style={{ color: "var(--text-muted)", fontWeight: 600 }}>Carregando materiais pendentes...</p>
               </div>
@@ -722,7 +722,7 @@ const Admin = ({ usuarioLogado }) => {
               style={{ borderBottom: "1px solid var(--border-subtle)" }}>
               <h2 className="flex items-center gap-2.5"
                 style={{ fontSize: 18, fontWeight: 900, color: "var(--text-heading)" }}>
-                <MessageCircle size={19} style={{ color: "var(--color-navy-mid)" }} />
+                <MessageCircle size={19} style={{ color: "var(--text-accent)" }} />
                 Mensagens do Chat
               </h2>
               <div className="flex items-center gap-3">
@@ -738,7 +738,7 @@ const Admin = ({ usuarioLogado }) => {
                 <button
                   onClick={() => fetchMensagens(cursoChatFiltro)}
                   className="rounded-2xl px-4 py-2.5 text-sm font-bold transition-all"
-                  style={{ background: "var(--surface-hover)", border: "1.5px solid var(--border-subtle-strong)", color: "var(--color-navy-mid)" }}
+                  style={{ background: "var(--surface-hover)", border: "1.5px solid var(--border-subtle-strong)", color: "var(--text-accent)" }}
                 >
                   Actualizar
                 </button>
@@ -749,7 +749,7 @@ const Admin = ({ usuarioLogado }) => {
               {loadingChat ? (
                 <div className="text-center p-12">
                   <div className="w-10 h-10 rounded-full border-4 animate-spin mx-auto mb-3"
-                    style={{ borderColor: "rgba(var(--color-navy-mid-rgb),0.10)", borderTopColor: "var(--color-navy-mid)" }} />
+                    style={{ borderColor: "rgba(var(--color-navy-mid-rgb),0.10)", borderTopColor: "var(--text-accent)" }} />
                   <p style={{ color: "var(--text-muted)", fontWeight: 600 }}>A carregar mensagens...</p>
                 </div>
               ) : mensagens.length === 0 ? (
@@ -820,7 +820,7 @@ const Admin = ({ usuarioLogado }) => {
               style={{ background: "var(--surface-card)", border: "1px solid var(--border-subtle)", boxShadow: "0 4px 32px rgba(var(--color-navy-mid-rgb),0.07)" }}
             >
               <div className="flex items-center gap-2.5 px-7 py-5" style={{ borderBottom: "1px solid var(--border-subtle)" }}>
-                <UserPlus size={19} style={{ color: "var(--color-navy-mid)" }} />
+                <UserPlus size={19} style={{ color: "var(--text-accent)" }} />
                 <h2 style={{ fontSize: 18, fontWeight: 900, color: "var(--text-heading)" }}>Criar conta</h2>
               </div>
               <div className="p-7">
@@ -886,7 +886,7 @@ const Admin = ({ usuarioLogado }) => {
               style={{ background: "var(--surface-card)", border: "1px solid var(--border-subtle)", boxShadow: "0 4px 32px rgba(var(--color-navy-mid-rgb),0.07)" }}
             >
               <div className="flex items-center gap-2.5 px-7 py-5" style={{ borderBottom: "1px solid var(--border-subtle)" }}>
-                <Users size={19} style={{ color: "var(--color-navy-mid)" }} />
+                <Users size={19} style={{ color: "var(--text-accent)" }} />
                 <h2 style={{ fontSize: 18, fontWeight: 900, color: "var(--text-heading)" }}>
                   Todos os utilizadores {utilizadores.length > 0 && `(${utilizadores.length})`}
                 </h2>
@@ -895,7 +895,7 @@ const Admin = ({ usuarioLogado }) => {
                 {loadingUtilizadores ? (
                   <div className="text-center p-14">
                     <div className="w-12 h-12 rounded-full border-4 animate-spin mx-auto mb-4"
-                      style={{ borderColor: "rgba(var(--color-navy-mid-rgb),0.10)", borderTopColor: "var(--color-navy-mid)" }} />
+                      style={{ borderColor: "rgba(var(--color-navy-mid-rgb),0.10)", borderTopColor: "var(--text-accent)" }} />
                   </div>
                 ) : (
                   <div className="divide-y" style={{ borderColor: "var(--border-subtle)" }}>
@@ -951,7 +951,7 @@ const Admin = ({ usuarioLogado }) => {
                 style={{ background: "var(--surface-card)", border: "1px solid var(--border-subtle)", boxShadow: "0 4px 32px rgba(var(--color-navy-mid-rgb),0.07)" }}
               >
                 <div className="flex items-center gap-2.5 px-7 py-5" style={{ borderBottom: "1px solid var(--border-subtle)" }}>
-                  <Settings size={19} style={{ color: "var(--color-navy-mid)" }} />
+                  <Settings size={19} style={{ color: "var(--text-accent)" }} />
                   <h2 style={{ fontSize: 18, fontWeight: 900, color: "var(--text-heading)" }}>Identidade e Funcionalidades</h2>
                 </div>
 
@@ -970,7 +970,7 @@ const Admin = ({ usuarioLogado }) => {
                     <div className="flex flex-col gap-2 items-start">
                       <label
                         className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold cursor-pointer transition-all"
-                        style={{ background: "var(--surface-input)", border: "1.5px solid var(--border-subtle-strong)", color: "var(--color-navy-mid)" }}
+                        style={{ background: "var(--surface-input)", border: "1.5px solid var(--border-subtle-strong)", color: "var(--text-accent)" }}
                       >
                         <Upload size={15} /> {logoUploading ? "A enviar..." : "Carregar logótipo"}
                         <input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleLogoUpload} disabled={logoUploading} className="hidden" />
@@ -1164,7 +1164,7 @@ const Admin = ({ usuarioLogado }) => {
               style={{ background: "var(--surface-card)", border: "1px solid var(--border-subtle)", boxShadow: "0 4px 32px rgba(var(--color-navy-mid-rgb),0.07)" }}
             >
               <div className="flex items-center gap-2.5 px-7 py-5" style={{ borderBottom: "1px solid var(--border-subtle)" }}>
-                <ShieldCheck size={19} style={{ color: "var(--color-navy-mid)" }} />
+                <ShieldCheck size={19} style={{ color: "var(--text-accent)" }} />
                 <h2 style={{ fontSize: 18, fontWeight: 900, color: "var(--text-heading)" }}>Cursos / Disciplinas</h2>
               </div>
               <div className="p-7">
