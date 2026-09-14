@@ -19,8 +19,8 @@ export default function ConfigureSecurity() {
     try {
       const { data } = await axios.get('/api/2fa/status');
       setTwoFAativado(data.ativado);
-    } catch (erro) {
-      console.error('Erro ao verificar 2FA:', erro);
+    } catch {
+      // Erro ao verificar 2FA
     } finally {
       setCarregando(false);
     }
@@ -32,7 +32,7 @@ export default function ConfigureSecurity() {
       setSecret(data.secret);
       setMostrarSetup2FA(true);
       setToast({ tipo: 'info', mensagem: 'Secret gerado. Escaneie o QR code com sua app de autenticação.' });
-    } catch (erro) {
+    } catch {
       setToast({ tipo: 'erro', mensagem: 'Erro ao gerar secret' });
     }
   };
@@ -49,7 +49,7 @@ export default function ConfigureSecurity() {
       setMostrarSetup2FA(false);
       setCodigo2FA('');
       verificarStatus2FA();
-    } catch (erro) {
+    } catch {
       setToast({ tipo: 'erro', mensagem: 'Código inválido' });
     }
   };
@@ -62,7 +62,7 @@ export default function ConfigureSecurity() {
       await axios.post('/api/2fa/desativar', { codigo });
       setToast({ tipo: 'sucesso', mensagem: '2FA desativado' });
       verificarStatus2FA();
-    } catch (erro) {
+    } catch {
       setToast({ tipo: 'erro', mensagem: 'Código inválido' });
     }
   };

@@ -1,7 +1,7 @@
-const { describe, it, expect, beforeAll, afterAll } = require('vitest');
-const request = require('supertest');
-const { app, server } = require('../server');
-const db = require('../config/db');
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import request from 'supertest';
+import { app, server } from '../server.js';
+import db from '../config/db.js';
 
 describe('Rotas de Avaliações', () => {
   let token;

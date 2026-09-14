@@ -9,6 +9,7 @@ export default function Reputacao({ usuarioId }) {
 
   useEffect(() => {
     carregarDados();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [usuarioId]);
 
   const carregarDados = async () => {

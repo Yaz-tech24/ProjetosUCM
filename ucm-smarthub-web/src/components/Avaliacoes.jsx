@@ -14,7 +14,7 @@ export default function Avaliacoes({ materialId, ehAutenticado }) {
   useEffect(() => {
     carregarAvaliacoes();
     if (ehAutenticado) carregarMinhaAvaliacao();
-  }, [materialId]);
+  }, [materialId, ehAutenticado]);
 
   const carregarAvaliacoes = async () => {
     try {
@@ -52,7 +52,7 @@ export default function Avaliacoes({ materialId, ehAutenticado }) {
       setMostrarForm(false);
       carregarAvaliacoes();
       carregarMinhaAvaliacao();
-    } catch (erro) {
+    } catch {
       setToast({ tipo: 'erro', mensagem: 'Erro ao registar avaliação' });
     } finally {
       setCarregando(false);

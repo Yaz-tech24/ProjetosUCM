@@ -10,6 +10,7 @@ export default function Comentarios({ materialId, usuarioId }) {
 
   useEffect(() => {
     carregarComentarios();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [materialId]);
 
   const carregarComentarios = async () => {
@@ -35,7 +36,7 @@ export default function Comentarios({ materialId, usuarioId }) {
       setToast({ tipo: 'sucesso', mensagem: 'Comentário adicionado!' });
       setNovoComentario('');
       carregarComentarios();
-    } catch (erro) {
+    } catch {
       setToast({ tipo: 'erro', mensagem: 'Erro ao adicionar comentário' });
     } finally {
       setCarregando(false);
@@ -48,7 +49,7 @@ export default function Comentarios({ materialId, usuarioId }) {
       await axios.delete(`/api/comentarios/${id}`);
       setToast({ tipo: 'sucesso', mensagem: 'Comentário removido' });
       carregarComentarios();
-    } catch (erro) {
+    } catch {
       setToast({ tipo: 'erro', mensagem: 'Erro ao remover comentário' });
     }
   };

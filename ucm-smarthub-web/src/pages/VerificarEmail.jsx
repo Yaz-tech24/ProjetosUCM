@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import Toast from '../components/Toast';
@@ -12,6 +12,18 @@ export default function VerificarEmail() {
   const [email, setEmail] = useState('');
   const [enviadoNovamente, setEnviadoNovamente] = useState(false);
 
+  const verificarToken = useCallback(async (token) => {
+    try {
+      await axios.post('/api/verificar-email', { token });
+      setSucesso(true);
+      setToast({ tipo: 'sucesso', mensagem: 'Email verificado com sucesso!' });
+      setTimeout(() => navigate('/login'), 2000);
+    } catch {
+      setToast({ tipo: 'erro', mensagem: 'Token inválido ou expirado. Tente pedir um novo.' });
+      setCarregando(false);
+    }
+  }, [navigate]);
+
   useEffect(() => {
     const token = searchParams.get('token');
     if (token) {
@@ -19,19 +31,7 @@ export default function VerificarEmail() {
     } else {
       setCarregando(false);
     }
-  }, [searchParams]);
-
-  const verificarToken = async (token) => {
-    try {
-      await axios.post('/api/verificar-email', { token });
-      setSucesso(true);
-      setToast({ tipo: 'sucesso', mensagem: 'Email verificado com sucesso!' });
-      setTimeout(() => navigate('/login'), 2000);
-    } catch (erro) {
-      setToast({ tipo: 'erro', mensagem: 'Token inválido ou expirado. Tente pedir um novo.' });
-      setCarregando(false);
-    }
-  };
+  }, [searchParams, verificarToken]);
 
   const reenviarEmail = async () => {
     if (!email.trim()) {
@@ -43,7 +43,7 @@ export default function VerificarEmail() {
       await axios.post('/api/reenviar-verificacao-email', { email });
       setToast({ tipo: 'sucesso', mensagem: 'Email reenviado! Verifique a sua caixa de entrada.' });
       setEnviadoNovamente(true);
-    } catch (erro) {
+    } catch {
       setToast({ tipo: 'erro', mensagem: 'Erro ao reenviar email' });
     }
   };

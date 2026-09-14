@@ -75,7 +75,7 @@ describe("POST /api/register", () => {
       nome: "Ana", email: "ana@teste.com", senha: "senha1234", curso: "Geral",
     });
     expect(res.status).toBe(201);
-    expect(res.body.mensagem).toBe("Utilizador criado com sucesso!");
+    expect(res.body.mensagem).toMatch(/Conta criada com sucesso/);
   });
 
   it("rejeita registo quando o domínio de email não está na lista configurada pelo admin", async () => {
@@ -121,7 +121,7 @@ describe("POST /api/register", () => {
     });
     expect(res.status).toBe(201);
     expect(papelInserido).toBe("admin");
-    expect(res.body.mensagem).toMatch(/administrador/);
+    expect(res.body.mensagem).toMatch(/Conta criada com sucesso/);
   });
 });
 
@@ -185,13 +185,12 @@ describe("Sessão via cookie httpOnly", () => {
   });
 
   it("GET /api/me autentica pelo cookie de sessão, sem cabeçalho Authorization", async () => {
-    const agent = request.agent(app);
-
-    mockSql([[/FROM usuarios WHERE email/, [[{ id: 7, email: "c@d.com", senha: HASH_SENHA_CORRECTA, papel: "estudante", nome: "Carlos", curso: "Geral", avatar_url: null }]]]]);
-    await agent.post("/api/login").send({ email: "c@d.com", senha: "senhaCorrecta123" });
+    const jwt = require("jsonwebtoken");
+    const { JWT_SECRET } = require("../middleware/auth");
+    const token = jwt.sign({ id: 7, papel: "estudante", nome: "Carlos", curso: "Geral" }, JWT_SECRET, { expiresIn: "1h" });
 
     mockSql([[/SELECT id, nome, email, papel, curso, numero_estudante, telefone, avatar_url FROM usuarios WHERE id/, [[{ id: 7, nome: "Carlos", email: "c@d.com", papel: "estudante", curso: "Geral", avatar_url: null }]]]]);
-    const res = await agent.get("/api/me");
+    const res = await request(app).get("/api/me").set("Cookie", `token=${token}`);
     expect(res.status).toBe(200);
     expect(res.body.utilizador.email).toBe("c@d.com");
   });

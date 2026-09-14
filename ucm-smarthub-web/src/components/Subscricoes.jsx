@@ -18,8 +18,8 @@ export default function Subscricoes() {
       const { data } = await axios.get('/api/config');
       // Assumindo que cursos estão em config ou em endpoint separado
       setDisciplinas(data.cursos || []);
-    } catch (erro) {
-      console.error('Erro ao carregar disciplinas:', erro);
+    } catch {
+      // Erro ao carregar disciplinas
     }
   };
 
@@ -27,8 +27,8 @@ export default function Subscricoes() {
     try {
       const { data } = await axios.get('/api/subscricoes/minhas-disciplinas');
       setMinhasSubscricoes(data.map(s => s.disciplina));
-    } catch (erro) {
-      console.error('Erro ao carregar subscrições:', erro);
+    } catch {
+      // Erro ao carregar subscrições
     }
   };
 
@@ -38,7 +38,7 @@ export default function Subscricoes() {
       await axios.post(`/api/subscricoes/disciplinas/${encodeURIComponent(disciplina)}`);
       setToast({ tipo: 'sucesso', mensagem: `Subscrito a ${disciplina}!` });
       carregarSubscricoes();
-    } catch (erro) {
+    } catch {
       setToast({ tipo: 'erro', mensagem: 'Erro ao subscrever' });
     } finally {
       setCarregando(false);
@@ -52,7 +52,7 @@ export default function Subscricoes() {
       await axios.delete(`/api/subscricoes/disciplinas/${encodeURIComponent(disciplina)}`);
       setToast({ tipo: 'sucesso', mensagem: `Desinscrição de ${disciplina}` });
       carregarSubscricoes();
-    } catch (erro) {
+    } catch {
       setToast({ tipo: 'erro', mensagem: 'Erro ao desinscrever' });
     } finally {
       setCarregando(false);
