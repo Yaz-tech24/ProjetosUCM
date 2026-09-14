@@ -99,6 +99,13 @@ require("./routes/config")(app);
 require("./routes/stats")(app);
 require("./routes/chat")(app, io);
 require("./routes/status")(app);
+require("./routes/avaliacoes")(app);
+require("./routes/comentarios")(app);
+require("./routes/subscricoes")(app);
+require("./routes/reputacao")(app);
+require("./routes/analytics")(app);
+require("./routes/2fa")(app);
+require("./routes/tags")(app);
 
 // ==========================================
 // TRATAMENTO GLOBAL DE ERROS (deve ficar por último)
@@ -172,6 +179,21 @@ async function runMigrations() {
   }
   try {
     await db.query(`ALTER TABLE usuarios ADD COLUMN email_token_expira DATETIME NULL`);
+  } catch {
+    // Coluna já existe — ignorar
+  }
+  try {
+    await db.query(`ALTER TABLE usuarios ADD COLUMN 2fa_ativado TINYINT(1) NOT NULL DEFAULT 0`);
+  } catch {
+    // Coluna já existe — ignorar
+  }
+  try {
+    await db.query(`ALTER TABLE usuarios ADD COLUMN 2fa_secret VARCHAR(255) NULL`);
+  } catch {
+    // Coluna já existe — ignorar
+  }
+  try {
+    await db.query(`ALTER TABLE usuarios ADD COLUMN 2fa_secret_temp VARCHAR(255) NULL`);
   } catch {
     // Coluna já existe — ignorar
   }
@@ -258,6 +280,139 @@ async function runMigrations() {
   if (totalCursos === 0) {
     await db.query("INSERT INTO cursos (nome) VALUES ('Geral')");
     console.log("✅ Migração: curso por defeito 'Geral' criado.");
+  }
+
+  // Tabelas de novas funcionalidades (criadas idempotentemente)
+  try {
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS auditoria (
+        id            INT NOT NULL AUTO_INCREMENT,
+        usuario_id    INT,
+        acao          VARCHAR(100) NOT NULL,
+        recurso       VARCHAR(100),
+        recurso_id    INT,
+        descricao     TEXT,
+        dados_antigos JSON,
+        dados_novos   JSON,
+        data_hora     TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+        ip_origem     VARCHAR(45),
+        PRIMARY KEY (id),
+        KEY usuario_id (usuario_id),
+        KEY idx_auditoria_data_acao (data_hora, acao)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `);
+  } catch {
+    // Tabela já existe
+  }
+
+  try {
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS avaliacoes (
+        id            INT NOT NULL AUTO_INCREMENT,
+        material_id   INT NOT NULL,
+        usuario_id    INT NOT NULL,
+        nota          INT NOT NULL,
+        comentario    TEXT,
+        data_criacao  TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        UNIQUE KEY material_usuario (material_id, usuario_id),
+        KEY usuario_id (usuario_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `);
+  } catch {
+    // Tabela já existe
+  }
+
+  try {
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS comentarios_materiais (
+        id            INT NOT NULL AUTO_INCREMENT,
+        material_id   INT NOT NULL,
+        usuario_id    INT NOT NULL,
+        conteudo      TEXT NOT NULL,
+        data_criacao  TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        KEY material_id (material_id),
+        KEY usuario_id (usuario_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `);
+  } catch {
+    // Tabela já existe
+  }
+
+  try {
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS reputacao_usuarios (
+        id            INT NOT NULL AUTO_INCREMENT,
+        usuario_id    INT NOT NULL UNIQUE,
+        pontos        INT NOT NULL DEFAULT 0,
+        materiais_submetidos INT NOT NULL DEFAULT 0,
+        materiais_aprovados INT NOT NULL DEFAULT 0,
+        media_avaliacoes DECIMAL(3,2),
+        emblema       VARCHAR(50),
+        data_atualizacao TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `);
+  } catch {
+    // Tabela já existe
+  }
+
+  try {
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS subscricoes_disciplinas (
+        id            INT NOT NULL AUTO_INCREMENT,
+        usuario_id    INT NOT NULL,
+        disciplina    VARCHAR(100) NOT NULL,
+        data_subscrition TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        UNIQUE KEY usuario_disciplina (usuario_id, disciplina)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `);
+  } catch {
+    // Tabela já existe
+  }
+
+  try {
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS quotas_utilizadores (
+        id            INT NOT NULL AUTO_INCREMENT,
+        usuario_id    INT NOT NULL UNIQUE,
+        bytes_usados  BIGINT NOT NULL DEFAULT 0,
+        materiais_este_mes INT NOT NULL DEFAULT 0,
+        data_reset_cota TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `);
+  } catch {
+    // Tabela já existe
+  }
+
+  try {
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS tags (
+        id    INT NOT NULL AUTO_INCREMENT,
+        nome  VARCHAR(50) NOT NULL UNIQUE,
+        cor   CHAR(7) NOT NULL DEFAULT '#ffd700',
+        PRIMARY KEY (id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `);
+  } catch {
+    // Tabela já existe
+  }
+
+  try {
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS materiais_tags (
+        id           INT NOT NULL AUTO_INCREMENT,
+        material_id  INT NOT NULL,
+        tag_id       INT NOT NULL,
+        PRIMARY KEY (id),
+        UNIQUE KEY material_tag (material_id, tag_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `);
+  } catch {
+    // Tabela já existe
   }
 }
 
