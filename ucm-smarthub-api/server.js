@@ -160,6 +160,21 @@ async function runMigrations() {
   } catch {
     // Coluna já existe — ignorar
   }
+  try {
+    await db.query(`ALTER TABLE usuarios ADD COLUMN email_verificado TINYINT(1) NOT NULL DEFAULT 0`);
+  } catch {
+    // Coluna já existe — ignorar
+  }
+  try {
+    await db.query(`ALTER TABLE usuarios ADD COLUMN email_token VARCHAR(255) NULL`);
+  } catch {
+    // Coluna já existe — ignorar
+  }
+  try {
+    await db.query(`ALTER TABLE usuarios ADD COLUMN email_token_expira DATETIME NULL`);
+  } catch {
+    // Coluna já existe — ignorar
+  }
 
   for (const coluna of ["link_facebook", "link_instagram", "link_linkedin"]) {
     try {

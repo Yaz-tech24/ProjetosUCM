@@ -22,6 +22,9 @@ CREATE TABLE IF NOT EXISTS usuarios (
   reset_token_expira  DATETIME DEFAULT NULL,
   numero_estudante    VARCHAR(50) DEFAULT NULL,
   telefone            VARCHAR(30) DEFAULT NULL,
+  email_verificado    TINYINT(1) NOT NULL DEFAULT 0,
+  email_token         VARCHAR(255) DEFAULT NULL,
+  email_token_expira  DATETIME DEFAULT NULL,
   PRIMARY KEY (id),
   UNIQUE KEY email (email)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

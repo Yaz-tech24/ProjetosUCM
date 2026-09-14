@@ -3,6 +3,7 @@ const path = require("path");
 const fs = require("fs");
 const { getConfiguracoes } = require("../services/plataforma");
 const { TAMANHO_MAXIMO_TECTO_MB } = require("../schemas");
+const { gerarUUID, validarMagicBytes } = require("../utils/security");
 
 // Garante que a pasta uploads existe ao carregar o módulo
 const uploadsDir = path.join(__dirname, "..", "uploads");
@@ -41,8 +42,9 @@ const extensaoSegura = (mimetype) => MAPA_EXTENSAO_MIME[mimetype] || "";
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, uploadsDir),
   filename: (req, file, cb) => {
-    const nomeUnico = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    cb(null, file.fieldname + "-" + nomeUnico + extensaoSegura(file.mimetype));
+    // UUID garante que os nomes não têm structure previsível e impede path traversal
+    const nomeUnico = gerarUUID();
+    cb(null, nomeUnico + extensaoSegura(file.mimetype));
   },
 });
 
@@ -55,11 +57,14 @@ const upload = multer({
       const mimesPermitidos = (config.tipos_ficheiro_permitidos || "")
         .split(",").map(t => t.trim()).filter(Boolean)
         .flatMap(t => MAPA_TIPOS_MIME[t] || []);
-      if (mimesPermitidos.includes(file.mimetype)) {
-        cb(null, true);
-      } else {
-        cb(new Error("Tipo de ficheiro não permitido pela configuração actual da plataforma."));
+
+      if (!mimesPermitidos.includes(file.mimetype)) {
+        return cb(new Error("Tipo de ficheiro não permitido pela configuração actual da plataforma."));
       }
+
+      // Validação de magic bytes acontecerá no handler de rota após o ficheiro ser gravado
+      // (multer não tem acesso fácil ao buffer completo nesta fase)
+      cb(null, true);
     } catch {
       cb(new Error("Não foi possível validar o tipo de ficheiro."));
     }

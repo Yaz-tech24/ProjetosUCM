@@ -6,6 +6,7 @@ const db = require("../config/db");
 const mailer = require("../services/email");
 const { getConfiguracoes, getCursos } = require("../services/plataforma");
 const { paraUrlAbsoluto } = require("../utils/urls");
+const { gerarUUID } = require("../utils/security");
 const validar = require("../middleware/validar");
 const { autenticar, JWT_SECRET } = require("../middleware/auth");
 const {
@@ -16,6 +17,11 @@ const {
   schemaRegisto, schemaLogin, schemaEsqueciSenha, schemaReporSenha,
   emailComDominioPermitido,
 } = require("../schemas");
+
+// Gerar token de verificação de email (válido por 24 horas)
+function gerarTokenVerificacaoEmail() {
+  return crypto.randomBytes(32).toString("hex");
+}
 
 // Hash bcrypt fixo sem correspondência real — usado quando o email não existe,
 // para que bcrypt.compare() corra sempre e o tempo de resposta não denuncie
@@ -101,10 +107,14 @@ module.exports = function registarRotasAuth(app) {
       const [[{ total }]] = await db.query("SELECT COUNT(*) AS total FROM usuarios");
       const papelFinal = total === 0 ? "admin" : "estudante";
 
+      // Gerar token de verificação de email (válido por 24 horas)
+      const emailToken = gerarTokenVerificacaoEmail();
+      const emailTokenExpira = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
       try {
         await db.query(
-          "INSERT INTO usuarios (nome, email, senha, curso, papel, numero_estudante, telefone) VALUES (?, ?, ?, ?, ?, ?, ?)",
-          [nome, email, senhaCriptografada, cursoValido, papelFinal, numero_estudante || null, telefone || null]
+          "INSERT INTO usuarios (nome, email, senha, curso, papel, numero_estudante, telefone, email_token, email_token_expira) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+          [nome, email, senhaCriptografada, cursoValido, papelFinal, numero_estudante || null, telefone || null, emailToken, emailTokenExpira]
         );
       } catch (erroInsert) {
         // Condição de corrida: dois registos com o mesmo email quase em
@@ -118,17 +128,22 @@ module.exports = function registarRotasAuth(app) {
       }
 
       res.status(201).json({
-        mensagem: papelFinal === "admin"
-          ? "Conta de administrador criada com sucesso! É a primeira conta da plataforma."
-          : "Utilizador criado com sucesso!",
+        mensagem: "Conta criada com sucesso! Verifique o seu email para confirmar a conta.",
       });
 
-      // Email de boas-vindas — não bloqueia a resposta; falhas de envio já são
-      // engolidas dentro do próprio serviço de email.
+      // Email de verificação — não bloqueia a resposta
       getConfiguracoes().then(config => {
-        mailer.enviarBoasVindas({
-          to: email, nome, nomePlataforma: config.nome_plataforma,
-          corPrimaria: config.cor_primaria, corDestaque: config.cor_destaque, logoUrl: config.logo_url,
+        const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+        const linkVerificacao = `${frontendUrl}/verificar-email?token=${emailToken}`;
+
+        mailer.enviarVerificacaoEmail({
+          to: email,
+          nome,
+          linkVerificacao,
+          nomePlataforma: config.nome_plataforma,
+          corPrimaria: config.cor_primaria,
+          corDestaque: config.cor_destaque,
+          logoUrl: config.logo_url,
         });
       }).catch(() => {});
     } catch (erro) {
@@ -350,7 +365,7 @@ module.exports = function registarRotasAuth(app) {
   app.get("/api/me", autenticar, async (req, res) => {
     try {
       const [[utilizador]] = await db.query(
-        "SELECT id, nome, email, papel, curso, numero_estudante, telefone, avatar_url FROM usuarios WHERE id = ?",
+        "SELECT id, nome, email, papel, curso, numero_estudante, telefone, avatar_url, email_verificado FROM usuarios WHERE id = ?",
         [req.utilizador.id]
       );
       if (!utilizador) {
@@ -361,6 +376,129 @@ module.exports = function registarRotasAuth(app) {
     } catch (erro) {
       console.error("Erro ao buscar utilizador actual:", erro.message);
       res.status(500).json({ erro: "Falha ao buscar utilizador." });
+    }
+  });
+
+  /**
+   * @openapi
+   * /api/verificar-email:
+   *   post:
+   *     summary: Verifica o email usando o token enviado
+   *     tags: [Autenticação]
+   *     security: []
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required: [token]
+   *             properties:
+   *               token: { type: string }
+   *     responses:
+   *       200: { description: Email verificado com sucesso }
+   *       400: { description: Token inválido ou expirado }
+   */
+  app.post("/api/verificar-email", async (req, res) => {
+    try {
+      const { token } = req.body;
+      if (!token || !token.trim()) {
+        return res.status(400).json({ erro: "Token em falta." });
+      }
+
+      const [[utilizador]] = await db.query(
+        `SELECT id, email_verificado FROM usuarios WHERE email_token = ? AND email_token_expira > NOW()`,
+        [token.trim()]
+      );
+
+      if (!utilizador) {
+        return res.status(400).json({ erro: "Token inválido ou expirado. Tente registar-se novamente." });
+      }
+
+      if (utilizador.email_verificado) {
+        return res.status(200).json({ mensagem: "Email já tinha sido verificado anteriormente." });
+      }
+
+      await db.query(
+        "UPDATE usuarios SET email_verificado = 1, email_token = NULL, email_token_expira = NULL WHERE id = ?",
+        [utilizador.id]
+      );
+
+      res.status(200).json({ mensagem: "Email verificado com sucesso! Pode agora fazer login." });
+    } catch (erro) {
+      console.error("Erro ao verificar email:", erro.message);
+      res.status(500).json({ erro: "Erro ao verificar email. Tente novamente." });
+    }
+  });
+
+  /**
+   * @openapi
+   * /api/reenviar-verificacao-email:
+   *   post:
+   *     summary: Reenvia o email de verificação se não foi recebido
+   *     tags: [Autenticação]
+   *     security: []
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required: [email]
+   *             properties:
+   *               email: { type: string }
+   *     responses:
+   *       200: { description: Email reenviado }
+   *       404: { description: Email não encontrado }
+   */
+  app.post("/api/reenviar-verificacao-email", limitarEsqueciSenha, async (req, res) => {
+    try {
+      const { email } = req.body;
+      if (!email || !email.trim()) {
+        return res.status(400).json({ erro: "Email obrigatório." });
+      }
+
+      const [[utilizador]] = await db.query(
+        "SELECT id, nome, email_verificado FROM usuarios WHERE email = ?",
+        [email.trim().toLowerCase()]
+      );
+
+      if (!utilizador) {
+        return res.status(404).json({ erro: "Email não encontrado." });
+      }
+
+      if (utilizador.email_verificado) {
+        return res.status(200).json({ mensagem: "Este email já foi verificado." });
+      }
+
+      const emailToken = gerarTokenVerificacaoEmail();
+      const emailTokenExpira = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+      await db.query(
+        "UPDATE usuarios SET email_token = ?, email_token_expira = ? WHERE id = ?",
+        [emailToken, emailTokenExpira, utilizador.id]
+      );
+
+      res.status(200).json({ mensagem: "Email de verificação reenviado. Verifique a sua caixa de entrada." });
+
+      // Enviar email — não bloqueia a resposta
+      getConfiguracoes().then(config => {
+        const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+        const linkVerificacao = `${frontendUrl}/verificar-email?token=${emailToken}`;
+
+        mailer.enviarVerificacaoEmail({
+          to: email,
+          nome: utilizador.nome,
+          linkVerificacao,
+          nomePlataforma: config.nome_plataforma,
+          corPrimaria: config.cor_primaria,
+          corDestaque: config.cor_destaque,
+          logoUrl: config.logo_url,
+        });
+      }).catch(() => {});
+    } catch (erro) {
+      console.error("Erro ao reenviar verificação de email:", erro.message);
+      res.status(500).json({ erro: "Erro ao reenviar email de verificação." });
     }
   });
 };

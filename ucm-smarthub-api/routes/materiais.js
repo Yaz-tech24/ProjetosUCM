@@ -6,6 +6,7 @@ const mailer = require("../services/email");
 const { getConfiguracoes, getCursos } = require("../services/plataforma");
 const { genAI, extractPdfText, gerarResumoIA, verificarConformidadeIA, MENSAGEM_IA_MAX } = require("../services/ia");
 const { paraUrlAbsoluto } = require("../utils/urls");
+const { validarMagicBytes } = require("../utils/security");
 const validar = require("../middleware/validar");
 const { autenticar, apenasAdmin } = require("../middleware/auth");
 const { limitarChat } = require("../middleware/rateLimiters");
@@ -202,7 +203,16 @@ module.exports = function registarRotasMateriais(app) {
       let resumoTexto = "";
 
       if (material.tipo === "PDF") {
-        const fileName = path.basename(material.url_arquivo);
+        // url_arquivo é armazenado como "/uploads/uuid.pdf" — extrair APENAS o filename
+        // Usando split('/') para ser seguro contra path traversal (ex: "/uploads/../../../etc/passwd")
+        const urlParts = material.url_arquivo.split('/').filter(p => p && p !== "..");
+        const fileName = urlParts[urlParts.length - 1];
+
+        if (!fileName || fileName.includes("..")) {
+          console.error("Tentativa de acesso com path traversal:", material.url_arquivo);
+          return res.status(400).json({ erro: "Caminho de ficheiro inválido." });
+        }
+
         const filePath = path.join(uploadsDir, fileName);
 
         if (!fs.existsSync(filePath)) {
@@ -398,9 +408,11 @@ Responde APENAS com as 3 notas numeradas. Sem introdução, sem conclusão.`;
       // no conteúdo real do documento, não apenas no seu título.
       let trimmedText = "";
       if (material.tipo === "PDF") {
-        const fileName = path.basename(material.url_arquivo);
+        const urlParts = material.url_arquivo.split('/').filter(p => p && p !== "..");
+        const fileName = urlParts[urlParts.length - 1];
         const filePath = path.join(uploadsDir, fileName);
-        if (fs.existsSync(filePath)) {
+
+        if (fileName && !fileName.includes("..") && fs.existsSync(filePath)) {
           try {
             const pdfText = await extractPdfText(filePath);
             trimmedText = pdfText.slice(0, 12000);
@@ -464,6 +476,23 @@ Pergunta do estudante: ${mensagem.trim()}`;
         return res.status(400).json({ erro: `Ficheiro demasiado grande. Limite actual: ${config.tamanho_maximo_mb} MB.` });
       }
 
+      // Validação de Magic Bytes — verificar que o ficheiro é realmente o tipo esperado
+      // (previne upload de executáveis/malware disfarçados com extensão falsa)
+      try {
+        const ficheiroBuffer = fs.readFileSync(req.file.path);
+        const tipoEsperado = tipo === "PDF" ? "pdf" : tipo.toLowerCase();
+        if (!validarMagicBytes(ficheiroBuffer, tipoEsperado)) {
+          limparFicheiroOrfao();
+          return res.status(400).json({
+            erro: `Ficheiro suspeito ou tipo incorreto. Enviou um ficheiro que afirma ser ${tipo}, mas os dados internos não correspondem. Verifique a extensão e tente novamente.`
+          });
+        }
+      } catch (erroMagic) {
+        console.error("Erro ao validar magic bytes:", erroMagic.message);
+        limparFicheiroOrfao();
+        return res.status(400).json({ erro: "Não foi possível validar o ficheiro. Tente novamente." });
+      }
+
       const cursos = await getCursos();
       if (!cursos.some(c => c.nome === cadeira)) {
         limparFicheiroOrfao();
@@ -472,13 +501,14 @@ Pergunta do estudante: ${mensagem.trim()}`;
 
       const { sinalizado, motivo } = await verificarConformidadeIA(config, { titulo, cadeira, tipo });
 
-      // A IA já analisou o material acima: se a moderação estiver activada, a
-      // chave do Gemini estiver configurada (sem ela, verificarConformidadeIA
-      // nunca sinaliza nada — não podemos tratar "não verificou" como "está
-      // conforme") e nada de suspeito for encontrado, o material é publicado
-      // de imediato. Em qualquer outro caso — sinalizado, moderação desligada,
-      // ou IA não configurada — vai para a fila de aprovação manual do admin.
-      const statusInicial = config.moderacao_ia_activada && genAI && !sinalizado ? "aprovado" : "pendente";
+      // FAIL-SAFE: Se moderação falhar ou não conseguir validar, marcar como "pendente"
+      // em vez de "aprovado". Isto previne conteúdo impróprio de ser publicado automaticamente
+      // se houver um erro na IA ou timeout do Gemini.
+      let statusInicial = "pendente";
+      if (config.moderacao_ia_activada && genAI && sinalizado !== undefined && sinalizado !== null) {
+        // Só marca como "aprovado" se moderação está ON, IA está configurada, E conseguiu verificar
+        statusInicial = sinalizado === false ? "aprovado" : "pendente";
+      }
 
       // Usa sempre o ID do utilizador autenticado — ignora qualquer autor_id do body
       const autor_id = req.utilizador.id;

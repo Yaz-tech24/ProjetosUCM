@@ -77,6 +77,22 @@ function layout(nomePlataforma, corPrimaria, corDestaque, conteudoHtml, logoUrl)
 </body></html>`;
 }
 
+async function enviarVerificacaoEmail({ to, nome, linkVerificacao, nomePlataforma, corPrimaria, corDestaque, logoUrl }) {
+  const nomeSeguro = escapeHtml(nome);
+  return enviarEmail({
+    to,
+    subject: `Confirma o teu email — ${nomePlataforma}`,
+    html: layout(nomePlataforma, corPrimaria, corDestaque, `
+      <p>Olá, ${nomeSeguro},</p>
+      <p>Bem-vindo(a) à <strong>${nomePlataforma}</strong>! Para ativar a tua conta, confirma o teu email clicando no botão abaixo. Este link é válido por 24 horas:</p>
+      <p style="text-align:center;margin:28px 0;">
+        <a href="${linkVerificacao}" style="background:${corDestaque};color:#04122e;text-decoration:none;font-weight:800;padding:12px 28px;border-radius:12px;display:inline-block;">Confirmar Email</a>
+      </p>
+      <p>Se não criaste esta conta, ignora este email.</p>
+    `, logoUrl),
+  });
+}
+
 async function enviarBoasVindas({ to, nome, nomePlataforma, corPrimaria, corDestaque, logoUrl }) {
   const nomeSeguro = escapeHtml(nome);
   return enviarEmail({
@@ -122,4 +138,4 @@ async function enviarModeracaoMaterial({ to, nome, titulo, aprovado, nomePlatafo
   });
 }
 
-module.exports = { enviarEmail, enviarBoasVindas, enviarRecuperacaoPassword, enviarModeracaoMaterial, emailConfigurado };
+module.exports = { enviarEmail, enviarVerificacaoEmail, enviarBoasVindas, enviarRecuperacaoPassword, enviarModeracaoMaterial, emailConfigurado };
