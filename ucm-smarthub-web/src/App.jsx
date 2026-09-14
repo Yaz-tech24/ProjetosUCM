@@ -17,6 +17,9 @@ const Admin       = lazy(() => import("./pages/Admin"));
 const Chat        = lazy(() => import("./pages/Chat"));
 const Perfil      = lazy(() => import("./pages/Perfil"));
 const ReporSenha  = lazy(() => import("./pages/ReporSenha"));
+const Analytics   = lazy(() => import("./pages/Analytics"));
+const VerificarEmail = lazy(() => import("./pages/VerificarEmail"));
+const ConfigureSecurity = lazy(() => import("./pages/ConfigureSecurity"));
 
 // ─── Fallback de carregamento entre páginas ───────────────────
 const PageLoader = () => (
@@ -142,6 +145,14 @@ const App = () => {
               : <Navigate to="/dashboard" replace />
           }
         />
+        <Route
+          path="/verificar-email"
+          element={
+            !isLoggedIn
+              ? <VerificarEmail />
+              : <Navigate to="/dashboard" replace />
+          }
+        />
 
         {/* ─── PRIVADAS (Layout sem path, guarda de auth) ─── */}
         <Route
@@ -155,8 +166,10 @@ const App = () => {
           <Route path="repositorio" element={<Repositorio usuarioLogado={usuarioLogado} />} />
           <Route path="video/:id"   element={<Visualizador usuarioLogado={usuarioLogado} />} />
           <Route path="admin"       element={<Admin       usuarioLogado={usuarioLogado} />} />
+          <Route path="analytics"   element={usuarioLogado?.papel === 'admin' ? <Analytics /> : <Navigate to="/dashboard" replace />} />
           <Route path="chat"        element={<Chat        usuarioLogado={usuarioLogado} />} />
           <Route path="perfil"      element={<Perfil      usuarioLogado={usuarioLogado} onUpdateUsuario={handleUpdateUsuario} />} />
+          <Route path="seguranca"   element={<ConfigureSecurity />} />
         </Route>
 
         {/* ─── 404 ────────────────────────────────────────── */}

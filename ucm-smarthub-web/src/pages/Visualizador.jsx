@@ -4,6 +4,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, ExternalLink, DownloadCloud, Sparkles, RotateCcw, Heart, Share2, Trash2, Send, MessageCircle } from "lucide-react";
 import { useConfig } from "../context/ConfigContext";
 import Toast from "../components/Toast";
+import Avaliacoes from "../components/Avaliacoes";
+import Comentarios from "../components/Comentarios";
 
 /* ── Renderiza o resumo estruturado devolvido pela IA ── */
 const SummaryRenderer = ({ text }) => {
@@ -540,6 +542,14 @@ const Visualizador = ({ usuarioLogado }) => {
             </p>
           </div>
         </div>
+
+        {/* Avaliações e Comentários */}
+        {usuarioLogado && (
+          <>
+            <Avaliacoes materialId={id} ehAutenticado={true} />
+            <Comentarios materialId={id} usuarioId={usuarioLogado?.id} />
+          </>
+        )}
       </div>
     </div>
 
