@@ -14,6 +14,7 @@ export default function Avaliacoes({ materialId, ehAutenticado }) {
   useEffect(() => {
     carregarAvaliacoes();
     if (ehAutenticado) carregarMinhaAvaliacao();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [materialId, ehAutenticado]);
 
   const carregarAvaliacoes = async () => {
