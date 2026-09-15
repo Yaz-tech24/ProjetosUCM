@@ -51,9 +51,10 @@ Migrações em `ucm-smarthub-api/db/migracoes.js`, idempotentes (verificam
 
 ## Testes
 
-`npm test` na API: 135 testes com `db.query` mockado. Há ainda dois scripts de
-smoke test ponta-a-ponta contra a BD real usados durante o desenvolvimento
-(não fazem parte do CI).
+`npm test` na API: 135 testes com `db.query` mockado; no frontend, 42 (Vitest).
+Há ainda scripts de smoke test ponta-a-ponta contra a BD real e de fluxos de
+UI em Chromium headless (login 2FA, leitura offline) usados durante o
+desenvolvimento — não fazem parte do CI.
 
 ## Variáveis de ambiente relevantes
 
