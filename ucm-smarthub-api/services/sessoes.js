@@ -28,19 +28,24 @@ async function criarSessao({ usuarioId, req }) {
 
 // Uma consulta por pedido autenticado (chave primária) — o preço de poder
 // terminar sessões. ultimo_uso só se escreve de 5 em 5 minutos por sessão.
+// Devolve { papel, curso } actuais quando a sessão está activa, ou null.
+// Trazer o papel da BD em cada pedido é o que faz uma despromoção (ou
+// promoção) fazer efeito imediato em vez de só quando o JWT de 8 h expirar.
 async function sessaoActiva(jti) {
   const [[sessao]] = await db.query(
-    "SELECT usuario_id, revogada_em, expira_em FROM sessoes WHERE jti = ?",
+    `SELECT s.usuario_id, s.revogada_em, s.expira_em, u.papel, u.curso
+     FROM sessoes s JOIN usuarios u ON u.id = s.usuario_id
+     WHERE s.jti = ?`,
     [jti]
   );
-  if (!sessao || sessao.revogada_em || new Date(sessao.expira_em) < new Date()) return false;
+  if (!sessao || sessao.revogada_em || new Date(sessao.expira_em) < new Date()) return null;
 
   const agora = Date.now();
   if ((ultimaEscrita.get(jti) || 0) + INTERVALO_ULTIMO_USO_MS < agora) {
     ultimaEscrita.set(jti, agora);
     db.query("UPDATE sessoes SET ultimo_uso = NOW() WHERE jti = ?", [jti]).catch(() => {});
   }
-  return true;
+  return { papel: sessao.papel, curso: sessao.curso };
 }
 
 async function listarSessoes(usuarioId) {
@@ -84,6 +89,9 @@ async function revogarTodasSessoes(usuarioId) {
 async function purgarSessoesAntigas() {
   try {
     await db.query("DELETE FROM sessoes WHERE expira_em < DATE_SUB(NOW(), INTERVAL 30 DAY)");
+    // Os contadores por material ficam; as linhas individuais de acesso só
+    // servem para análise recente — um ano chega.
+    await db.query("DELETE FROM materiais_acessos WHERE criado_em < DATE_SUB(NOW(), INTERVAL 365 DAY)");
   } catch { /* best-effort */ }
 }
 

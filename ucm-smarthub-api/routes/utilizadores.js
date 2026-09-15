@@ -81,7 +81,8 @@ module.exports = function registarRotasUtilizadores(app) {
       let resultado;
       try {
         [resultado] = await db.query(
-          "INSERT INTO usuarios (nome, email, senha, curso, papel, numero_estudante, telefone) VALUES (?, ?, ?, ?, ?, ?, ?)",
+          // email_verificado = 1: é o admin que garante o email; não há email de verificação neste fluxo
+          "INSERT INTO usuarios (nome, email, senha, curso, papel, numero_estudante, telefone, email_verificado) VALUES (?, ?, ?, ?, ?, ?, ?, 1)",
           [nome, email, senhaCriptografada, cursoValido, papel, numero_estudante || null, telefone || null]
         );
       } catch (erroInsert) {

@@ -9,7 +9,12 @@
 // `chave` decide o que conta como "o mesmo cliente": por defeito o IP (rotas
 // públicas); nas rotas autenticadas usa-se o id do utilizador, senão uma
 // turma inteira atrás do mesmo NAT partilhava um único limite.
+// Interruptor SÓ para desenvolvimento/testes automatizados (scripts que fazem
+// dezenas de logins seguidos): ignorado em produção, mesmo que definido.
+const RATE_LIMIT_DESLIGADO = process.env.DESATIVAR_RATE_LIMIT === "1" && process.env.NODE_ENV !== "production";
+
 function criarLimitadorTaxa({ janelaMs, maxTentativas, chave = (req) => req.ip, mensagem }) {
+  if (RATE_LIMIT_DESLIGADO) return (req, res, next) => next();
   const tentativasPorChave = new Map();
 
   const limpar = () => {

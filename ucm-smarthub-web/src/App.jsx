@@ -76,7 +76,11 @@ const App = () => {
         setUsuario(res.data.utilizador);
         localStorage.setItem('usuarioLogado', JSON.stringify(res.data.utilizador));
       })
-      .catch(() => {
+      .catch((err) => {
+        // Sem resposta do servidor (offline, timeout) não é "sessão inválida":
+        // mantém-se a sessão em cache para a leitura offline funcionar. Só uma
+        // resposta explícita do servidor (401/403) termina a sessão.
+        if (!err.response) return;
         localStorage.removeItem('usuarioLogado');
         setUsuario(null);
         setLoggedIn(false);
@@ -89,6 +93,9 @@ const App = () => {
     api.post('/logout').catch(() => {}); // limpa o cookie no servidor; falha aqui não impede o logout local
     localStorage.removeItem('usuarioLogado');
     limparCacheFavoritos();
+    // Respostas da API guardadas pelo service worker (network-first) não
+    // podem sobreviver ao logout num computador partilhado.
+    if (typeof caches !== 'undefined') caches.delete('smarthub-api').catch(() => {});
     setUsuario(null);
     setLoggedIn(false);
   }, []);

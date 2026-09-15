@@ -237,7 +237,6 @@ Pergunta do estudante: ${mensagem}`;
    *   get:
    *     summary: Histórico de mensagens de uma sala de curso
    *     tags: [Chat]
-   *     security: []
    *     parameters:
    *       - in: query
    *         name: curso
@@ -245,7 +244,7 @@ Pergunta do estudante: ${mensagem}`;
    *     responses:
    *       200: { description: Últimas 60 mensagens da sala }
    */
-  app.get("/api/chat/messages", async (req, res) => {
+  app.get("/api/chat/messages", autenticar, async (req, res) => {
     const curso = req.query.curso || "Geral";
     try {
       const [messages] = await db.query(

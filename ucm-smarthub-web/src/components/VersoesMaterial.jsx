@@ -86,6 +86,11 @@ const VersoesMaterial = ({ material, podeEditar, aceitaFicheiros, onToast, onAtu
         </form>
       )}
 
+      {dados?.actual?.notas && (
+        <p className="mb-4 rounded-2xl px-4 py-3" style={{ fontSize: 13, background: "var(--surface-hover)", color: "var(--text-body)" }}>
+          <strong style={{ color: "var(--text-heading)" }}>Nesta versão:</strong> {dados.actual.notas}
+        </p>
+      )}
       {aCarregar ? <Spinner /> : anteriores.length === 0 ? (
         <p style={{ fontSize: 13.5, color: "var(--text-faint)" }}>Ainda não há versões anteriores.</p>
       ) : (

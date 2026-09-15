@@ -101,7 +101,7 @@ const Visualizador = ({ usuarioLogado }) => {
   const [offline,        setOffline]        = useState(false);   // guardado para leitura offline
   const [aGuardarOffline, setAGuardarOffline] = useState(false);
   const [urlLocal,       setUrlLocal]       = useState(null);    // blob URL do PDF em cache
-  const [semRede,        setSemRede]        = useState(false);   // a mostrar a cópia offline
+  const [semRede,        setSemRede]        = useState(() => typeof navigator !== 'undefined' && navigator.onLine === false); // a mostrar a cópia offline
   const [searchParams]   = useSearchParams();
   const [separador,      setSeparador]      = useState(() => searchParams.get('sep') || 'avaliacoes');
 
@@ -114,7 +114,7 @@ const Visualizador = ({ usuarioLogado }) => {
     const controller = new AbortController();
     setLoading(true);
     setErroCarregar(null);
-    setSemRede(false);
+    setSemRede(typeof navigator !== 'undefined' && navigator.onLine === false);
     setOffline(estaGuardadoOffline(id));
     api.get(`/materiais/${id}`, { signal: controller.signal })
       .then(res => {
@@ -136,6 +136,17 @@ const Visualizador = ({ usuarioLogado }) => {
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [id]);
+
+  /* O browser sabe quando a rede cai/volta — o aviso e as secções que precisam
+     de servidor seguem esse estado, mesmo que o service worker consiga servir
+     os metadados do material a partir da cache. */
+  useEffect(() => {
+    const cair = () => setSemRede(true);
+    const voltar = () => setSemRede(false);
+    window.addEventListener('offline', cair);
+    window.addEventListener('online', voltar);
+    return () => { window.removeEventListener('offline', cair); window.removeEventListener('online', voltar); };
+  }, []);
 
   /* Se o PDF estiver guardado offline, mostra-o a partir da cache (blob URL) */
   useEffect(() => {

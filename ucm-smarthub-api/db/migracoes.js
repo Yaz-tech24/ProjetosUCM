@@ -284,6 +284,7 @@ async function correrMigracoes() {
   await adicionarColuna("materiais", "texto_indexado_em", "DATETIME NULL");
   await adicionarColuna("materiais", "versao", "INT NOT NULL DEFAULT 1");
   await adicionarColuna("materiais", "formato_original", "VARCHAR(10) NULL");
+  await adicionarColuna("materiais", "notas_versao", "VARCHAR(500) NULL");
   if (!(await indiceExiste("materiais", "ft_materiais_texto"))) {
     await db.query("CREATE FULLTEXT INDEX ft_materiais_texto ON materiais (titulo, texto_extraido)");
     console.log("✅ Migração: índice FULLTEXT criado em materiais.");

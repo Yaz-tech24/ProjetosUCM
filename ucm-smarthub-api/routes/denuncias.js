@@ -6,6 +6,8 @@ const { autenticar, apenasAdmin } = require("../middleware/auth");
 const { limitarComentarios } = require("../middleware/rateLimiters");
 const { auditar } = require("../middleware/auditoria");
 const { criarNotificacao } = require("../services/notificacoes");
+const { atualizarReputacao } = require("../services/reputacao");
+const { apagarFicheirosMaterial } = require("../services/ficheirosMaterial");
 
 const TIPOS = ["material", "comentario", "mensagem", "pergunta", "resposta"];
 const MOTIVOS = ["conteudo_improprio", "direitos_autor", "spam", "informacao_errada", "assedio", "outro"];
@@ -154,7 +156,16 @@ module.exports = function registarRotasDenuncias(app) {
 
       if (remover && estado === "resolvida") {
         const def = TABELAS[denuncia.tipo];
-        await db.query(`DELETE FROM \`${def.tabela}\` WHERE id = ?`, [denuncia.recurso_id]);
+        if (denuncia.tipo === "material") {
+          // Mesmo tratamento da remoção normal: ficheiro fora do disco e
+          // reputação do autor recalculada.
+          const [[m]] = await db.query("SELECT autor_id FROM materiais WHERE id = ?", [denuncia.recurso_id]);
+          await apagarFicheirosMaterial(denuncia.recurso_id);
+          await db.query("DELETE FROM materiais WHERE id = ?", [denuncia.recurso_id]);
+          if (m?.autor_id) atualizarReputacao(m.autor_id);
+        } else {
+          await db.query(`DELETE FROM \`${def.tabela}\` WHERE id = ?`, [denuncia.recurso_id]);
+        }
         auditar(req.utilizador.id, "remover_conteudo_denunciado", denuncia.tipo, denuncia.recurso_id, `Removido a partir da denúncia #${id}`, req.ip);
       }
       // Todas as denúncias pendentes sobre o mesmo conteúdo fecham juntas.

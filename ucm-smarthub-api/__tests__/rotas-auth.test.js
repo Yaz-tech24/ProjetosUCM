@@ -189,7 +189,7 @@ describe("Sessão via cookie httpOnly", () => {
     const { JWT_SECRET } = require("../middleware/auth");
     const token = jwt.sign({ id: 7, papel: "estudante", nome: "Carlos", curso: "Geral" }, JWT_SECRET, { expiresIn: "1h" });
 
-    mockSql([[/SELECT id, nome, email, papel, curso, numero_estudante, telefone, avatar_url, email_verificado FROM usuarios WHERE id/, [[{ id: 7, nome: "Carlos", email: "c@d.com", papel: "estudante", curso: "Geral", avatar_url: null }]]]]);
+    mockSql([[/SELECT id, nome, email, papel, curso, numero_estudante, telefone, avatar_url, email_verificado, 2fa_ativado FROM usuarios WHERE id/, [[{ id: 7, nome: "Carlos", email: "c@d.com", papel: "estudante", curso: "Geral", avatar_url: null }]]]]);
     const res = await request(app).get("/api/me").set("Cookie", `token=${token}`);
     expect(res.status).toBe(200);
     expect(res.body.utilizador.email).toBe("c@d.com");
@@ -200,7 +200,7 @@ describe("Sessão via cookie httpOnly", () => {
     const { JWT_SECRET } = require("../middleware/auth");
     const token = jwt.sign({ id: 9, papel: "estudante", nome: "Bea", curso: "Geral" }, JWT_SECRET, { expiresIn: "1h" });
 
-    mockSql([[/SELECT id, nome, email, papel, curso, numero_estudante, telefone, avatar_url, email_verificado FROM usuarios WHERE id/, [[{ id: 9, nome: "Bea", email: "bea@teste.com", papel: "estudante", curso: "Geral", avatar_url: null }]]]]);
+    mockSql([[/SELECT id, nome, email, papel, curso, numero_estudante, telefone, avatar_url, email_verificado, 2fa_ativado FROM usuarios WHERE id/, [[{ id: 9, nome: "Bea", email: "bea@teste.com", papel: "estudante", curso: "Geral", avatar_url: null }]]]]);
     const res = await request(app).get("/api/me").set("Authorization", `Bearer ${token}`);
     expect(res.status).toBe(200);
     expect(res.body.utilizador.nome).toBe("Bea");

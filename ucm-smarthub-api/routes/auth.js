@@ -451,7 +451,8 @@ module.exports = function registarRotasAuth(app) {
         "UPDATE usuarios SET senha = ?, reset_token = NULL, reset_token_expira = NULL WHERE id = ?",
         [senhaCriptografada, utilizador.id]
       );
-      auditar(utilizador.id, "repor_senha", "usuarios", utilizador.id, "Repôs a palavra-passe via link de recuperação", req.ip);
+      await sessoes.revogarTodasSessoes(utilizador.id);
+      auditar(utilizador.id, "repor_senha", "usuarios", utilizador.id, "Repôs a palavra-passe via link de recuperação (todas as sessões terminadas)", req.ip);
 
       res.json({ mensagem: "Palavra-passe reposta com sucesso. Já pode entrar." });
     } catch (erro) {
@@ -494,13 +495,14 @@ module.exports = function registarRotasAuth(app) {
   app.get("/api/me", autenticar, async (req, res) => {
     try {
       const [[utilizador]] = await db.query(
-        "SELECT id, nome, email, papel, curso, numero_estudante, telefone, avatar_url, email_verificado FROM usuarios WHERE id = ?",
+        "SELECT id, nome, email, papel, curso, numero_estudante, telefone, avatar_url, email_verificado, 2fa_ativado FROM usuarios WHERE id = ?",
         [req.utilizador.id]
       );
       if (!utilizador) {
         return res.status(401).json({ erro: "Utilizador já não existe." });
       }
       utilizador.avatar_url = paraUrlAbsoluto(utilizador.avatar_url);
+      utilizador["2fa_ativado"] = utilizador["2fa_ativado"] === 1;
       res.json({ utilizador });
     } catch (erro) {
       console.error("Erro ao buscar utilizador actual:", erro.message);

@@ -73,7 +73,7 @@ module.exports = function registarRotasReputacao(app) {
         `SELECT r.usuario_id, u.nome, u.curso, u.avatar_url, r.pontos, r.materiais_aprovados, r.media_avaliacoes, r.emblema
          FROM reputacao_usuarios r
          JOIN usuarios u ON r.usuario_id = u.id
-         WHERE r.pontos > 0
+         WHERE r.pontos > 0 AND u.email <> 'conta-eliminada@sistema.local'
          ORDER BY r.pontos DESC, r.materiais_aprovados DESC
          LIMIT 10`
       );

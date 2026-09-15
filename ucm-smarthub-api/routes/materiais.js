@@ -14,6 +14,7 @@ const { atualizarReputacao } = require("../services/reputacao");
 const { notificarSubscritores, criarNotificacao } = require("../services/notificacoes");
 const { formatoConvertivel, conversaoDisponivel, converterParaPdf } = require("../services/conversao");
 const { indexarMaterial, consultaBooleana } = require("../services/indexacao");
+const { apagarFicheirosMaterial } = require("../services/ficheirosMaterial");
 const { limitarChat, limitarAvaliacoes } = require("../middleware/rateLimiters");
 const { uploadsDir, upload } = require("../middleware/upload");
 const { schemaMaterial } = require("../schemas");
@@ -695,7 +696,7 @@ Pergunta do estudante: ${mensagem.trim()}`;
   app.get("/api/materiais/:id/versoes", autenticar, async (req, res) => {
     try {
       const materialId = parseInt(req.params.id, 10);
-      const [[material]] = await db.query("SELECT id, versao, url_arquivo, data_upload FROM materiais WHERE id = ?", [materialId]);
+      const [[material]] = await db.query("SELECT id, versao, url_arquivo, data_upload, notas_versao FROM materiais WHERE id = ?", [materialId]);
       if (!material) return res.status(404).json({ erro: "Material não encontrado." });
       const [versoes] = await db.query(
         `SELECT v.id, v.versao, v.url_arquivo, v.notas, v.criado_em, u.nome AS autor
@@ -704,7 +705,7 @@ Pergunta do estudante: ${mensagem.trim()}`;
         [materialId]
       );
       res.json({
-        actual: { versao: material.versao, url_arquivo: paraUrlAbsoluto(material.url_arquivo), data: material.data_upload },
+        actual: { versao: material.versao, url_arquivo: paraUrlAbsoluto(material.url_arquivo), data: material.data_upload, notas: material.notas_versao },
         anteriores: versoes.map(v => ({ ...v, url_arquivo: paraUrlAbsoluto(v.url_arquivo) })),
       });
     } catch (erro) {
@@ -721,7 +722,7 @@ Pergunta do estudante: ${mensagem.trim()}`;
       const notas = typeof req.body?.notas === "string" ? req.body.notas.trim().slice(0, 500) : null;
 
       const [[material]] = await db.query(
-        "SELECT id, titulo, cadeira, tipo, url_arquivo, autor_id, status, versao FROM materiais WHERE id = ?",
+        "SELECT id, titulo, cadeira, tipo, url_arquivo, autor_id, status, versao, notas_versao FROM materiais WHERE id = ?",
         [materialId]
       );
       if (!material) { limparFicheiroOrfao(); return res.status(404).json({ erro: "Material não encontrado." }); }
@@ -746,20 +747,19 @@ Pergunta do estudante: ${mensagem.trim()}`;
       const novoStatus = passaAPendente ? "pendente" : material.status;
 
       const novaUrl = `/uploads/${ficheiro.nome}`;
+      // A versão que sai leva consigo as notas que a descreviam; as notas
+      // novas ficam no material, a descrever a versão actual.
       await db.query(
         "INSERT INTO versoes_materiais (material_id, versao, url_arquivo, notas, autor_id) VALUES (?, ?, ?, ?, ?)",
-        [materialId, material.versao, material.url_arquivo, null, material.autor_id]
+        [materialId, material.versao, material.url_arquivo, material.notas_versao || null, material.autor_id]
       );
       await db.query(
         `UPDATE materiais SET url_arquivo = ?, versao = versao + 1, status = ?, ia_sinalizado = ?, ia_motivo = ?,
-                              formato_original = ?, resumo_texto = NULL, resumo_gerado_em = NULL,
+                              formato_original = ?, notas_versao = ?, resumo_texto = NULL, resumo_gerado_em = NULL,
                               texto_extraido = NULL, texto_indexado_em = NULL
          WHERE id = ?`,
-        [novaUrl, novoStatus, sinalizado, motivo, ficheiro.formatoOriginal, materialId]
+        [novaUrl, novoStatus, sinalizado, motivo, ficheiro.formatoOriginal, notas, materialId]
       );
-      // As notas descrevem a versão NOVA — ficam na linha que a vai substituir
-      // quando houver outra; até lá vivem na resposta e no histórico via UPDATE.
-      if (notas) await db.query("UPDATE versoes_materiais SET notas = ? WHERE material_id = ? AND versao = ?", [`(substituída) ${notas}`, materialId, material.versao]);
       // Quiz e resumo eram sobre o conteúdo antigo.
       await db.query("DELETE FROM quizzes WHERE material_id = ?", [materialId]).catch(() => {});
 
@@ -825,11 +825,8 @@ Pergunta do estudante: ${mensagem.trim()}`;
         return res.status(403).json({ erro: "Só quem enviou este material ou um administrador o pode remover." });
       }
 
+      await apagarFicheirosMaterial(id);
       await db.query("DELETE FROM materiais WHERE id = ?", [id]);
-      if (material.url_arquivo) {
-        const fileName = path.basename(material.url_arquivo);
-        fs.unlink(path.join(uploadsDir, fileName), () => {});
-      }
       auditar(req.utilizador.id, "remover_material", "materiais", Number(id), `Removeu "${material.titulo}"`, req.ip);
       atualizarReputacao(material.autor_id);
       res.json({ mensagem: "Material removido com sucesso." });
@@ -938,11 +935,8 @@ Pergunta do estudante: ${mensagem.trim()}`;
         // material já aprovado não deve repetir o email a toda a gente.
         if (material.status !== "aprovado") notificarSubscritores(material);
       } else {
+        await apagarFicheirosMaterial(id);
         await db.query("DELETE FROM materiais WHERE id = ?", [id]);
-        if (material?.url_arquivo) {
-          const fileName = path.basename(material.url_arquivo);
-          fs.unlink(path.join(uploadsDir, fileName), () => {});
-        }
         auditar(req.utilizador.id, "rejeitar_material", "materiais", material.id, `Rejeitou "${material.titulo}"`, req.ip);
         criarNotificacao(material.autor_id, { tipo: "moderacao", titulo: "O seu material foi rejeitado", mensagem: material.titulo, link: "/repositorio" });
         res.json({ mensagem: "Material rejeitado e apagado." });

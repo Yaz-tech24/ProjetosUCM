@@ -44,7 +44,7 @@ describe("Sessões com jti", () => {
   });
 
   it("um token com jti cuja sessão foi revogada é recusado", async () => {
-    mockSql([[/FROM sessoes WHERE jti/, [[{ usuario_id: 1, revogada_em: new Date(), expira_em: new Date(Date.now() + 3600e3) }]]]]);
+    mockSql([[/FROM sessoes s JOIN usuarios u/, [[{ usuario_id: 1, revogada_em: new Date(), expira_em: new Date(Date.now() + 3600e3), papel: "estudante", curso: "Geral" }]]]]);
     const token = tokenDe(1, "estudante", { jwtid: crypto.randomUUID() });
     const res = await request(app).get("/api/me").set("Authorization", `Bearer ${token}`);
     expect(res.status).toBe(401);
@@ -53,7 +53,7 @@ describe("Sessões com jti", () => {
 
   it("um token com jti cuja sessão está activa passa", async () => {
     mockSql([
-      [/FROM sessoes WHERE jti/, [[{ usuario_id: 1, revogada_em: null, expira_em: new Date(Date.now() + 3600e3) }]]],
+      [/FROM sessoes s JOIN usuarios u/, [[{ usuario_id: 1, revogada_em: null, expira_em: new Date(Date.now() + 3600e3), papel: "estudante", curso: "Geral" }]]],
       [/FROM usuarios WHERE id/, [[{ id: 1, nome: "Ana", email: "a@b.com", papel: "estudante", curso: "Geral", avatar_url: null, email_verificado: 1 }]]],
     ]);
     const token = tokenDe(1, "estudante", { jwtid: crypto.randomUUID() });
@@ -64,7 +64,7 @@ describe("Sessões com jti", () => {
   it("DELETE /api/sessoes termina as outras sessões, nunca a actual", async () => {
     const jti = crypto.randomUUID();
     const chamadas = mockSql([
-      [/FROM sessoes WHERE jti/, [[{ usuario_id: 1, revogada_em: null, expira_em: new Date(Date.now() + 3600e3) }]]],
+      [/FROM sessoes s JOIN usuarios u/, [[{ usuario_id: 1, revogada_em: null, expira_em: new Date(Date.now() + 3600e3), papel: "estudante", curso: "Geral" }]]],
       [/UPDATE sessoes SET revogada_em = NOW\(\) WHERE usuario_id = \? AND revogada_em IS NULL AND jti <> \?/, [{ affectedRows: 2 }]],
     ]);
     const res = await request(app).delete("/api/sessoes").set("Authorization", `Bearer ${tokenDe(1, "estudante", { jwtid: jti })}`);

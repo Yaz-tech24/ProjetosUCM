@@ -25,7 +25,10 @@ async function verificarSessao(token) {
   const payload = jwt.verify(token, JWT_SECRET);
   if (payload.fase || !payload.papel) throw erroSessao("TokenNaoSessao", "Token não é uma sessão");
   if (payload.jti) {
-    if (!(await sessaoActiva(payload.jti))) throw erroSessao("SessaoRevogada", "Sessão terminada");
+    const actual = await sessaoActiva(payload.jti);
+    if (!actual) throw erroSessao("SessaoRevogada", "Sessão terminada");
+    payload.papel = actual.papel;
+    payload.curso = actual.curso;
   } else if (process.env.NODE_ENV === "production") {
     throw erroSessao("TokenSemSessao", "Token sem sessão registada");
   }
