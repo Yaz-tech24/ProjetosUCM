@@ -1,48 +1,69 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import api, { getFavoritos, isFavorito, toggleFavorito } from "./api";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import api from "./api";
+import { obterFavoritos, alternarFavorito, limparCacheFavoritos, subscreverFavoritos } from "./favoritos";
 
 const FAVORITOS_KEY = "ucm_favoritos";
 
-describe("favoritos (localStorage)", () => {
-  beforeEach(() => localStorage.clear());
-
-  it("getFavoritos devolve [] quando não há nada guardado", () => {
-    expect(getFavoritos()).toEqual([]);
+// Os favoritos vivem no servidor; o que a app guardava em localStorage é
+// enviado uma única vez para ser juntado. Estes testes substituem o axios
+// por mocks — não há rede.
+describe("favoritos (servidor)", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    limparCacheFavoritos();
+    vi.restoreAllMocks();
   });
 
-  it("getFavoritos devolve [] em vez de rebentar com JSON inválido", () => {
+  it("sem favoritos locais pede a lista ao servidor", async () => {
+    const get = vi.spyOn(api, "get").mockResolvedValue({ data: [3, 1] });
+    const post = vi.spyOn(api, "post");
+    expect(await obterFavoritos()).toEqual([3, 1]);
+    expect(get).toHaveBeenCalledWith("/favoritos");
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  it("migra os favoritos antigos do localStorage uma única vez e esquece-os", async () => {
+    localStorage.setItem(FAVORITOS_KEY, JSON.stringify([1, 2]));
+    const post = vi.spyOn(api, "post").mockResolvedValue({ data: [1, 2, 5] });
+    expect(await obterFavoritos()).toEqual([1, 2, 5]);
+    expect(post).toHaveBeenCalledWith("/favoritos/sincronizar", { ids: [1, 2] });
+    expect(localStorage.getItem(FAVORITOS_KEY)).toBeNull();
+  });
+
+  it("não rebenta com JSON inválido no localStorage", async () => {
     localStorage.setItem(FAVORITOS_KEY, "{isto não é json válido");
-    expect(getFavoritos()).toEqual([]);
+    vi.spyOn(api, "get").mockResolvedValue({ data: [] });
+    expect(await obterFavoritos()).toEqual([]);
   });
 
-  it("getFavoritos lê e devolve os ids guardados", () => {
-    localStorage.setItem(FAVORITOS_KEY, JSON.stringify([1, 2, 3]));
-    expect(getFavoritos()).toEqual([1, 2, 3]);
+  it("sem servidor usa os favoritos locais para não ficar em branco", async () => {
+    localStorage.setItem(FAVORITOS_KEY, JSON.stringify([4]));
+    vi.spyOn(api, "post").mockRejectedValue(new Error("offline"));
+    expect(await obterFavoritos()).toEqual([4]);
   });
 
-  it("isFavorito reconhece um id guardado, incluindo quando vem como string", () => {
-    localStorage.setItem(FAVORITOS_KEY, JSON.stringify([5]));
-    expect(isFavorito(5)).toBe(true);
-    expect(isFavorito("5")).toBe(true);
-    expect(isFavorito(6)).toBe(false);
+  it("alternar adiciona (PUT) e remove (DELETE), normalizando o id para número", async () => {
+    vi.spyOn(api, "get").mockResolvedValue({ data: [] });
+    const put = vi.spyOn(api, "put").mockResolvedValue({ data: { favorito: true } });
+    const del = vi.spyOn(api, "delete").mockResolvedValue({ data: { favorito: false } });
+    expect(await alternarFavorito("7")).toBe(true);
+    expect(put).toHaveBeenCalledWith("/favoritos/7");
+    expect(await obterFavoritos()).toEqual([7]);
+    expect(await alternarFavorito(7)).toBe(false);
+    expect(del).toHaveBeenCalledWith("/favoritos/7");
+    expect(await obterFavoritos()).toEqual([]);
   });
 
-  it("toggleFavorito adiciona um id que ainda não está guardado", () => {
-    const resultado = toggleFavorito(7);
-    expect(resultado).toBe(true);
-    expect(getFavoritos()).toEqual([7]);
-  });
-
-  it("toggleFavorito remove um id já guardado", () => {
-    localStorage.setItem(FAVORITOS_KEY, JSON.stringify([7, 8]));
-    const resultado = toggleFavorito(7);
-    expect(resultado).toBe(false);
-    expect(getFavoritos()).toEqual([8]);
-  });
-
-  it("toggleFavorito normaliza o id para número antes de guardar", () => {
-    toggleFavorito("9");
-    expect(getFavoritos()).toEqual([9]);
+  it("volta atrás na actualização optimista se o servidor recusar", async () => {
+    vi.spyOn(api, "get").mockResolvedValue({ data: [] });
+    vi.spyOn(api, "put").mockRejectedValue(new Error("500"));
+    const ouvinte = vi.fn();
+    subscreverFavoritos(ouvinte);
+    await expect(alternarFavorito(9)).rejects.toThrow();
+    expect(await obterFavoritos()).toEqual([]);
+    // avisou ao adicionar (optimista) e ao reverter
+    expect(ouvinte).toHaveBeenCalledTimes(2);
+    expect(ouvinte).toHaveBeenLastCalledWith([]);
   });
 });
 
