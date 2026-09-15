@@ -2,11 +2,13 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import api from "../services/api";
 import {
   ShieldCheck, CheckCircle, XCircle, Clock, AlertTriangle, X, MessageCircle, Trash2,
-  Settings, Upload, Plus, Save, Sparkles, Users, UserPlus, Mail, GraduationCap, Lock, Database,
+  Settings, Upload, Plus, Save, Sparkles, Users, UserPlus, Mail, GraduationCap, Lock, Database, Tag as TagIcon,
 } from "lucide-react";
 import { useConfig } from "../context/ConfigContext";
 import { aplicarPaleta } from "../utils/palette";
 import Toast from "../components/Toast";
+import ConfirmModal from "../components/ConfirmModal";
+import { Etiqueta } from "../components/TagsMaterial";
 
 const TIPOS_FICHEIRO_OPCOES = [
   { valor: "pdf",  label: "PDF" },
@@ -15,79 +17,6 @@ const TIPOS_FICHEIRO_OPCOES = [
   { valor: "ogg",  label: "Ogg" },
   { valor: "mov",  label: "QuickTime (.mov)" },
 ];
-
-/* Modal de confirmação */
-const ConfirmModal = ({ message, onConfirm, onCancel }) => {
-  const cancelBtnRef = useRef(null);
-  const onCancelRef = useRef(onCancel);
-  useEffect(() => { onCancelRef.current = onCancel; }, [onCancel]);
-
-  /* Foca o botão "Cancelar" ao abrir e permite fechar com Escape. */
-  useEffect(() => {
-    if (!message) return;
-    cancelBtnRef.current?.focus();
-    const handleKeyDown = (e) => { if (e.key === 'Escape') onCancelRef.current(); };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [message]);
-
-  if (!message) return null;
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center px-4"
-      style={{ background: "rgba(var(--color-navy-abyss-rgb),0.55)", backdropFilter: "blur(8px)" }}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="confirm-modal-title"
-        className="w-full max-w-sm rounded-[28px] p-8 animate-scale-in"
-        style={{
-          background: "var(--surface-card)",
-          border: "1px solid var(--border-subtle)",
-          boxShadow: "0 30px 90px rgba(var(--color-navy-deep-rgb),0.30)",
-        }}
-      >
-        <div
-          className="w-16 h-16 rounded-[20px] grid place-items-center mx-auto mb-5"
-          style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.20)" }}
-        >
-          <AlertTriangle size={30} style={{ color: "#ef4444" }} />
-        </div>
-        <h3 id="confirm-modal-title" style={{ fontSize: 18, fontWeight: 900, color: "var(--text-heading)", textAlign: "center", marginBottom: 8 }}>
-          Confirmar acção
-        </h3>
-        <p style={{ fontSize: 14, color: "var(--text-muted)", textAlign: "center", lineHeight: 1.65, marginBottom: 28 }}>
-          {message}
-        </p>
-        <div className="grid grid-cols-2 gap-3">
-          <button
-            ref={cancelBtnRef}
-            onClick={onCancel}
-            className="rounded-2xl px-5 py-3 text-sm font-bold transition-all duration-200"
-            style={{ background: "var(--surface-hover)", border: "1.5px solid var(--border-subtle-strong)", color: "var(--text-body)" }}
-            onMouseEnter={e => (e.currentTarget.style.background = "var(--color-ice-mid)")}
-            onMouseLeave={e => (e.currentTarget.style.background = "var(--surface-hover)")}
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={onConfirm}
-            className="rounded-2xl px-5 py-3 text-sm font-bold text-white transition-all duration-200"
-            style={{
-              background: "linear-gradient(135deg, #dc2626, #ef4444)",
-              boxShadow: "0 6px 20px rgba(239,68,68,0.35)",
-            }}
-            onMouseEnter={e => (e.currentTarget.style.transform = "translateY(-1px)", e.currentTarget.style.boxShadow = "0 8px 28px rgba(239,68,68,0.50)")}
-            onMouseLeave={e => (e.currentTarget.style.transform = "", e.currentTarget.style.boxShadow = "0 6px 20px rgba(239,68,68,0.35)")}
-          >
-            Confirmar
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 const Admin = ({ usuarioLogado }) => {
   const { config, cursos, refetchConfig } = useConfig();
@@ -109,6 +38,9 @@ const Admin = ({ usuarioLogado }) => {
   const [savingConfig,  setSavingConfig]  = useState(false);
   const [logoUploading, setLogoUploading] = useState(false);
   const [novoCurso,     setNovoCurso]     = useState('');
+  const [tags,          setTags]          = useState([]);
+  const [novaTag,       setNovaTag]       = useState({ nome: '', cor: '#ffd700' });
+  const [adicionandoTag, setAdicionandoTag] = useState(false);
   const [adicionandoCurso, setAdicionandoCurso] = useState(false);
 
   /* ── Utilizadores state ── */
@@ -153,6 +85,11 @@ const Admin = ({ usuarioLogado }) => {
   const pendentesAbortRef = useRef(null);
   const mensagensAbortRef = useRef(null);
   const statusAbortRef    = useRef(null);
+
+  const fetchTags = useCallback(async () => {
+    try { const res = await api.get('/tags'); setTags(res.data); } catch { setTags([]); }
+  }, []);
+  useEffect(() => { if (aba === 'config') fetchTags(); }, [aba, fetchTags]);
 
   const fetchPendentes = useCallback(async () => {
     pendentesAbortRef.current?.abort();
@@ -260,6 +197,26 @@ const Admin = ({ usuarioLogado }) => {
     setConfirm({ message: 'Apagar esta mensagem permanentemente para todos os utilizadores?', id, tipo: 'mensagem' });
   };
 
+  const handleAdicionarTag = async (e) => {
+    e.preventDefault();
+    if (!novaTag.nome.trim() || adicionandoTag) return;
+    setAdicionandoTag(true);
+    try {
+      await api.post('/admin/tags', { nome: novaTag.nome.trim(), cor: novaTag.cor });
+      setNovaTag(t => ({ ...t, nome: '' }));
+      showToast('Tag criada.', 'success');
+      fetchTags();
+    } catch (err) {
+      showToast(err.response?.data?.erro || 'Erro ao criar tag.', 'error');
+    } finally {
+      setAdicionandoTag(false);
+    }
+  };
+
+  const handleRemoverTag = (id) => {
+    setConfirm({ message: 'Remover esta tag? Será retirada de todos os materiais onde está aplicada.', id, tipo: 'tag' });
+  };
+
   const handleRemoverCurso = (id) => {
     setConfirm({ message: 'Remover este curso da lista? Materiais e contas já criados com ele não são afectados.', id, tipo: 'curso' });
   };
@@ -280,6 +237,10 @@ const Admin = ({ usuarioLogado }) => {
         await api.delete(`/admin/cursos/${id}`);
         showToast('Curso removido.', 'success');
         await refetchConfig();
+      } else if (tipo === 'tag') {
+        await api.delete(`/admin/tags/${id}`);
+        setTags(prev => prev.filter(t => t.id !== id));
+        showToast('Tag removida.', 'success');
       } else if (tipo === 'utilizador') {
         await api.delete(`/admin/utilizadores/${id}`);
         setUtilizadores(prev => prev.filter(u => u.id !== id));
@@ -1197,6 +1158,45 @@ const Admin = ({ usuarioLogado }) => {
                         <X size={13} />
                       </button>
                     </span>
+                  ))}
+                </div>
+              </div>
+            </section>
+
+            {/* Tags */}
+            <section
+              className="rounded-[28px] overflow-hidden"
+              style={{ background: "var(--surface-card)", border: "1px solid var(--border-subtle)", boxShadow: "0 4px 32px rgba(var(--color-navy-mid-rgb),0.07)" }}
+            >
+              <div className="flex items-center gap-2.5 px-7 py-5" style={{ borderBottom: "1px solid var(--border-subtle)" }}>
+                <TagIcon size={19} style={{ color: "var(--text-accent)" }} />
+                <div>
+                  <h2 style={{ fontSize: 18, fontWeight: 900, color: "var(--text-heading)" }}>Tags de materiais</h2>
+                  <p style={{ fontSize: 12.5, color: "var(--text-faint)" }}>Etiquetas transversais às disciplinas (ex.: Exame, Resumo, 1.º ano). Aplicam-se a cada material na página do próprio material.</p>
+                </div>
+              </div>
+              <div className="p-7">
+                <form onSubmit={handleAdicionarTag} className="flex flex-wrap gap-3 mb-6">
+                  <input value={novaTag.nome} onChange={e => setNovaTag(t => ({ ...t, nome: e.target.value.slice(0, 50) }))} placeholder="Nome da tag"
+                    className="flex-1 min-w-[180px] rounded-2xl px-5 py-3.5 text-sm outline-none"
+                    style={{ background: "var(--surface-input)", border: "1.5px solid var(--border-subtle-strong)", color: "var(--text-heading)" }} />
+                  <label className="inline-flex items-center gap-2 rounded-2xl px-4 text-sm font-semibold cursor-pointer"
+                    style={{ background: "var(--surface-input)", border: "1.5px solid var(--border-subtle-strong)", color: "var(--text-body)" }}>
+                    <input type="color" value={novaTag.cor} onChange={e => setNovaTag(t => ({ ...t, cor: e.target.value }))} className="w-7 h-7 rounded-lg border-0 bg-transparent cursor-pointer" aria-label="Cor da tag" />
+                    Cor
+                  </label>
+                  <button type="submit" disabled={adicionandoTag || !novaTag.nome.trim()}
+                    className="inline-flex items-center gap-2 rounded-2xl px-5 py-3.5 text-sm font-bold text-white shrink-0 transition-all disabled:opacity-60"
+                    style={{ background: "linear-gradient(135deg,var(--color-navy-deep),var(--color-navy-mid))" }}>
+                    <Plus size={16} /> {adicionandoTag ? "A criar..." : "Criar tag"}
+                  </button>
+                </form>
+                <div className="flex flex-wrap gap-2">
+                  {tags.length === 0 && (
+                    <p style={{ fontSize: 13, color: "var(--text-faint)" }}>Ainda não há tags. Crie a primeira acima.</p>
+                  )}
+                  {tags.map(t => (
+                    <Etiqueta key={t.id} nome={`${t.nome} · ${t.quantidade}`} cor={t.cor} onRemover={() => handleRemoverTag(t.id)} />
                   ))}
                 </div>
               </div>

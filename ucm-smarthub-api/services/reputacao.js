@@ -1,0 +1,62 @@
+const db = require("../config/db");
+
+const PONTOS_POR_MATERIAL_APROVADO = 10;
+const PONTOS_POR_ESTRELA_MEDIA = 5;
+
+function calcularEmblema({ aprovados, media }) {
+  if (aprovados >= 5 && media >= 4.0) return "Confiável";
+  if (media >= 4.5 && aprovados >= 1) return "Excelente Qualidade";
+  if (aprovados >= 10) return "Produtor Verificado";
+  return null;
+}
+
+// Recalcula a partir das tabelas de origem (materiais + avaliacoes) em vez de
+// incrementar contadores — assim uma remoção, rejeição ou correcção manual
+// nunca deixa a reputação dessincronizada. Best-effort: um erro aqui nunca
+// deve falhar a acção que a desencadeou (aprovar um material, avaliar).
+async function atualizarReputacao(usuarioId) {
+  if (!usuarioId) return;
+  try {
+    const [[stats]] = await db.query(
+      `SELECT
+         COUNT(DISTINCT m.id) AS submetidos,
+         COUNT(DISTINCT CASE WHEN m.status = 'aprovado' THEN m.id END) AS aprovados,
+         COALESCE(AVG(a.nota), 0) AS media
+       FROM materiais m
+       LEFT JOIN avaliacoes a ON a.material_id = m.id
+       WHERE m.autor_id = ?`,
+      [usuarioId]
+    );
+
+    const aprovados = Number(stats.aprovados) || 0;
+    const media = Number(stats.media) || 0;
+    const pontos = aprovados * PONTOS_POR_MATERIAL_APROVADO + Math.round(media * PONTOS_POR_ESTRELA_MEDIA);
+    const emblema = calcularEmblema({ aprovados, media });
+
+    await db.query(
+      `INSERT INTO reputacao_usuarios (usuario_id, pontos, materiais_submetidos, materiais_aprovados, media_avaliacoes, emblema)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         pontos = VALUES(pontos),
+         materiais_submetidos = VALUES(materiais_submetidos),
+         materiais_aprovados = VALUES(materiais_aprovados),
+         media_avaliacoes = VALUES(media_avaliacoes),
+         emblema = VALUES(emblema)`,
+      [usuarioId, pontos, Number(stats.submetidos) || 0, aprovados, media.toFixed(2), emblema]
+    );
+  } catch (erro) {
+    console.error("[Reputação] Erro ao actualizar:", erro.message);
+  }
+}
+
+// Quem avaliou um material afecta a reputação do AUTOR desse material.
+async function atualizarReputacaoDoAutor(materialId) {
+  try {
+    const [[material]] = await db.query("SELECT autor_id FROM materiais WHERE id = ?", [materialId]);
+    if (material) await atualizarReputacao(material.autor_id);
+  } catch (erro) {
+    console.error("[Reputação] Erro ao localizar autor:", erro.message);
+  }
+}
+
+module.exports = { atualizarReputacao, atualizarReputacaoDoAutor, calcularEmblema };

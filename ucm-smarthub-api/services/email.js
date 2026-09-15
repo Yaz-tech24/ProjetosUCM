@@ -57,6 +57,11 @@ async function enviarEmail({ to, subject, html }) {
   }
 }
 
+// Nome por defeito quando a configuração ainda não foi carregada/definida —
+// evita assuntos como "Bem-vindo(a) à undefined!".
+const NOME_POR_DEFEITO = "SmartHub";
+const nomeOu = (nome) => (nome && String(nome).trim()) || NOME_POR_DEFEITO;
+
 function layout(nomePlataforma, corPrimaria, corDestaque, conteudoHtml, logoUrl) {
   const cabecalho = logoUrl
     ? `<img src="${logoUrl}" alt="${nomePlataforma}" height="32" style="height:32px;max-width:160px;object-fit:contain;vertical-align:middle;">`
@@ -77,7 +82,8 @@ function layout(nomePlataforma, corPrimaria, corDestaque, conteudoHtml, logoUrl)
 </body></html>`;
 }
 
-async function enviarVerificacaoEmail({ to, nome, linkVerificacao, nomePlataforma, corPrimaria, corDestaque, logoUrl }) {
+async function enviarVerificacaoEmail({ to, nome, linkVerificacao, nomePlataforma: nomePlataformaBruto, corPrimaria, corDestaque, logoUrl }) {
+  const nomePlataforma = nomeOu(nomePlataformaBruto);
   const nomeSeguro = escapeHtml(nome);
   return enviarEmail({
     to,
@@ -93,7 +99,8 @@ async function enviarVerificacaoEmail({ to, nome, linkVerificacao, nomePlataform
   });
 }
 
-async function enviarBoasVindas({ to, nome, nomePlataforma, corPrimaria, corDestaque, logoUrl }) {
+async function enviarBoasVindas({ to, nome, nomePlataforma: nomePlataformaBruto, corPrimaria, corDestaque, logoUrl }) {
+  const nomePlataforma = nomeOu(nomePlataformaBruto);
   const nomeSeguro = escapeHtml(nome);
   return enviarEmail({
     to,
@@ -105,7 +112,8 @@ async function enviarBoasVindas({ to, nome, nomePlataforma, corPrimaria, corDest
   });
 }
 
-async function enviarRecuperacaoPassword({ to, nome, link, nomePlataforma, corPrimaria, corDestaque, logoUrl }) {
+async function enviarRecuperacaoPassword({ to, nome, link, nomePlataforma: nomePlataformaBruto, corPrimaria, corDestaque, logoUrl }) {
+  const nomePlataforma = nomeOu(nomePlataformaBruto);
   const nomeSeguro = escapeHtml(nome);
   return enviarEmail({
     to,
@@ -121,7 +129,8 @@ async function enviarRecuperacaoPassword({ to, nome, link, nomePlataforma, corPr
   });
 }
 
-async function enviarModeracaoMaterial({ to, nome, titulo, aprovado, nomePlataforma, corPrimaria, corDestaque, logoUrl }) {
+async function enviarModeracaoMaterial({ to, nome, titulo, aprovado, nomePlataforma: nomePlataformaBruto, corPrimaria, corDestaque, logoUrl }) {
+  const nomePlataforma = nomeOu(nomePlataformaBruto);
   const nomeSeguro = escapeHtml(nome);
   const tituloSeguro = escapeHtml(titulo);
   return enviarEmail({
@@ -138,4 +147,24 @@ async function enviarModeracaoMaterial({ to, nome, titulo, aprovado, nomePlatafo
   });
 }
 
-module.exports = { enviarEmail, enviarVerificacaoEmail, enviarBoasVindas, enviarRecuperacaoPassword, enviarModeracaoMaterial, emailConfigurado };
+async function enviarNovoMaterialSubscrito({ to, nome, titulo, cadeira, tipo, link, nomePlataforma: nomePlataformaBruto, corPrimaria, corDestaque, logoUrl }) {
+  const nomePlataforma = nomeOu(nomePlataformaBruto);
+  const nomeSeguro = escapeHtml(nome);
+  const tituloSeguro = escapeHtml(titulo);
+  const cadeiraSegura = escapeHtml(cadeira);
+  return enviarEmail({
+    to,
+    subject: `Novo material em ${cadeira} — ${nomePlataforma}`,
+    html: layout(nomePlataforma, corPrimaria, corDestaque, `
+      <p>Olá, ${nomeSeguro},</p>
+      <p>Foi publicado um novo ${tipo === "PDF" ? "documento" : "vídeo"} na disciplina <strong>${cadeiraSegura}</strong> que subscreves:</p>
+      <p style="font-size:18px;font-weight:bold;color:${corPrimaria}">"${tituloSeguro}"</p>
+      <p style="margin:24px 0">
+        <a href="${link}" style="background:${corPrimaria};color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold">Abrir material</a>
+      </p>
+      <p style="color:#64748b;font-size:12px">Recebes este email porque subscreveste a disciplina ${cadeiraSegura}. Podes cancelar a subscrição no teu perfil.</p>
+    `, logoUrl),
+  });
+}
+
+module.exports = { enviarEmail, enviarVerificacaoEmail, enviarBoasVindas, enviarRecuperacaoPassword, enviarModeracaoMaterial, enviarNovoMaterialSubscrito, emailConfigurado };

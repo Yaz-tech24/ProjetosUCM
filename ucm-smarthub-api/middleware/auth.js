@@ -12,6 +12,20 @@ const JWT_SECRET = process.env.JWT_SECRET || "ucm_smarthub_dev_secret_mude_em_pr
 // ler, o que reduz o impacto de um eventual XSS), com o cabeçalho
 // "Authorization: Bearer" como alternativa para clientes de API, o Swagger
 // UI e os testes automatizados que assinam o seu próprio token.
+// O login com 2FA emite um JWT intermédio ({ id, fase: "2fa" }) que só serve
+// para /api/login/2fa — é assinado com a mesma chave, por isso tem de ser
+// recusado explicitamente como sessão, senão dava acesso total durante 5
+// minutos a quem tivesse só a palavra-passe (apanhado em smoke test real).
+function verificarSessao(token) {
+  const payload = jwt.verify(token, JWT_SECRET);
+  if (payload.fase || !payload.papel) {
+    const erro = new Error("Token não é uma sessão");
+    erro.name = "TokenNaoSessao";
+    throw erro;
+  }
+  return payload;
+}
+
 function autenticar(req, res, next) {
   const authHeader = req.headers.authorization;
   const tokenCabecalho = authHeader?.startsWith("Bearer ") ? authHeader.split(" ")[1] : null;
@@ -21,7 +35,7 @@ function autenticar(req, res, next) {
     return res.status(401).json({ erro: "Token de autenticação em falta." });
   }
   try {
-    req.utilizador = jwt.verify(token, JWT_SECRET);
+    req.utilizador = verificarSessao(token);
     next();
   } catch {
     return res.status(401).json({ erro: "Token inválido ou expirado." });
@@ -35,4 +49,4 @@ function apenasAdmin(req, res, next) {
   next();
 }
 
-module.exports = { autenticar, apenasAdmin, JWT_SECRET };
+module.exports = { autenticar, apenasAdmin, verificarSessao, JWT_SECRET };

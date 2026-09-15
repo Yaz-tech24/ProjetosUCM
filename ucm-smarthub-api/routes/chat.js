@@ -1,10 +1,9 @@
-const jwt = require("jsonwebtoken");
 const cookie = require("cookie");
 
 const db = require("../config/db");
 const { getConfiguracoes } = require("../services/plataforma");
 const { genAI, gerarResumoIA, MENSAGEM_IA_MAX } = require("../services/ia");
-const { autenticar, apenasAdmin, JWT_SECRET } = require("../middleware/auth");
+const { autenticar, apenasAdmin, verificarSessao } = require("../middleware/auth");
 const { limitarChat } = require("../middleware/rateLimiters");
 const { analisarMensagem, mensagemAviso } = require("../utils/filtroChat");
 
@@ -160,7 +159,7 @@ Pergunta do estudante: ${mensagem}`;
       return next(erro);
     }
     try {
-      socket.utilizador = jwt.verify(token, JWT_SECRET);
+      socket.utilizador = verificarSessao(token);
       next();
     } catch {
       // `data.codigo` é o que o cliente usa para decidir a mensagem a

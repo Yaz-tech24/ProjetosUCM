@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { BookOpen, Home, Library, ShieldCheck, Search, MessageCircle, LogOut, Bell, X, FileText, PlayCircle, Sun, Moon, Menu } from 'lucide-react';
+import { BookOpen, Home, Library, ShieldCheck, Search, MessageCircle, LogOut, Bell, X, FileText, PlayCircle, Sun, Moon, Menu, KeyRound, BarChart3 } from 'lucide-react';
 import Chatbot from './Chatbot';
 import api from '../services/api';
 import { useConfig } from '../context/ConfigContext';
@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { label: 'Painel Inicial',  icon: Home,          path: '/dashboard'   },
   { label: 'Repositório',     icon: Library,       path: '/repositorio' },
   { label: 'Chat Estudantes', icon: MessageCircle, path: '/chat'        },
+  { label: 'Segurança',       icon: KeyRound,      path: '/seguranca'   },
 ];
 
 const Layout = ({ usuarioLogado, onLogout }) => {
@@ -231,6 +232,19 @@ const Layout = ({ usuarioLogado, onLogout }) => {
               >
                 <ShieldCheck size={19} />
                 <span>Administração</span>
+              </button>
+              <button
+                onClick={() => navigate('/analytics')}
+                className="w-full flex items-center gap-3.5 rounded-2xl px-4 py-3.5 text-left text-sm font-semibold transition-all duration-250"
+                style={isActive('/analytics') ? {
+                  background: "rgba(255,255,255,0.95)", color: "var(--color-navy-mid)", fontWeight: 800,
+                  boxShadow: "0 4px 16px rgba(var(--color-navy-abyss-rgb),0.25)",
+                } : { border: "1px solid rgba(255,255,255,0.09)", color: "rgba(200,215,240,0.70)" }}
+                onMouseEnter={e => !isActive('/analytics') && (e.currentTarget.style.background = "rgba(255,255,255,0.07)", e.currentTarget.style.color = "#fff")}
+                onMouseLeave={e => !isActive('/analytics') && (e.currentTarget.style.background = "", e.currentTarget.style.color = "rgba(200,215,240,0.70)")}
+              >
+                <BarChart3 size={19} />
+                <span>Analytics</span>
               </button>
             </>
           )}

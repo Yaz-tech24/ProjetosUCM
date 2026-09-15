@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import api from "../services/api";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import {
   BookOpen, User, Lock, Mail, GraduationCap, MapPin, Info,
   ArrowRight, Library, MessageCircle, Sparkles, CheckCircle,
@@ -146,6 +146,11 @@ const Login = ({ onLogin }) => {
   const [telefone,         setTelefone]         = useState("");
   const [stats,            setStats]            = useState(null);
   const [emailRecuperacao, setEmailRecuperacao] = useState("");
+  // Segundo passo do login para contas com 2FA: o servidor devolve um token
+  // intermédio (só serve para /login/2fa) em vez da sessão.
+  const [token2FA,         setToken2FA]         = useState("");
+  const [codigo2FA,        setCodigo2FA]        = useState("");
+  const [emailPorVerificar, setEmailPorVerificar] = useState(false);
 
   /* navbar mobile */
   const [mobileMenu, setMobileMenu] = useState(false);
@@ -206,11 +211,40 @@ const Login = ({ onLogin }) => {
       // nada a guardar aqui além do perfil (usado só para UI, nunca para
       // decisões de autorização, que o servidor sempre re-valida pelo cookie).
       const res = await api.post("/login", { email, senha });
+      if (res.data.requer_2fa) {
+        setToken2FA(res.data.token_2fa);
+        setCodigo2FA("");
+        return;
+      }
       onLogin(res.data.utilizador);
       navigate("/dashboard");
     } catch (err) {
+      setEmailPorVerificar(Boolean(err.response?.data?.email_nao_verificado));
       setMensagem({ texto: err.response?.data?.erro || "Email ou senha incorretos.", tipo: "erro" });
     } finally { setLoading(false); }
+  };
+
+  const handleLogin2FA = async (e) => {
+    e.preventDefault();
+    if (codigo2FA.length !== 6) return;
+    setMensagem({ texto: "", tipo: "" });
+    setLoading(true);
+    try {
+      const res = await api.post("/login/2fa", { token_2fa: token2FA, codigo: codigo2FA });
+      onLogin(res.data.utilizador);
+      navigate("/dashboard");
+    } catch (err) {
+      const erro = err.response?.data?.erro || "Código inválido.";
+      // Token intermédio expirado (5 min) — volta ao primeiro passo.
+      if (err.response?.status === 401) { setToken2FA(""); setCodigo2FA(""); }
+      setMensagem({ texto: erro, tipo: "erro" });
+    } finally { setLoading(false); }
+  };
+
+  const cancelar2FA = () => {
+    setToken2FA("");
+    setCodigo2FA("");
+    setMensagem({ texto: "", tipo: "" });
   };
 
   const switchMode = () => {
@@ -537,12 +571,12 @@ const Login = ({ onLogin }) => {
                   style={{ background:"var(--surface-hover)", border:"1px solid var(--border-subtle-strong)" }}>
                   <div className="w-2 h-2 rounded-full" style={{ background:"#10b981", boxShadow:"0 0 6px rgba(16,185,129,.80)" }} />
                   <span style={{ fontSize:10, fontWeight:700, letterSpacing:".4em", color:"var(--text-muted)", textTransform:"uppercase" }}>
-                    {esqueciSenha ? "Recuperação" : isRegistering ? "Novo acesso" : "Acesso seguro"}
+                    {token2FA ? "Segundo passo" : esqueciSenha ? "Recuperação" : isRegistering ? "Novo acesso" : "Acesso seguro"}
                   </span>
                 </div>
                 <h2 className="leading-tight mb-2"
                   style={{ fontSize:"2.1rem", fontWeight:900, color:"var(--text-heading)", letterSpacing:"-.025em" }}>
-                  {esqueciSenha ? "Recuperar acesso" : isRegistering ? "Criar conta" : "Bem‑vindo\nde volta"}
+                  {token2FA ? "Código de\nverificação" : esqueciSenha ? "Recuperar acesso" : isRegistering ? "Criar conta" : "Bem‑vindo\nde volta"}
                 </h2>
                 <p style={{ fontSize:14, color:"var(--text-faint)", lineHeight:1.65 }}>
                   {esqueciSenha
@@ -564,11 +598,48 @@ const Login = ({ onLogin }) => {
                   {mensagem.tipo === "erro"
                     ? <AlertCircle size={16} className="shrink-0 mt-0.5" />
                     : <CheckCircle size={16} className="shrink-0 mt-0.5" />}
-                  <span style={{ fontWeight:600 }}>{mensagem.texto}</span>
+                  <span style={{ fontWeight:600 }}>
+                    {mensagem.texto}
+                    {emailPorVerificar && (
+                      <> <Link to="/verificar-email" className="underline font-black">Pedir novo link de verificação</Link></>
+                    )}
+                  </span>
                 </div>
               )}
 
-              {esqueciSenha ? (
+              {token2FA ? (
+                <form onSubmit={handleLogin2FA} className="space-y-4">
+                  <p style={{ fontSize: 13.5, color: "var(--text-muted)", lineHeight: 1.6 }}>
+                    Esta conta tem autenticação de dois factores. Abra a app de autenticação e introduza o código de 6 dígitos.
+                  </p>
+                  <input
+                    type="text" inputMode="numeric" autoComplete="one-time-code" pattern="\d{6}" maxLength={6} autoFocus required
+                    value={codigo2FA} onChange={e => setCodigo2FA(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                    placeholder="000000" aria-label="Código de 6 dígitos"
+                    className="w-full rounded-2xl py-4 px-4 text-center outline-none transition-all duration-200"
+                    style={{ background:"var(--surface-input)", border:"1.5px solid var(--border-subtle-strong)", color:"var(--text-heading)", fontSize: 26, letterSpacing: "0.5em", fontWeight: 800 }}
+                  />
+                  <button
+                    disabled={loading || codigo2FA.length !== 6}
+                    className="w-full flex items-center justify-center gap-2.5 rounded-2xl py-[14px] text-sm font-black uppercase tracking-[.10em] transition-all duration-250 disabled:opacity-60 mt-1"
+                    style={{
+                      background:"linear-gradient(135deg,var(--color-navy-deep) 0%,var(--color-navy-mid) 60%,var(--color-navy-bright) 100%)",
+                      color:"#fff",
+                      boxShadow:"0 8px 32px rgba(var(--color-navy-deep-rgb),.38), inset 0 1px 0 rgba(255,255,255,.08)",
+                    }}
+                  >
+                    {loading
+                      ? <div className="w-5 h-5 rounded-full border-2 border-white/25 border-t-white animate-spin" />
+                      : <>Confirmar e entrar<ArrowRight size={17} /></>
+                    }
+                  </button>
+                  <button type="button" onClick={cancelar2FA}
+                    className="w-full text-center text-xs font-semibold pt-1 transition-colors hover:text-[var(--color-navy-mid)]"
+                    style={{ color:"var(--text-faint)" }}>
+                    ← Voltar ao início de sessão
+                  </button>
+                </form>
+              ) : esqueciSenha ? (
                 <form onSubmit={handleEsqueciSenha} className="space-y-4">
                   <InputField icon={<Mail size={17} />}
                     type="email" placeholder="Email institucional" required

@@ -126,19 +126,10 @@ CREATE TABLE IF NOT EXISTS subscricoes_disciplinas (
   id            INT NOT NULL AUTO_INCREMENT,
   usuario_id    INT NOT NULL,
   disciplina    VARCHAR(100) NOT NULL,
-  data_subscrition TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  data_subscricao TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY usuario_disciplina (usuario_id, disciplina),
   CONSTRAINT subscricoes_ibfk_1 FOREIGN KEY (usuario_id) REFERENCES usuarios (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Quotas de Upload por Utilizador
-CREATE TABLE IF NOT EXISTS quotas_utilizadores (
-  id            INT NOT NULL AUTO_INCREMENT,
-  usuario_id    INT NOT NULL UNIQUE,
-  bytes_usados  BIGINT NOT NULL DEFAULT 0,
-  materiais_este_mes INT NOT NULL DEFAULT 0,
-  data_reset_cota TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  CONSTRAINT quotas_ibfk_1 FOREIGN KEY (usuario_id) REFERENCES usuarios (id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

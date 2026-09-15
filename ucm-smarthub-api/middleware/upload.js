@@ -3,7 +3,7 @@ const path = require("path");
 const fs = require("fs");
 const { getConfiguracoes } = require("../services/plataforma");
 const { TAMANHO_MAXIMO_TECTO_MB } = require("../schemas");
-const { gerarUUID, validarMagicBytes } = require("../utils/security");
+const { gerarUUID } = require("../utils/security");
 
 // Garante que a pasta uploads existe ao carregar o módulo
 const uploadsDir = path.join(__dirname, "..", "uploads");
@@ -62,8 +62,8 @@ const upload = multer({
         return cb(new Error("Tipo de ficheiro não permitido pela configuração actual da plataforma."));
       }
 
-      // Validação de magic bytes acontecerá no handler de rota após o ficheiro ser gravado
-      // (multer não tem acesso fácil ao buffer completo nesta fase)
+      // A assinatura real do ficheiro é validada no handler da rota, depois
+      // de gravado (ver validarFicheiroPorMime em utils/security.js).
       cb(null, true);
     } catch {
       cb(new Error("Não foi possível validar o tipo de ficheiro."));

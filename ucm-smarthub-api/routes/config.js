@@ -6,6 +6,7 @@ const { getConfiguracoes, getCursos, invalidarCacheConfig } = require("../servic
 const { paraUrlAbsoluto } = require("../utils/urls");
 const validar = require("../middleware/validar");
 const { autenticar, apenasAdmin } = require("../middleware/auth");
+const { auditar } = require("../middleware/auditoria");
 const { uploadsDir, uploadLogo } = require("../middleware/upload");
 const { schemaConfig, schemaCurso } = require("../schemas");
 
@@ -82,6 +83,7 @@ module.exports = function registarRotasConfig(app) {
       );
 
       invalidarCacheConfig();
+      auditar(req.utilizador.id, "actualizar_config", "configuracoes", 1, "Alterou as configurações da plataforma", req.ip);
       res.json({ mensagem: "Configuração actualizada com sucesso!", configuracoes: await getConfiguracoes() });
     } catch (erro) {
       console.error("Erro ao actualizar configuração:", erro.message);
@@ -120,6 +122,7 @@ module.exports = function registarRotasConfig(app) {
       if (configAntiga.logo_url) {
         fs.unlink(path.join(uploadsDir, path.basename(configAntiga.logo_url)), () => {});
       }
+      auditar(req.utilizador.id, "actualizar_logo", "configuracoes", 1, "Substituiu o logótipo", req.ip);
       res.json({ mensagem: "Logótipo actualizado!", logo_url: paraUrlAbsoluto(caminhoRelativo) });
     } catch (erro) {
       if (req.file) fs.unlink(req.file.path, () => {});
@@ -136,6 +139,7 @@ module.exports = function registarRotasConfig(app) {
       if (config.logo_url) {
         fs.unlink(path.join(uploadsDir, path.basename(config.logo_url)), () => {});
       }
+      auditar(req.utilizador.id, "remover_logo", "configuracoes", 1, "Removeu o logótipo", req.ip);
       res.json({ mensagem: "Logótipo removido." });
     } catch (erro) {
       console.error("Erro ao remover logótipo:", erro.message);
@@ -187,7 +191,8 @@ module.exports = function registarRotasConfig(app) {
   app.post("/api/admin/cursos", autenticar, apenasAdmin, validar(schemaCurso), async (req, res) => {
     try {
       const { nome } = req.body;
-      await db.query("INSERT INTO cursos (nome) VALUES (?)", [nome]);
+      const [resultado] = await db.query("INSERT INTO cursos (nome) VALUES (?)", [nome]);
+      auditar(req.utilizador.id, "criar_curso", "cursos", resultado.insertId, `Adicionou o curso "${nome}"`, req.ip);
       res.status(201).json({ mensagem: "Curso adicionado.", cursos: await getCursos() });
     } catch (erro) {
       if (erro.code === "ER_DUP_ENTRY") {
@@ -202,6 +207,7 @@ module.exports = function registarRotasConfig(app) {
     try {
       const { nome } = req.body;
       await db.query("UPDATE cursos SET nome = ? WHERE id = ?", [nome, req.params.id]);
+      auditar(req.utilizador.id, "actualizar_curso", "cursos", Number(req.params.id), `Renomeou o curso para "${nome}"`, req.ip);
       res.json({ mensagem: "Curso actualizado.", cursos: await getCursos() });
     } catch (erro) {
       if (erro.code === "ER_DUP_ENTRY") {
@@ -215,6 +221,7 @@ module.exports = function registarRotasConfig(app) {
   app.delete("/api/admin/cursos/:id", autenticar, apenasAdmin, async (req, res) => {
     try {
       await db.query("DELETE FROM cursos WHERE id = ?", [req.params.id]);
+      auditar(req.utilizador.id, "remover_curso", "cursos", Number(req.params.id), "Removeu um curso", req.ip);
       res.json({ mensagem: "Curso removido.", cursos: await getCursos() });
     } catch (erro) {
       console.error("Erro ao remover curso:", erro.message);

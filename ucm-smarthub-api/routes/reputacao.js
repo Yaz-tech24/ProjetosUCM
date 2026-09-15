@@ -1,40 +1,56 @@
 const db = require("../config/db");
-const { autenticar, apenasAdmin } = require("../middleware/auth");
+const { autenticar } = require("../middleware/auth");
+const { paraUrlAbsoluto } = require("../utils/urls");
 
 module.exports = function registarRotasReputacao(app) {
-  // GET: Perfil de reputação de um utilizador
-  app.get("/api/utilizadores/:id/reputacao", async (req, res) => {
+  /**
+   * @openapi
+   * /api/utilizadores/{id}/reputacao:
+   *   get:
+   *     summary: Perfil público de reputação de um utilizador (pontos, materiais, emblema)
+   *     tags: [Comunidade]
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema: { type: integer }
+   *     responses:
+   *       200: { description: Reputação }
+   *       404: { description: Utilizador não encontrado }
+   */
+  app.get("/api/utilizadores/:id/reputacao", autenticar, async (req, res) => {
     try {
       const usuarioId = parseInt(req.params.id, 10);
+      if (!Number.isInteger(usuarioId)) return res.status(400).json({ erro: "ID inválido." });
 
-      const [[reputacao]] = await db.query(
-        `SELECT r.pontos, r.materiais_submetidos, r.materiais_aprovados, r.media_avaliacoes, r.emblema,
-                u.nome, u.email, u.papel, u.data_criacao
-         FROM reputacao_usuarios r
-         LEFT JOIN usuarios u ON r.usuario_id = u.id
-         WHERE r.usuario_id = ?`,
+      // LEFT JOIN a partir de usuarios: quem ainda não tem linha em
+      // reputacao_usuarios (nunca submeteu nada) aparece com zeros em vez de 404.
+      const [[perfil]] = await db.query(
+        `SELECT u.id, u.nome, u.papel, u.curso, u.avatar_url, u.data_criacao,
+                COALESCE(r.pontos, 0) AS pontos,
+                COALESCE(r.materiais_submetidos, 0) AS materiais_submetidos,
+                COALESCE(r.materiais_aprovados, 0) AS materiais_aprovados,
+                COALESCE(r.media_avaliacoes, 0) AS media_avaliacoes,
+                r.emblema
+         FROM usuarios u
+         LEFT JOIN reputacao_usuarios r ON r.usuario_id = u.id
+         WHERE u.id = ?`,
         [usuarioId]
       );
+      if (!perfil) return res.status(404).json({ erro: "Utilizador não encontrado." });
 
-      if (!reputacao) {
-        return res.status(404).json({ erro: "Utilizador não encontrado." });
-      }
-
-      // Estatísticas adicionais
-      const [[stats]] = await db.query(
-        `SELECT
-           COUNT(DISTINCT m.id) as total_materiais,
-           SUM(CASE WHEN m.status = 'aprovado' THEN 1 ELSE 0 END) as aprovados,
-           COALESCE(AVG(a.nota), 0) as media_avaliacoes_calc
-         FROM materiais m
-         LEFT JOIN avaliacoes a ON m.id = a.material_id
-         WHERE m.autor_id = ?`,
-        [usuarioId]
+      const [[{ posicao }]] = await db.query(
+        "SELECT COUNT(*) + 1 AS posicao FROM reputacao_usuarios WHERE pontos > ?",
+        [perfil.pontos]
       );
 
       res.json({
-        reputacao,
-        estatisticas: stats,
+        reputacao: {
+          ...perfil,
+          avatar_url: paraUrlAbsoluto(perfil.avatar_url),
+          media_avaliacoes: Number(perfil.media_avaliacoes),
+          posicao,
+        },
       });
     } catch (erro) {
       console.error("Erro ao buscar reputação:", erro.message);
@@ -42,64 +58,33 @@ module.exports = function registarRotasReputacao(app) {
     }
   });
 
-  // GET: Leaderboard top 10 utilizadores
-  app.get("/api/leaderboard", async (req, res) => {
+  /**
+   * @openapi
+   * /api/leaderboard:
+   *   get:
+   *     summary: Top 10 utilizadores por pontos de reputação
+   *     tags: [Comunidade]
+   *     responses:
+   *       200: { description: Lista ordenada }
+   */
+  app.get("/api/leaderboard", autenticar, async (req, res) => {
     try {
       const [leaderboard] = await db.query(
-        `SELECT r.usuario_id, u.nome, r.pontos, r.materiais_aprovados, r.media_avaliacoes, r.emblema
+        `SELECT r.usuario_id, u.nome, u.curso, u.avatar_url, r.pontos, r.materiais_aprovados, r.media_avaliacoes, r.emblema
          FROM reputacao_usuarios r
          JOIN usuarios u ON r.usuario_id = u.id
          WHERE r.pontos > 0
-         ORDER BY r.pontos DESC
+         ORDER BY r.pontos DESC, r.materiais_aprovados DESC
          LIMIT 10`
       );
-
-      res.json(leaderboard);
+      res.json(leaderboard.map(l => ({
+        ...l,
+        avatar_url: paraUrlAbsoluto(l.avatar_url),
+        media_avaliacoes: Number(l.media_avaliacoes),
+      })));
     } catch (erro) {
       console.error("Erro ao buscar leaderboard:", erro.message);
       res.status(500).json({ erro: "Erro ao buscar leaderboard." });
     }
   });
-
-  // Função auxiliar para atualizar reputação (chamada por webhook/scheduler)
-  async function atualizarReputacao(usuarioId) {
-    try {
-      // Calcular estatísticas
-      const [[stats]] = await db.query(
-        `SELECT
-           COUNT(DISTINCT m.id) as total_submetidos,
-           SUM(CASE WHEN m.status = 'aprovado' THEN 1 ELSE 0 END) as total_aprovados,
-           COALESCE(AVG(a.nota), 0) as media_nota
-         FROM materiais m
-         LEFT JOIN avaliacoes a ON m.id = a.material_id
-         WHERE m.autor_id = ?`,
-        [usuarioId]
-      );
-
-      // Calcular pontos: 10 por material aprovado + bónus por média de avaliação
-      const pontos = (stats.total_aprovados || 0) * 10 + Math.floor((stats.media_nota || 0) * 5);
-
-      // Determinar emblema baseado em métricas
-      let emblema = null;
-      if ((stats.total_aprovados || 0) >= 10) emblema = "Produtor Verificado";
-      if ((stats.media_nota || 0) >= 4.5) emblema = "Excelente Qualidade";
-      if ((stats.total_aprovados || 0) >= 5 && (stats.media_nota || 0) >= 4.0) emblema = "Confiável";
-
-      // Atualizar ou inserir registro
-      await db.query(
-        `INSERT INTO reputacao_usuarios (usuario_id, pontos, materiais_submetidos, materiais_aprovados, media_avaliacoes, emblema)
-         VALUES (?, ?, ?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE
-         pontos = ?, materiais_submetidos = ?, materiais_aprovados = ?, media_avaliacoes = ?, emblema = ?`,
-        [
-          usuarioId, pontos, stats.total_submetidos, stats.total_aprovados, stats.media_nota || 0, emblema,
-          pontos, stats.total_submetidos, stats.total_aprovados, stats.media_nota || 0, emblema,
-        ]
-      );
-    } catch (erro) {
-      console.error("[Reputação] Erro ao atualizar:", erro.message);
-    }
-  }
-
-  module.exports.atualizarReputacao = atualizarReputacao;
 };

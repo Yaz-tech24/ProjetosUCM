@@ -1,50 +1,80 @@
 const crypto = require("crypto");
+const fs = require("fs");
 
-// Magic bytes (file signatures) para validar tipo de ficheiro
-const MAGIC_BYTES = {
-  pdf: Buffer.from([0x25, 0x50, 0x44, 0x46]), // %PDF
-  mp4: [Buffer.from([0x00, 0x00, 0x00, 0x20, 0x66, 0x74, 0x79, 0x70])], // ftyp
-  webm: Buffer.from([0x1A, 0x45, 0xDF, 0xA3]), // EBML
-  ogg: Buffer.from([0x4F, 0x67, 0x67, 0x53]), // OggS
-  mov: [Buffer.from([0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70])], // ftyp (QuickTime)
-  png: Buffer.from([0x89, 0x50, 0x4E, 0x47]), // PNG signature
-  jpg: Buffer.from([0xFF, 0xD8, 0xFF]), // JPEG signature
-  webp: Buffer.from([0x52, 0x49, 0x46, 0x46]), // RIFF (WebP/WAV container)
+// Assinaturas de ficheiro (magic bytes). `offset` é onde a assinatura começa:
+// MP4/MOV são contentores ISO-BMFF cujos 4 primeiros bytes são o tamanho da
+// primeira "box" (variável), seguidos de "ftyp" — por isso verificam-se a
+// partir do byte 4, não do 0.
+const ASSINATURAS = {
+  pdf:  [{ offset: 0, bytes: Buffer.from("%PDF", "ascii") }],
+  mp4:  [{ offset: 4, bytes: Buffer.from("ftyp", "ascii") }],
+  mov:  [{ offset: 4, bytes: Buffer.from("ftyp", "ascii") }],
+  webm: [{ offset: 0, bytes: Buffer.from([0x1a, 0x45, 0xdf, 0xa3]) }],
+  ogg:  [{ offset: 0, bytes: Buffer.from("OggS", "ascii") }],
+  png:  [{ offset: 0, bytes: Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]) }],
+  jpg:  [{ offset: 0, bytes: Buffer.from([0xff, 0xd8, 0xff]) }],
+  webp: [{ offset: 0, bytes: Buffer.from("RIFF", "ascii") }, { offset: 8, bytes: Buffer.from("WEBP", "ascii") }],
 };
 
-// Gerar UUID v4 para nomes de ficheiro (evita path traversal)
+const MIME_PARA_TIPO = {
+  "application/pdf": "pdf",
+  "video/mp4": "mp4",
+  "video/x-m4v": "mp4",
+  "video/quicktime": "mov",
+  "video/webm": "webm",
+  "video/ogg": "ogg",
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/webp": "webp",
+};
+
+const BYTES_CABECALHO = 16;
+
 function gerarUUID() {
   return crypto.randomUUID();
 }
 
-// Validar magic bytes do ficheiro (primeiros bytes da assinatura)
-function validarMagicBytes(buffer, tipoEsperado) {
+// Todas as assinaturas do tipo têm de bater (WebP exige RIFF e WEBP).
+function validarMagicBytes(buffer, tipo) {
   if (!buffer || buffer.length === 0) return false;
-
-  const tipoLower = tipoEsperado.toLowerCase();
-  const magicBytes = MAGIC_BYTES[tipoLower];
-
-  if (!magicBytes) return false;
-
-  // Se for array (múltiplas assinaturas válidas)
-  if (Array.isArray(magicBytes)) {
-    return magicBytes.some(bytes => buffer.subarray(0, bytes.length).equals(bytes));
-  }
-
-  // Comparação direta
-  return buffer.subarray(0, magicBytes.length).equals(magicBytes);
+  const assinaturas = ASSINATURAS[String(tipo || "").toLowerCase()];
+  if (!assinaturas) return false;
+  return assinaturas.every(({ offset, bytes }) =>
+    buffer.length >= offset + bytes.length &&
+    buffer.subarray(offset, offset + bytes.length).equals(bytes)
+  );
 }
 
-// Sanitizar nome de ficheiro para logs/mensagens (remove caminhos)
+// Lê apenas o cabeçalho do ficheiro — um vídeo de 100 MB não precisa de ir
+// inteiro para memória só para confirmar 8 bytes.
+function lerCabecalhoFicheiro(caminho) {
+  const fd = fs.openSync(caminho, "r");
+  try {
+    const buffer = Buffer.alloc(BYTES_CABECALHO);
+    const lidos = fs.readSync(fd, buffer, 0, BYTES_CABECALHO, 0);
+    return buffer.subarray(0, lidos);
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+function validarFicheiroPorMime(caminho, mimetype) {
+  const tipo = MIME_PARA_TIPO[mimetype];
+  if (!tipo) return false;
+  return validarMagicBytes(lerCabecalhoFicheiro(caminho), tipo);
+}
+
 function sanitizarCaminhoFicheiro(caminho) {
   if (!caminho) return "";
-  const partes = caminho.split(/[\/\\]/);
+  const partes = caminho.split(/[/\\]/);
   return partes[partes.length - 1];
 }
 
 module.exports = {
   gerarUUID,
   validarMagicBytes,
+  validarFicheiroPorMime,
+  lerCabecalhoFicheiro,
   sanitizarCaminhoFicheiro,
-  MAGIC_BYTES,
+  MIME_PARA_TIPO,
 };

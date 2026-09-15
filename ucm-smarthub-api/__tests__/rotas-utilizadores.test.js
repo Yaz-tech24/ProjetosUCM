@@ -115,14 +115,14 @@ describe("DELETE /api/admin/utilizadores/:id", () => {
   });
 
   it("devolve 404 para utilizador inexistente", async () => {
-    mockSql([[/SELECT id, papel, avatar_url FROM usuarios/, [[]]]]);
+    mockSql([[/SELECT id, papel, email, avatar_url FROM usuarios/, [[]]]]);
     const res = await request(app).delete("/api/admin/utilizadores/999").set("Authorization", `Bearer ${tokenAdmin}`);
     expect(res.status).toBe(404);
   });
 
   it("rejeita remover o único administrador", async () => {
     mockSql([
-      [/SELECT id, papel, avatar_url FROM usuarios/, [[{ id: 5, papel: "admin", avatar_url: null }]]],
+      [/SELECT id, papel, email, avatar_url FROM usuarios/, [[{ id: 5, papel: "admin", avatar_url: null }]]],
       [/COUNT\(\*\) AS total FROM usuarios WHERE papel = 'admin'/, [[{ total: 1 }]]],
     ]);
     const res = await request(app).delete("/api/admin/utilizadores/5").set("Authorization", `Bearer ${tokenAdmin}`);
@@ -132,7 +132,7 @@ describe("DELETE /api/admin/utilizadores/:id", () => {
 
   it("remove um estudante com sucesso", async () => {
     mockSql([
-      [/SELECT id, papel, avatar_url FROM usuarios/, [[{ id: 2, papel: "estudante", avatar_url: null }]]],
+      [/SELECT id, papel, email, avatar_url FROM usuarios/, [[{ id: 2, papel: "estudante", avatar_url: null }]]],
       [/DELETE FROM usuarios WHERE id = \?/, [{ affectedRows: 1 }]],
     ]);
     const res = await request(app).delete("/api/admin/utilizadores/2").set("Authorization", `Bearer ${tokenAdmin}`);
@@ -141,7 +141,7 @@ describe("DELETE /api/admin/utilizadores/:id", () => {
 
   it("bloqueia com mensagem clara quando o utilizador tem conteúdo associado (FK)", async () => {
     vi.spyOn(db, "query").mockImplementation((sql) => {
-      if (/SELECT id, papel, avatar_url FROM usuarios/.test(sql)) {
+      if (/SELECT id, papel, email, avatar_url FROM usuarios/.test(sql)) {
         return Promise.resolve([[{ id: 2, papel: "estudante", avatar_url: null }]]);
       }
       if (/DELETE FROM usuarios WHERE id = \?/.test(sql)) {

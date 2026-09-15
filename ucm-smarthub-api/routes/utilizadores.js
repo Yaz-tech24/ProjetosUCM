@@ -8,6 +8,7 @@ const { getConfiguracoes, getCursos } = require("../services/plataforma");
 const { paraUrlAbsoluto } = require("../utils/urls");
 const validar = require("../middleware/validar");
 const { autenticar, apenasAdmin } = require("../middleware/auth");
+const { auditar } = require("../middleware/auditoria");
 const { uploadsDir } = require("../middleware/upload");
 const { schemaUtilizadorAdmin, emailComDominioPermitido } = require("../schemas");
 
@@ -95,6 +96,7 @@ module.exports = function registarRotasUtilizadores(app) {
         mensagem: "Conta criada com sucesso!",
         utilizador: { id: resultado.insertId, nome, email, papel, curso: cursoValido, numero_estudante: numero_estudante || null, telefone: telefone || null },
       });
+      auditar(req.utilizador.id, "criar_utilizador", "usuarios", resultado.insertId, `Criou a conta ${email} (${papel})`, req.ip);
 
       mailer.enviarBoasVindas({
         to: email, nome, nomePlataforma: config.nome_plataforma,
@@ -131,7 +133,7 @@ module.exports = function registarRotasUtilizadores(app) {
         return res.status(400).json({ erro: "Não pode remover a sua própria conta." });
       }
 
-      const [[alvo]] = await db.query("SELECT id, papel, avatar_url FROM usuarios WHERE id = ?", [id]);
+      const [[alvo]] = await db.query("SELECT id, papel, email, avatar_url FROM usuarios WHERE id = ?", [id]);
       if (!alvo) return res.status(404).json({ erro: "Utilizador não encontrado." });
 
       if (alvo.papel === "admin") {
@@ -161,6 +163,7 @@ module.exports = function registarRotasUtilizadores(app) {
         fs.unlink(path.join(uploadsDir, path.basename(alvo.avatar_url)), () => {});
       }
 
+      auditar(req.utilizador.id, "remover_utilizador", "usuarios", id, `Removeu a conta ${alvo.email} (${alvo.papel})`, req.ip);
       res.json({ mensagem: "Utilizador removido com sucesso." });
     } catch (erro) {
       console.error("Erro ao remover utilizador:", erro.message);

@@ -6,7 +6,10 @@
 // limite ao longo de meses de actividade (nunca mais liberta memória do
 // processo). Cada limitador limpa-se sozinho periodicamente — ver
 // limparPeriodicamente() abaixo.
-function criarLimitadorTaxa({ janelaMs, maxTentativas }) {
+// `chave` decide o que conta como "o mesmo cliente": por defeito o IP (rotas
+// públicas); nas rotas autenticadas usa-se o id do utilizador, senão uma
+// turma inteira atrás do mesmo NAT partilhava um único limite.
+function criarLimitadorTaxa({ janelaMs, maxTentativas, chave = (req) => req.ip, mensagem }) {
   const tentativasPorChave = new Map();
 
   const limpar = () => {
@@ -23,14 +26,14 @@ function criarLimitadorTaxa({ janelaMs, maxTentativas }) {
   intervalo.unref?.();
 
   return (req, res, next) => {
-    const chave = req.ip;
+    const chaveCliente = chave(req);
     const agora = Date.now();
-    const tentativas = (tentativasPorChave.get(chave) || []).filter(t => agora - t < janelaMs);
+    const tentativas = (tentativasPorChave.get(chaveCliente) || []).filter(t => agora - t < janelaMs);
     if (tentativas.length >= maxTentativas) {
-      return res.status(429).json({ erro: "Demasiadas tentativas. Tente novamente dentro de alguns minutos." });
+      return res.status(429).json({ erro: mensagem || "Demasiadas tentativas. Tente novamente dentro de alguns minutos." });
     }
     tentativas.push(agora);
-    tentativasPorChave.set(chave, tentativas);
+    tentativasPorChave.set(chaveCliente, tentativas);
     next();
   };
 }
@@ -52,6 +55,16 @@ const limitarEsqueciSenha = criarLimitadorTaxa({ janelaMs: 60 * 60 * 1000, maxTe
 // O token em si tem 256 bits de entropia (impraticável de adivinhar), mas um
 // limite generoso aqui é defesa em profundidade barata contra automatismos.
 const limitarReporSenha = criarLimitadorTaxa({ janelaMs: 60 * 60 * 1000, maxTentativas: 20 });
+const limitarVerificarEmail = criarLimitadorTaxa({ janelaMs: 60 * 60 * 1000, maxTentativas: 20 });
+
+const porUtilizador = (req) => `u:${req.utilizador?.id ?? req.ip}`;
+// Um código TOTP tem 1 000 000 combinações e ±30 s de tolerância — sem limite,
+// 10 pedidos/s adivinhavam-no em minutos. 10 tentativas por 15 minutos por
+// conta tornam a adivinhação impraticável sem incomodar quem se engana a escrever.
+const limitar2FA = criarLimitadorTaxa({ janelaMs: 15 * 60 * 1000, maxTentativas: 10, chave: porUtilizador });
+const limitarComentarios = criarLimitadorTaxa({ janelaMs: 10 * 60 * 1000, maxTentativas: 20, chave: porUtilizador, mensagem: "Está a comentar demasiado depressa. Aguarde uns minutos." });
+const limitarAvaliacoes = criarLimitadorTaxa({ janelaMs: 10 * 60 * 1000, maxTentativas: 30, chave: porUtilizador });
+const limitarSubscricoes = criarLimitadorTaxa({ janelaMs: 10 * 60 * 1000, maxTentativas: 30, chave: porUtilizador });
 
 // ─── Bloqueio de conta por tentativas falhadas ────────────────────────────
 // Complementa o limite por IP acima: um atacante que rode várias origens/IPs
@@ -88,6 +101,7 @@ const intervaloFalhas = setInterval(() => {
 intervaloFalhas.unref?.();
 
 module.exports = {
-  limitarLogin, limitarRegisto, limitarChat, limitarEsqueciSenha, limitarReporSenha,
+  limitarLogin, limitarRegisto, limitarChat, limitarEsqueciSenha, limitarReporSenha, limitarVerificarEmail,
+  limitar2FA, limitarComentarios, limitarAvaliacoes, limitarSubscricoes,
   contaBloqueada, registarFalhaLogin, limparFalhasLogin,
 };

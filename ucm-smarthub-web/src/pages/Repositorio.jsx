@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { useConfig } from "../context/ConfigContext";
 import Toast from "../components/Toast";
+import { Etiqueta } from "../components/TagsMaterial";
 
 /* Card de material com botão de favorito e (para o autor ou um admin) de remover */
 const MaterialCard = ({ m, onClick, favs, onToggleFav, podeRemover, onRemover }) => {
@@ -89,6 +90,11 @@ const MaterialCard = ({ m, onClick, favs, onToggleFav, podeRemover, onRemover })
         <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.25em", color: "var(--text-faint)", marginBottom: 12 }}>
           {m.cadeira}
         </p>
+        {m.tags?.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            {m.tags.map(t => <Etiqueta key={t.nome} nome={t.nome} cor={t.cor} />)}
+          </div>
+        )}
         <p style={{ fontSize: 13, color: "var(--text-faint)", marginBottom: 20 }}>
           {m.autor} · {new Date(m.data_upload).toLocaleDateString("pt-PT")}
         </p>
@@ -115,6 +121,8 @@ const Repositorio = ({ usuarioLogado }) => {
   /* Estado — inicializado a partir do URL ?q= e ?tipo= */
   const [materiais,       setMateriais]       = useState([]);
   const [filtroCadeira,   setFiltroCadeira]   = useState("Todas");
+  const [filtroTag,       setFiltroTag]       = useState("");
+  const [tagsDisponiveis, setTagsDisponiveis] = useState([]);
   const [filtroTipo,      setFiltroTipo]      = useState(searchParams.get('tipo') || "Todos");
   const [buscaTermo,      setBuscaTermo]      = useState(searchParams.get('q') || "");
   const [currentPage,     setCurrentPage]     = useState(1);
@@ -165,6 +173,7 @@ const Repositorio = ({ usuarioLogado }) => {
       if (debouncedBusca.trim())    params.set('busca',   debouncedBusca.trim());
       if (filtroTipo !== 'Todos')   params.set('tipo',    filtroTipo);
       if (filtroCadeira !== 'Todas') params.set('cadeira', filtroCadeira);
+      if (filtroTag)                params.set('tag',     filtroTag);
 
       const res = await api.get(`/materiais?${params}`, { signal: controller.signal });
       setMateriais(res.data.materiais || []);
@@ -177,7 +186,11 @@ const Repositorio = ({ usuarioLogado }) => {
     } finally {
       if (!controller.signal.aborted) setLoading(false);
     }
-  }, [debouncedBusca, filtroTipo, filtroCadeira]);
+  }, [debouncedBusca, filtroTipo, filtroCadeira, filtroTag]);
+
+  useEffect(() => {
+    api.get('/tags').then(res => setTagsDisponiveis(res.data.filter(t => t.quantidade > 0))).catch(() => setTagsDisponiveis([]));
+  }, []);
 
   /* Recarrega ao mudar qualquer filtro; cancela o pedido em curso ao mudar
      de filtro novamente ou ao desmontar a página. */
@@ -386,6 +399,17 @@ const Repositorio = ({ usuarioLogado }) => {
             </select>
           </div>
         </div>
+
+        {tagsDisponiveis.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[10.5px] font-bold uppercase mr-1" style={{ letterSpacing: "0.12em", color: "var(--text-faint)" }}>Tags</span>
+            {tagsDisponiveis.map(t => (
+              <Etiqueta key={t.id} nome={`${t.nome} · ${t.quantidade}`} cor={t.cor}
+                activa={filtroTag ? filtroTag === t.nome : undefined}
+                onClick={() => setFiltroTag(f => (f === t.nome ? "" : t.nome))} />
+            ))}
+          </div>
+        )}
 
         {/* Linha 2: filtro por tipo + stats */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

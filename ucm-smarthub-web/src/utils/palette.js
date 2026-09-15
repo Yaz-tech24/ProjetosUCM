@@ -107,3 +107,13 @@ export function aplicarPaleta(corPrimaria, corDestaque) {
     root.setProperty(`--color-${nome}-rgb`, rgb);
   }
 }
+
+/* Cor de texto (clara ou escura) que contrasta com uma cor de fundo hex,
+   pela luminância relativa — usada nas etiquetas coloridas de tags. */
+export const corTextoContraste = (hex) => {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex || "");
+  if (!m) return "#fff";
+  const n = parseInt(m[1], 16);
+  const lum = 0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255);
+  return lum > 150 ? "var(--color-navy-abyss)" : "#fff";
+};

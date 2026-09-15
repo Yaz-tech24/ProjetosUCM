@@ -1,112 +1,101 @@
-import { useState, useEffect } from 'react';
-import axios from 'axios';
-import Toast from './Toast';
+import React, { useState, useEffect, useCallback } from "react";
+import { Bell, BellOff, BellRing, Check } from "lucide-react";
+import api from "../services/api";
+import Toast from "./Toast";
+import { useConfig } from "../context/ConfigContext";
+import { Cartao, Vazio, Spinner } from "./ui";
 
-export default function Subscricoes() {
-  const [disciplinas, setDisciplinas] = useState([]);
-  const [minhasSubscricoes, setMinhasSubscricoes] = useState([]);
-  const [carregando, setCarregando] = useState(false);
-  const [toast, setToast] = useState(null);
+const Subscricoes = () => {
+  const { cursos } = useConfig();
+  const [subscritas, setSubscritas] = useState(new Set());
+  const [aCarregar, setACarregar] = useState(true);
+  const [aAlterar, setAAlterar] = useState(null);
+  const [toast, setToast] = useState({ message: "", type: "" });
 
-  useEffect(() => {
-    carregarDisciplinas();
-    carregarSubscricoes();
+  const showToast = (message, type = "success") => setToast({ message, type });
+
+  const carregar = useCallback(async () => {
+    try {
+      const { data } = await api.get("/subscricoes/minhas-disciplinas");
+      setSubscritas(new Set(data.map(s => s.disciplina)));
+    } catch {
+      showToast("Não foi possível carregar as subscrições.", "error");
+    } finally {
+      setACarregar(false);
+    }
   }, []);
 
-  const carregarDisciplinas = async () => {
-    try {
-      const { data } = await axios.get('/api/config');
-      // Assumindo que cursos estão em config ou em endpoint separado
-      setDisciplinas(data.cursos || []);
-    } catch {
-      // Erro ao carregar disciplinas
-    }
-  };
+  useEffect(() => { carregar(); }, [carregar]);
 
-  const carregarSubscricoes = async () => {
+  const alternar = async (disciplina) => {
+    if (aAlterar) return;
+    const estava = subscritas.has(disciplina);
+    setAAlterar(disciplina);
     try {
-      const { data } = await axios.get('/api/subscricoes/minhas-disciplinas');
-      setMinhasSubscricoes(data.map(s => s.disciplina));
-    } catch {
-      // Erro ao carregar subscrições
-    }
-  };
-
-  const subscrever = async (disciplina) => {
-    setCarregando(true);
-    try {
-      await axios.post(`/api/subscricoes/disciplinas/${encodeURIComponent(disciplina)}`);
-      setToast({ tipo: 'sucesso', mensagem: `Subscrito a ${disciplina}!` });
-      carregarSubscricoes();
-    } catch {
-      setToast({ tipo: 'erro', mensagem: 'Erro ao subscrever' });
+      if (estava) {
+        await api.delete(`/subscricoes/disciplinas/${encodeURIComponent(disciplina)}`);
+        setSubscritas(prev => { const s = new Set(prev); s.delete(disciplina); return s; });
+        showToast(`Deixou de seguir ${disciplina}.`);
+      } else {
+        await api.post(`/subscricoes/disciplinas/${encodeURIComponent(disciplina)}`);
+        setSubscritas(prev => new Set(prev).add(disciplina));
+        showToast(`A seguir ${disciplina}. Vai receber um email por cada novo material.`);
+      }
+    } catch (err) {
+      showToast(err.response?.data?.erro || "Erro ao alterar a subscrição.", "error");
     } finally {
-      setCarregando(false);
-    }
-  };
-
-  const desinscrever = async (disciplina) => {
-    if (!confirm(`Desinscrever de ${disciplina}?`)) return;
-    setCarregando(true);
-    try {
-      await axios.delete(`/api/subscricoes/disciplinas/${encodeURIComponent(disciplina)}`);
-      setToast({ tipo: 'sucesso', mensagem: `Desinscrição de ${disciplina}` });
-      carregarSubscricoes();
-    } catch {
-      setToast({ tipo: 'erro', mensagem: 'Erro ao desinscrever' });
-    } finally {
-      setCarregando(false);
+      setAAlterar(null);
     }
   };
 
   return (
-    <div style={{ padding: '1.5rem', background: '#f5f5f5', borderRadius: '8px' }}>
-      <h2>📬 Minhas Subscrições</h2>
-      <p style={{ color: '#666' }}>Receba notificações de novos materiais nas disciplinas que segue</p>
-
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-        gap: '1rem',
-        marginTop: '1.5rem'
-      }}>
-        {disciplinas.map(d => {
-          const estaSubscrito = minhasSubscricoes.includes(d.nome || d);
-          return (
-            <div
-              key={d.id || d}
-              style={{
-                background: estaSubscrito ? '#04122e' : '#fff',
-                color: estaSubscrito ? '#fff' : '#04122e',
-                padding: '1rem',
-                borderRadius: '8px',
-                textAlign: 'center',
-                border: `2px solid ${estaSubscrito ? '#ffd700' : '#ccc'}`,
-              }}
-            >
-              <h4 style={{ margin: '0 0 1rem 0' }}>{d.nome || d}</h4>
-              <button
-                onClick={() => estaSubscrito ? desinscrever(d.nome || d) : subscrever(d.nome || d)}
-                disabled={carregando}
-                style={{
-                  background: estaSubscrito ? '#ffd700' : '#04122e',
-                  color: estaSubscrito ? '#04122e' : '#fff',
-                  border: 'none',
-                  padding: '0.5rem 1rem',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontWeight: 'bold',
-                  width: '100%',
-                }}
-              >
-                {estaSubscrito ? '✓ Subscrito' : '+ Subscrever'}
-              </button>
-            </div>
-          );
-        })}
-      </div>
-
-      {toast && <Toast tipo={toast.tipo} mensagem={toast.mensagem} />}
-    </div>
+    <>
+      <Toast message={toast.message} type={toast.type} onClose={() => setToast({ message: "", type: "" })} />
+      <Cartao
+        icon={BellRing}
+        titulo="Disciplinas que sigo"
+        subtitulo="Receba um email sempre que for publicado um novo material nas disciplinas escolhidas"
+        accao={subscritas.size > 0 && (
+          <span className="rounded-full px-3 py-1 text-xs font-black" style={{ background: "rgba(var(--color-gold-rgb),0.18)", color: "var(--color-gold-dark)" }}>
+            {subscritas.size} activa{subscritas.size > 1 ? "s" : ""}
+          </span>
+        )}
+      >
+        {aCarregar ? <Spinner /> : cursos.length === 0 ? (
+          <Vazio icon={BellOff}>Ainda não há disciplinas configuradas.</Vazio>
+        ) : (
+          <div className="flex flex-wrap gap-2.5">
+            {cursos.map(c => {
+              const activa = subscritas.has(c.nome);
+              const ocupada = aAlterar === c.nome;
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => alternar(c.nome)}
+                  disabled={ocupada}
+                  aria-pressed={activa}
+                  className="inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-bold transition-all duration-200 disabled:opacity-60"
+                  style={activa ? {
+                    background: "linear-gradient(135deg,var(--color-navy-deep),var(--color-navy-mid))",
+                    color: "#fff",
+                    boxShadow: "0 6px 20px rgba(var(--color-navy-deep-rgb),0.28)",
+                  } : {
+                    background: "var(--surface-hover)",
+                    border: "1.5px solid var(--border-subtle-strong)",
+                    color: "var(--text-body)",
+                  }}
+                >
+                  {activa ? <Check size={15} style={{ color: "var(--color-gold)" }} /> : <Bell size={15} />}
+                  {c.nome}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </Cartao>
+    </>
   );
-}
+};
+
+export default Subscricoes;

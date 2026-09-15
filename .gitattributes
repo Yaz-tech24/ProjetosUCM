@@ -10,3 +10,9 @@
 Caddyfile text eol=lf
 Dockerfile text eol=lf
 backup/crontab text eol=lf
+
+# Normaliza fins de linha de todo o texto para LF no repositório (evita os
+# avisos "LF will be replaced by CRLF" e diffs de ficheiro inteiro entre SOs).
+* text=auto eol=lf
+*.webp binary
+*.mp4 binary

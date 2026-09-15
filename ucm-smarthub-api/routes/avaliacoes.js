@@ -1,6 +1,8 @@
 const db = require("../config/db");
 const { autenticar } = require("../middleware/auth");
 const { auditar } = require("../middleware/auditoria");
+const { limitarAvaliacoes } = require("../middleware/rateLimiters");
+const { atualizarReputacaoDoAutor } = require("../services/reputacao");
 const { z } = require("zod");
 const validar = require("../middleware/validar");
 
@@ -11,7 +13,7 @@ const schemaAvaliacao = z.object({
 
 module.exports = function registarRotasAvaliacoes(app) {
   // POST: Submeter ou atualizar avaliação
-  app.post("/api/materiais/:id/avaliacoes", autenticar, validar(schemaAvaliacao), async (req, res) => {
+  app.post("/api/materiais/:id/avaliacoes", autenticar, limitarAvaliacoes, validar(schemaAvaliacao), async (req, res) => {
     try {
       const materialId = parseInt(req.params.id, 10);
       const { nota, comentario } = req.body;
@@ -35,6 +37,7 @@ module.exports = function registarRotasAvaliacoes(app) {
       );
 
       auditar(usuarioId, "avaliar_material", "materiais", materialId, `Avaliação ${nota} estrelas`, req.ip);
+      atualizarReputacaoDoAutor(materialId);
 
       res.status(201).json({ mensagem: "Avaliação registada com sucesso." });
     } catch (erro) {
@@ -102,6 +105,7 @@ module.exports = function registarRotasAvaliacoes(app) {
       }
 
       auditar(usuarioId, "remover_avaliacao", "materiais", materialId, "Removeu a sua avaliação", req.ip);
+      atualizarReputacaoDoAutor(materialId);
 
       res.json({ mensagem: "Avaliação removida com sucesso." });
     } catch (erro) {

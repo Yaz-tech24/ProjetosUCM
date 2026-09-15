@@ -6,11 +6,12 @@ const db = require("../config/db");
 const mailer = require("../services/email");
 const { getConfiguracoes, getCursos } = require("../services/plataforma");
 const { paraUrlAbsoluto } = require("../utils/urls");
-const { gerarUUID } = require("../utils/security");
 const validar = require("../middleware/validar");
 const { autenticar, JWT_SECRET } = require("../middleware/auth");
+const { auditar } = require("../middleware/auditoria");
+const totp = require("../services/totp");
 const {
-  limitarLogin, limitarRegisto, limitarEsqueciSenha, limitarReporSenha,
+  limitarLogin, limitarRegisto, limitarEsqueciSenha, limitarReporSenha, limitarVerificarEmail,
   contaBloqueada, registarFalhaLogin, limparFalhasLogin,
 } = require("../middleware/rateLimiters");
 const {
@@ -18,9 +19,31 @@ const {
   emailComDominioPermitido,
 } = require("../schemas");
 
-// Gerar token de verificação de email (válido por 24 horas)
-function gerarTokenVerificacaoEmail() {
-  return crypto.randomBytes(32).toString("hex");
+// Tokens de verificação de email: o valor em claro vai no link; na BD fica só
+// o hash SHA-256 (tal como reset_token) — uma fuga da tabela não chega para
+// confirmar contas alheias.
+const gerarTokenBruto = () => crypto.randomBytes(32).toString("hex");
+const hashToken = (token) => crypto.createHash("sha256").update(token).digest("hex");
+const VALIDADE_TOKEN_EMAIL_MS = 24 * 60 * 60 * 1000;
+
+// A verificação de email só faz sentido quando o servidor consegue enviar
+// emails. Sem SMTP configurado, exigi-la deixava toda a gente de fora — nesse
+// caso as contas nascem verificadas e o login não a exige.
+const verificacaoEmailActiva = () => mailer.emailConfigurado();
+
+function enviarEmailVerificacao({ email, nome, tokenBruto }) {
+  getConfiguracoes().then(config => {
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+    mailer.enviarVerificacaoEmail({
+      to: email,
+      nome,
+      linkVerificacao: `${frontendUrl}/verificar-email?token=${tokenBruto}`,
+      nomePlataforma: config.nome_plataforma,
+      corPrimaria: config.cor_primaria,
+      corDestaque: config.cor_destaque,
+      logoUrl: config.logo_url,
+    });
+  }).catch(() => {});
 }
 
 // Hash bcrypt fixo sem correspondência real — usado quando o email não existe,
@@ -41,6 +64,39 @@ const OPCOES_COOKIE_SESSAO = {
   maxAge: 8 * 60 * 60 * 1000,
   path: "/",
 };
+
+// Token intermédio do login com 2FA: prova que a palavra-passe já foi
+// validada, mas não dá acesso a nada — só serve para o segundo passo.
+const VALIDADE_TOKEN_2FA = "5m";
+
+function emitirSessao(res, utilizador) {
+  const token = jwt.sign(
+    { id: utilizador.id, papel: utilizador.papel, nome: utilizador.nome, curso: utilizador.curso },
+    JWT_SECRET,
+    { expiresIn: "8h" }
+  );
+
+  // Cookie httpOnly é a forma "real" de autenticação da SPA (ver
+  // middleware/auth.js); o token continua também no corpo da resposta
+  // para clientes de API/Swagger/testes que não guardam cookies.
+  res.cookie("token", token, OPCOES_COOKIE_SESSAO);
+
+  res.status(200).json({
+    mensagem: "Login aprovado!",
+    token,
+    utilizador: {
+      id: utilizador.id,
+      nome: utilizador.nome,
+      email: utilizador.email,
+      papel: utilizador.papel,
+      curso: utilizador.curso,
+      numero_estudante: utilizador.numero_estudante,
+      telefone: utilizador.telefone,
+      avatar_url: paraUrlAbsoluto(utilizador.avatar_url),
+      "2fa_ativado": utilizador["2fa_ativado"] === 1,
+    },
+  });
+}
 
 module.exports = function registarRotasAuth(app) {
   // ==========================================
@@ -107,14 +163,14 @@ module.exports = function registarRotasAuth(app) {
       const [[{ total }]] = await db.query("SELECT COUNT(*) AS total FROM usuarios");
       const papelFinal = total === 0 ? "admin" : "estudante";
 
-      // Gerar token de verificação de email (válido por 24 horas)
-      const emailToken = gerarTokenVerificacaoEmail();
-      const emailTokenExpira = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      const exigeVerificacao = verificacaoEmailActiva();
+      const tokenBruto = exigeVerificacao ? gerarTokenBruto() : null;
+      const emailTokenExpira = exigeVerificacao ? new Date(Date.now() + VALIDADE_TOKEN_EMAIL_MS) : null;
 
       try {
         await db.query(
-          "INSERT INTO usuarios (nome, email, senha, curso, papel, numero_estudante, telefone, email_token, email_token_expira) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-          [nome, email, senhaCriptografada, cursoValido, papelFinal, numero_estudante || null, telefone || null, emailToken, emailTokenExpira]
+          "INSERT INTO usuarios (nome, email, senha, curso, papel, numero_estudante, telefone, email_verificado, email_token, email_token_expira) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+          [nome, email, senhaCriptografada, cursoValido, papelFinal, numero_estudante || null, telefone || null, exigeVerificacao ? 0 : 1, tokenBruto ? hashToken(tokenBruto) : null, emailTokenExpira]
         );
       } catch (erroInsert) {
         // Condição de corrida: dois registos com o mesmo email quase em
@@ -127,25 +183,14 @@ module.exports = function registarRotasAuth(app) {
         throw erroInsert;
       }
 
-      res.status(201).json({
-        mensagem: "Conta criada com sucesso! Verifique o seu email para confirmar a conta.",
-      });
+      const partes = ["Conta criada com sucesso!"];
+      if (papelFinal === "admin") partes.push("Como primeira conta da plataforma, tornou-se administrador.");
+      partes.push(exigeVerificacao ? "Verifique o seu email para confirmar a conta antes de entrar." : "Já pode entrar.");
+
+      res.status(201).json({ mensagem: partes.join(" "), verificacao_pendente: exigeVerificacao });
 
       // Email de verificação — não bloqueia a resposta
-      getConfiguracoes().then(config => {
-        const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
-        const linkVerificacao = `${frontendUrl}/verificar-email?token=${emailToken}`;
-
-        mailer.enviarVerificacaoEmail({
-          to: email,
-          nome,
-          linkVerificacao,
-          nomePlataforma: config.nome_plataforma,
-          corPrimaria: config.cor_primaria,
-          corDestaque: config.cor_destaque,
-          logoUrl: config.logo_url,
-        });
-      }).catch(() => {});
+      if (exigeVerificacao) enviarEmailVerificacao({ email, nome, tokenBruto });
     } catch (erro) {
       console.error("Erro no registo:", erro.message);
       res.status(500).json({ erro: "Erro interno ao registar utilizador." });
@@ -208,34 +253,84 @@ module.exports = function registarRotasAuth(app) {
 
       limparFalhasLogin(email);
 
-      const token = jwt.sign(
-        { id: utilizador.id, papel: utilizador.papel, nome: utilizador.nome, curso: utilizador.curso },
-        JWT_SECRET,
-        { expiresIn: "8h" }
-      );
+      // Só depois da palavra-passe estar certa — assim quem não a tem
+      // continua a receber a mesma mensagem genérica de sempre.
+      if (verificacaoEmailActiva() && utilizador.email_verificado === 0) {
+        return res.status(403).json({
+          erro: "Confirme o seu email antes de entrar. Verifique a caixa de entrada (e o spam) ou peça um novo link.",
+          email_nao_verificado: true,
+        });
+      }
 
-      // Cookie httpOnly é a forma "real" de autenticação da SPA (ver
-      // middleware/auth.js); o token continua também no corpo da resposta
-      // para clientes de API/Swagger/testes que não guardam cookies.
-      res.cookie("token", token, OPCOES_COOKIE_SESSAO);
+      if (utilizador["2fa_ativado"] === 1) {
+        const token2fa = jwt.sign({ id: utilizador.id, fase: "2fa" }, JWT_SECRET, { expiresIn: VALIDADE_TOKEN_2FA });
+        return res.status(200).json({ requer_2fa: true, token_2fa: token2fa });
+      }
 
-      res.status(200).json({
-        mensagem: "Login aprovado!",
-        token,
-        utilizador: {
-          id: utilizador.id,
-          nome: utilizador.nome,
-          email: utilizador.email,
-          papel: utilizador.papel,
-          curso: utilizador.curso,
-          numero_estudante: utilizador.numero_estudante,
-          telefone: utilizador.telefone,
-          avatar_url: paraUrlAbsoluto(utilizador.avatar_url),
-        },
-      });
+      emitirSessao(res, utilizador);
     } catch (erro) {
       console.error("Erro no login:", erro.message);
       res.status(500).json({ erro: "Erro interno ao validar credenciais." });
+    }
+  });
+
+  /**
+   * @openapi
+   * /api/login/2fa:
+   *   post:
+   *     summary: Segundo passo do login para contas com 2FA — troca o token intermédio + código TOTP por uma sessão
+   *     tags: [Autenticação]
+   *     security: []
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required: [token_2fa, codigo]
+   *             properties:
+   *               token_2fa: { type: string }
+   *               codigo: { type: string, pattern: '^\\d{6}$' }
+   *     responses:
+   *       200: { description: Login aprovado }
+   *       400: { description: Código inválido }
+   *       401: { description: Token intermédio inválido ou expirado }
+   */
+  app.post("/api/login/2fa", limitarLogin, async (req, res) => {
+    try {
+      const { token_2fa, codigo } = req.body || {};
+      if (typeof token_2fa !== "string" || !/^\d{6}$/.test(String(codigo || ""))) {
+        return res.status(400).json({ erro: "Token e código de 6 dígitos são obrigatórios." });
+      }
+
+      let payload;
+      try {
+        payload = jwt.verify(token_2fa, JWT_SECRET);
+      } catch {
+        return res.status(401).json({ erro: "Sessão de login expirada. Volte a introduzir as credenciais." });
+      }
+      if (payload.fase !== "2fa") {
+        return res.status(401).json({ erro: "Token inválido para este passo." });
+      }
+
+      const [[utilizador]] = await db.query("SELECT * FROM usuarios WHERE id = ?", [payload.id]);
+      if (!utilizador || utilizador["2fa_ativado"] !== 1 || !utilizador["2fa_secret"]) {
+        return res.status(401).json({ erro: "Esta conta já não tem 2FA activo. Volte a entrar." });
+      }
+
+      if (contaBloqueada(utilizador.email)) {
+        return res.status(429).json({ erro: "Demasiadas tentativas falhadas. Tente novamente dentro de 15 minutos." });
+      }
+      if (!(await totp.verificarCodigo(utilizador["2fa_secret"], codigo))) {
+        registarFalhaLogin(utilizador.email);
+        return res.status(400).json({ erro: "Código inválido." });
+      }
+      limparFalhasLogin(utilizador.email);
+
+      emitirSessao(res, utilizador);
+    } catch (erro) {
+      console.error("Erro no login 2FA:", erro.message);
+      res.status(500).json({ erro: "Erro interno ao validar o código." });
     }
   });
 
@@ -330,6 +425,7 @@ module.exports = function registarRotasAuth(app) {
         "UPDATE usuarios SET senha = ?, reset_token = NULL, reset_token_expira = NULL WHERE id = ?",
         [senhaCriptografada, utilizador.id]
       );
+      auditar(utilizador.id, "repor_senha", "usuarios", utilizador.id, "Repôs a palavra-passe via link de recuperação", req.ip);
 
       res.json({ mensagem: "Palavra-passe reposta com sucesso. Já pode entrar." });
     } catch (erro) {
@@ -399,20 +495,20 @@ module.exports = function registarRotasAuth(app) {
    *       200: { description: Email verificado com sucesso }
    *       400: { description: Token inválido ou expirado }
    */
-  app.post("/api/verificar-email", async (req, res) => {
+  app.post("/api/verificar-email", limitarVerificarEmail, async (req, res) => {
     try {
-      const { token } = req.body;
-      if (!token || !token.trim()) {
+      const token = typeof req.body?.token === "string" ? req.body.token.trim() : "";
+      if (!token) {
         return res.status(400).json({ erro: "Token em falta." });
       }
 
       const [[utilizador]] = await db.query(
-        `SELECT id, email_verificado FROM usuarios WHERE email_token = ? AND email_token_expira > NOW()`,
-        [token.trim()]
+        "SELECT id, email_verificado FROM usuarios WHERE email_token = ? AND email_token_expira > NOW()",
+        [hashToken(token)]
       );
 
       if (!utilizador) {
-        return res.status(400).json({ erro: "Token inválido ou expirado. Tente registar-se novamente." });
+        return res.status(400).json({ erro: "Link inválido ou expirado. Peça um novo link de verificação." });
       }
 
       if (utilizador.email_verificado) {
@@ -448,57 +544,34 @@ module.exports = function registarRotasAuth(app) {
    *             properties:
    *               email: { type: string }
    *     responses:
-   *       200: { description: Email reenviado }
-   *       404: { description: Email não encontrado }
+   *       200: { description: "Resposta genérica (não revela se o email existe nem se já está verificado)" }
    */
-  app.post("/api/reenviar-verificacao-email", limitarEsqueciSenha, async (req, res) => {
+  app.post("/api/reenviar-verificacao-email", limitarEsqueciSenha, validar(schemaEsqueciSenha), async (req, res) => {
+    // Resposta sempre igual, quer o email exista ou não — o mesmo raciocínio
+    // do /api/esqueci-senha: nunca confirmar a terceiros que uma conta existe.
+    const respostaGenerica = { mensagem: "Se esse email tiver uma conta por verificar, foi enviado um novo link." };
     try {
-      const { email } = req.body;
-      if (!email || !email.trim()) {
-        return res.status(400).json({ erro: "Email obrigatório." });
-      }
-
+      const email = req.body.email.trim().toLowerCase();
       const [[utilizador]] = await db.query(
         "SELECT id, nome, email_verificado FROM usuarios WHERE email = ?",
-        [email.trim().toLowerCase()]
+        [email]
       );
 
-      if (!utilizador) {
-        return res.status(404).json({ erro: "Email não encontrado." });
+      if (!utilizador || utilizador.email_verificado) {
+        return res.json(respostaGenerica);
       }
 
-      if (utilizador.email_verificado) {
-        return res.status(200).json({ mensagem: "Este email já foi verificado." });
-      }
-
-      const emailToken = gerarTokenVerificacaoEmail();
-      const emailTokenExpira = new Date(Date.now() + 24 * 60 * 60 * 1000);
-
+      const tokenBruto = gerarTokenBruto();
       await db.query(
         "UPDATE usuarios SET email_token = ?, email_token_expira = ? WHERE id = ?",
-        [emailToken, emailTokenExpira, utilizador.id]
+        [hashToken(tokenBruto), new Date(Date.now() + VALIDADE_TOKEN_EMAIL_MS), utilizador.id]
       );
 
-      res.status(200).json({ mensagem: "Email de verificação reenviado. Verifique a sua caixa de entrada." });
-
-      // Enviar email — não bloqueia a resposta
-      getConfiguracoes().then(config => {
-        const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
-        const linkVerificacao = `${frontendUrl}/verificar-email?token=${emailToken}`;
-
-        mailer.enviarVerificacaoEmail({
-          to: email,
-          nome: utilizador.nome,
-          linkVerificacao,
-          nomePlataforma: config.nome_plataforma,
-          corPrimaria: config.cor_primaria,
-          corDestaque: config.cor_destaque,
-          logoUrl: config.logo_url,
-        });
-      }).catch(() => {});
+      res.json(respostaGenerica);
+      enviarEmailVerificacao({ email, nome: utilizador.nome, tokenBruto });
     } catch (erro) {
       console.error("Erro ao reenviar verificação de email:", erro.message);
-      res.status(500).json({ erro: "Erro ao reenviar email de verificação." });
+      res.json(respostaGenerica);
     }
   });
 };

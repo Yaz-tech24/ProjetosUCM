@@ -117,17 +117,13 @@ module.exports = function registarRotasAnalytics(app) {
     try {
       const [materiais] = await db.query(
         `SELECT
-           m.id, m.titulo, m.cadeira, m.tipo,
-           COUNT(a.id) as total_avaliacoes,
-           AVG(a.nota) as media_nota,
-           COUNT(DISTINCT c.id) as total_comentarios,
-           m.data_upload
+           m.id, m.titulo, m.cadeira, m.tipo, m.data_upload,
+           (SELECT COUNT(*) FROM avaliacoes a WHERE a.material_id = m.id) AS total_avaliacoes,
+           (SELECT AVG(a.nota) FROM avaliacoes a WHERE a.material_id = m.id) AS media_nota,
+           (SELECT COUNT(*) FROM comentarios_materiais c WHERE c.material_id = m.id) AS total_comentarios
          FROM materiais m
-         LEFT JOIN avaliacoes a ON m.id = a.material_id
-         LEFT JOIN comentarios_materiais c ON m.id = c.material_id
          WHERE m.status = 'aprovado'
-         GROUP BY m.id
-         ORDER BY total_avaliacoes DESC
+         ORDER BY total_avaliacoes DESC, total_comentarios DESC, m.data_upload DESC
          LIMIT 10`
       );
 

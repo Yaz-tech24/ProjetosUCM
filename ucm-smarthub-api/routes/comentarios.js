@@ -1,6 +1,7 @@
 const db = require("../config/db");
 const { autenticar } = require("../middleware/auth");
 const { auditar } = require("../middleware/auditoria");
+const { limitarComentarios } = require("../middleware/rateLimiters");
 const { z } = require("zod");
 const validar = require("../middleware/validar");
 
@@ -10,7 +11,7 @@ const schemaComentario = z.object({
 
 module.exports = function registarRotasComentarios(app) {
   // POST: Submeter comentário
-  app.post("/api/materiais/:id/comentarios", autenticar, validar(schemaComentario), async (req, res) => {
+  app.post("/api/materiais/:id/comentarios", autenticar, limitarComentarios, validar(schemaComentario), async (req, res) => {
     try {
       const materialId = parseInt(req.params.id, 10);
       const { conteudo } = req.body;

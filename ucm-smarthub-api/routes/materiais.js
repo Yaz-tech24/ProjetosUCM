@@ -6,9 +6,12 @@ const mailer = require("../services/email");
 const { getConfiguracoes, getCursos } = require("../services/plataforma");
 const { genAI, extractPdfText, gerarResumoIA, verificarConformidadeIA, MENSAGEM_IA_MAX } = require("../services/ia");
 const { paraUrlAbsoluto } = require("../utils/urls");
-const { validarMagicBytes } = require("../utils/security");
+const { validarFicheiroPorMime } = require("../utils/security");
 const validar = require("../middleware/validar");
 const { autenticar, apenasAdmin } = require("../middleware/auth");
+const { auditar } = require("../middleware/auditoria");
+const { atualizarReputacao } = require("../services/reputacao");
+const { notificarSubscritores } = require("../services/notificacoes");
 const { limitarChat } = require("../middleware/rateLimiters");
 const { uploadsDir, upload } = require("../middleware/upload");
 const { schemaMaterial } = require("../schemas");
@@ -77,6 +80,7 @@ module.exports = function registarRotasMateriais(app) {
       const busca   = req.query.busca   ? `%${req.query.busca}%` : null;
       const tipo    = req.query.tipo    || null; // "PDF" | "Vídeo" | null = todos
       const cadeira = req.query.cadeira || null; // filtro por disciplina
+      const tag     = req.query.tag     || null; // filtro por tag (nome)
 
       const params = [];
       let where = "WHERE m.status = 'aprovado'";
@@ -84,9 +88,14 @@ module.exports = function registarRotasMateriais(app) {
       if (busca)   { where += " AND m.titulo LIKE ?"; params.push(busca);   }
       if (tipo)    { where += " AND m.tipo = ?";      params.push(tipo);    }
       if (cadeira) { where += " AND m.cadeira = ?";   params.push(cadeira); }
+      if (tag)     { where += " AND EXISTS (SELECT 1 FROM materiais_tags mt JOIN tags t ON t.id = mt.tag_id WHERE mt.material_id = m.id AND t.nome = ?)"; params.push(tag); }
 
+      // As tags vêm agregadas numa string "nome|cor;nome|cor" para evitar uma
+      // consulta por material só para desenhar as etiquetas nos cartões.
       const [materiais] = await db.query(
-        `SELECT m.id, m.titulo, m.cadeira, m.tipo, m.url_arquivo, m.data_upload, m.status, m.autor_id, u.nome AS autor
+        `SELECT m.id, m.titulo, m.cadeira, m.tipo, m.url_arquivo, m.data_upload, m.status, m.autor_id, u.nome AS autor,
+                (SELECT GROUP_CONCAT(CONCAT(t.nome, '|', t.cor) ORDER BY t.nome SEPARATOR ';')
+                 FROM materiais_tags mt JOIN tags t ON t.id = mt.tag_id WHERE mt.material_id = m.id) AS tags_raw
          FROM materiais m
          JOIN usuarios u ON m.autor_id = u.id
          ${where}
@@ -101,7 +110,11 @@ module.exports = function registarRotasMateriais(app) {
       );
 
       res.status(200).json({
-        materiais: materiais.map(m => ({ ...m, url_arquivo: paraUrlAbsoluto(m.url_arquivo) })),
+        materiais: materiais.map(({ tags_raw, ...m }) => ({
+          ...m,
+          url_arquivo: paraUrlAbsoluto(m.url_arquivo),
+          tags: tags_raw ? tags_raw.split(";").map(par => { const [nome, cor] = par.split("|"); return { nome, cor }; }) : [],
+        })),
         pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
       });
     } catch (erro) {
@@ -476,21 +489,18 @@ Pergunta do estudante: ${mensagem.trim()}`;
         return res.status(400).json({ erro: `Ficheiro demasiado grande. Limite actual: ${config.tamanho_maximo_mb} MB.` });
       }
 
-      // Validação de Magic Bytes — verificar que o ficheiro é realmente o tipo esperado
-      // (previne upload de executáveis/malware disfarçados com extensão falsa)
+      // O Content-Type e a extensão vêm do cliente; o cabeçalho real do
+      // ficheiro é a única coisa que não controla. Um .exe renomeado para
+      // .pdf passa o fileFilter do multer, mas não passa aqui.
+      let assinaturaValida = false;
       try {
-        const ficheiroBuffer = fs.readFileSync(req.file.path);
-        const tipoEsperado = tipo === "PDF" ? "pdf" : tipo.toLowerCase();
-        if (!validarMagicBytes(ficheiroBuffer, tipoEsperado)) {
-          limparFicheiroOrfao();
-          return res.status(400).json({
-            erro: `Ficheiro suspeito ou tipo incorreto. Enviou um ficheiro que afirma ser ${tipo}, mas os dados internos não correspondem. Verifique a extensão e tente novamente.`
-          });
-        }
-      } catch (erroMagic) {
-        console.error("Erro ao validar magic bytes:", erroMagic.message);
+        assinaturaValida = validarFicheiroPorMime(req.file.path, req.file.mimetype);
+      } catch (erroLeitura) {
+        console.error("Erro ao ler cabeçalho do ficheiro:", erroLeitura.message);
+      }
+      if (!assinaturaValida) {
         limparFicheiroOrfao();
-        return res.status(400).json({ erro: "Não foi possível validar o ficheiro. Tente novamente." });
+        return res.status(400).json({ erro: "O conteúdo do ficheiro não corresponde ao tipo indicado. Verifique que é um PDF ou vídeo válido." });
       }
 
       const cursos = await getCursos();
@@ -525,6 +535,9 @@ Pergunta do estudante: ${mensagem.trim()}`;
         id_novo_material: resultado.insertId,
         status: statusInicial,
       });
+
+      atualizarReputacao(autor_id);
+      if (statusInicial === "aprovado") notificarSubscritores({ id: resultado.insertId, titulo, cadeira, tipo });
     } catch (erro) {
       limparFicheiroOrfao();
       console.error("Erro ao gravar material:", erro.message);
@@ -567,6 +580,8 @@ Pergunta do estudante: ${mensagem.trim()}`;
         const fileName = path.basename(material.url_arquivo);
         fs.unlink(path.join(uploadsDir, fileName), () => {});
       }
+      auditar(req.utilizador.id, "remover_material", "materiais", Number(id), `Removeu "${material.titulo}"`, req.ip);
+      atualizarReputacao(material.autor_id);
       res.json({ mensagem: "Material removido com sucesso." });
     } catch (erro) {
       console.error("Erro ao remover material:", erro.message);
@@ -654,7 +669,7 @@ Pergunta do estudante: ${mensagem.trim()}`;
       }
 
       const [[material]] = await db.query(
-        `SELECT m.titulo, m.url_arquivo, u.email AS autor_email, u.nome AS autor_nome
+        `SELECT m.id, m.titulo, m.cadeira, m.tipo, m.status, m.url_arquivo, m.autor_id, u.email AS autor_email, u.nome AS autor_nome
          FROM materiais m JOIN usuarios u ON m.autor_id = u.id
          WHERE m.id = ?`,
         [id]
@@ -666,15 +681,21 @@ Pergunta do estudante: ${mensagem.trim()}`;
 
       if (acao === "aprovar") {
         await db.query("UPDATE materiais SET status = 'aprovado' WHERE id = ?", [id]);
+        auditar(req.utilizador.id, "aprovar_material", "materiais", material.id, `Aprovou "${material.titulo}"`, req.ip);
         res.json({ mensagem: "Material aprovado com sucesso!" });
+        // Só avisa os subscritores na primeira aprovação — reaprovar um
+        // material já aprovado não deve repetir o email a toda a gente.
+        if (material.status !== "aprovado") notificarSubscritores(material);
       } else {
         await db.query("DELETE FROM materiais WHERE id = ?", [id]);
         if (material?.url_arquivo) {
           const fileName = path.basename(material.url_arquivo);
           fs.unlink(path.join(uploadsDir, fileName), () => {});
         }
+        auditar(req.utilizador.id, "rejeitar_material", "materiais", material.id, `Rejeitou "${material.titulo}"`, req.ip);
         res.json({ mensagem: "Material rejeitado e apagado." });
       }
+      atualizarReputacao(material.autor_id);
 
       // Notifica o autor por email — não bloqueia a resposta nem falha a moderação.
       if (material) {

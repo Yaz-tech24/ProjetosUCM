@@ -19,7 +19,7 @@ const Perfil      = lazy(() => import("./pages/Perfil"));
 const ReporSenha  = lazy(() => import("./pages/ReporSenha"));
 const Analytics   = lazy(() => import("./pages/Analytics"));
 const VerificarEmail = lazy(() => import("./pages/VerificarEmail"));
-const ConfigureSecurity = lazy(() => import("./pages/ConfigureSecurity"));
+const Seguranca   = lazy(() => import("./pages/Seguranca"));
 
 // ─── Fallback de carregamento entre páginas ───────────────────
 const PageLoader = () => (
@@ -169,7 +169,7 @@ const App = () => {
           <Route path="analytics"   element={usuarioLogado?.papel === 'admin' ? <Analytics /> : <Navigate to="/dashboard" replace />} />
           <Route path="chat"        element={<Chat        usuarioLogado={usuarioLogado} />} />
           <Route path="perfil"      element={<Perfil      usuarioLogado={usuarioLogado} onUpdateUsuario={handleUpdateUsuario} />} />
-          <Route path="seguranca"   element={<ConfigureSecurity />} />
+          <Route path="seguranca"   element={<Seguranca   usuarioLogado={usuarioLogado} onUpdateUsuario={handleUpdateUsuario} />} />
         </Route>
 
         {/* ─── 404 ────────────────────────────────────────── */}

@@ -1,10 +1,11 @@
 const db = require("../config/db");
-const { autenticar } = require("../middleware/auth");
+const { autenticar, apenasAdmin } = require("../middleware/auth");
 const { auditar } = require("../middleware/auditoria");
+const { limitarSubscricoes } = require("../middleware/rateLimiters");
 
 module.exports = function registarRotasSubscricoes(app) {
   // POST: Subscrever a uma disciplina
-  app.post("/api/subscricoes/disciplinas/:disciplina", autenticar, async (req, res) => {
+  app.post("/api/subscricoes/disciplinas/:disciplina", autenticar, limitarSubscricoes, async (req, res) => {
     try {
       const disciplina = req.params.disciplina.trim();
       const usuarioId = req.utilizador.id;
@@ -44,7 +45,7 @@ module.exports = function registarRotasSubscricoes(app) {
   });
 
   // DELETE: Desinscrever de uma disciplina
-  app.delete("/api/subscricoes/disciplinas/:disciplina", autenticar, async (req, res) => {
+  app.delete("/api/subscricoes/disciplinas/:disciplina", autenticar, limitarSubscricoes, async (req, res) => {
     try {
       const disciplina = req.params.disciplina.trim();
       const usuarioId = req.utilizador.id;
@@ -73,9 +74,9 @@ module.exports = function registarRotasSubscricoes(app) {
       const usuarioId = req.utilizador.id;
 
       const [subscricoes] = await db.query(
-        `SELECT disciplina, data_subscrition FROM subscricoes_disciplinas
+        `SELECT disciplina, data_subscricao FROM subscricoes_disciplinas
          WHERE usuario_id = ?
-         ORDER BY data_subscrition DESC`,
+         ORDER BY data_subscricao DESC`,
         [usuarioId]
       );
 
@@ -87,23 +88,19 @@ module.exports = function registarRotasSubscricoes(app) {
   });
 
   // GET: Listar utilizadores subscritos a uma disciplina (admin)
-  app.get("/api/admin/subscricoes/:disciplina", autenticar, async (req, res) => {
+  app.get("/api/admin/subscricoes/:disciplina", autenticar, apenasAdmin, async (req, res) => {
     try {
-      if (req.utilizador.papel !== "admin") {
-        return res.status(403).json({ erro: "Acesso restrito a administradores." });
-      }
-
       const disciplina = req.params.disciplina.trim();
       const page = Math.max(1, parseInt(req.query.page) || 1);
       const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 20));
       const offset = (page - 1) * limit;
 
       const [subscricoes] = await db.query(
-        `SELECT s.id, s.usuario_id, s.data_subscrition, u.nome, u.email
+        `SELECT s.id, s.usuario_id, s.data_subscricao, u.nome, u.email
          FROM subscricoes_disciplinas s
          JOIN usuarios u ON s.usuario_id = u.id
          WHERE s.disciplina = ?
-         ORDER BY s.data_subscrition DESC
+         ORDER BY s.data_subscricao DESC
          LIMIT ? OFFSET ?`,
         [disciplina, limit, offset]
       );

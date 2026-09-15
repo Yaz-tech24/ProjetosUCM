@@ -6,6 +6,7 @@ import { useConfig } from "../context/ConfigContext";
 import Toast from "../components/Toast";
 import Avaliacoes from "../components/Avaliacoes";
 import Comentarios from "../components/Comentarios";
+import TagsMaterial from "../components/TagsMaterial";
 
 /* ── Renderiza o resumo estruturado devolvido pela IA ── */
 const SummaryRenderer = ({ text }) => {
@@ -396,6 +397,9 @@ const Visualizador = ({ usuarioLogado }) => {
               </span>
             ))}
           </div>
+          <div className="mt-4">
+            <TagsMaterial materialId={material.id} ehAdmin={usuarioLogado?.papel === 'admin'} onErro={msg => setToast({ message: msg, type: 'error' })} />
+          </div>
         </div>
       </div>
 
@@ -544,12 +548,8 @@ const Visualizador = ({ usuarioLogado }) => {
         </div>
 
         {/* Avaliações e Comentários */}
-        {usuarioLogado && (
-          <>
-            <Avaliacoes materialId={id} ehAutenticado={true} />
-            <Comentarios materialId={id} usuarioId={usuarioLogado?.id} />
-          </>
-        )}
+        <Avaliacoes materialId={material.id} usuarioId={usuarioLogado?.id} />
+        <Comentarios materialId={material.id} usuarioId={usuarioLogado?.id} ehAdmin={usuarioLogado?.papel === 'admin'} />
       </div>
     </div>
 

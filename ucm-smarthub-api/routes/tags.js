@@ -54,6 +54,23 @@ module.exports = function registarRotasTags(app) {
     }
   });
 
+  // DELETE: Remover tag (admin) — materiais_tags cai em cascata pela FK
+  app.delete("/api/admin/tags/:id", autenticar, apenasAdmin, async (req, res) => {
+    try {
+      const tagId = parseInt(req.params.id, 10);
+      if (!Number.isInteger(tagId)) return res.status(400).json({ erro: "ID inválido." });
+      const [[tag]] = await db.query("SELECT nome FROM tags WHERE id = ?", [tagId]);
+      if (!tag) return res.status(404).json({ erro: "Tag não encontrada." });
+      await db.query("DELETE FROM materiais_tags WHERE tag_id = ?", [tagId]);
+      await db.query("DELETE FROM tags WHERE id = ?", [tagId]);
+      auditar(req.utilizador.id, "remover_tag_global", "tags", tagId, `Removeu a tag "${tag.nome}"`, req.ip);
+      res.json({ mensagem: "Tag removida." });
+    } catch (erro) {
+      console.error("Erro ao remover tag:", erro.message);
+      res.status(500).json({ erro: "Erro ao remover tag." });
+    }
+  });
+
   // POST: Adicionar tag a um material (admin)
   app.post("/api/admin/materiais/:id/tags/:tagId", autenticar, apenasAdmin, async (req, res) => {
     try {
