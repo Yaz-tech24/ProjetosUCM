@@ -32,6 +32,11 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
         navigateFallback: '/index.html',
+        // O iframe do PDF, o <a download> e o Swagger são pedidos de
+        // NAVEGAÇÃO para /uploads e /api — sem esta lista o Workbox
+        // respondia-lhes com o index.html e o React mostrava o 404 dentro
+        // do visualizador. Em produção estes caminhos são da mesma origem.
+        navigateFallbackDenylist: [/^\/api\//, /^\/uploads\//, /^\/socket\.io\//],
         // O cookie de sessão nunca é cacheado (as respostas da API são
         // network-first e expiram em 1 h); os uploads não passam por aqui.
         runtimeCaching: [
@@ -63,6 +68,18 @@ export default defineConfig({
         './src/pages/Dashboard.jsx',
         './src/pages/Login.jsx',
       ],
+    },
+  },
+
+  // ─── Pré-visualização do build de produção (npm run preview) ─────
+  // Proxy para a API local, para o build se comportar como em produção
+  // (API, uploads e socket na MESMA origem — é assim que o Caddy serve).
+  preview: {
+    port: 4173,
+    proxy: {
+      '/api': 'http://localhost:5055',
+      '/uploads': 'http://localhost:5055',
+      '/socket.io': { target: 'http://localhost:5055', ws: true },
     },
   },
 
