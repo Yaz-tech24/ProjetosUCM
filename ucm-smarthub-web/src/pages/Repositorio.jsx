@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import api, { getFavoritos, toggleFavorito } from "../services/api";
+import api from "../services/api";
+import useFavoritos from "../hooks/useFavoritos";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Search, Plus, X, ChevronLeft, ChevronRight,
@@ -95,8 +96,15 @@ const MaterialCard = ({ m, onClick, favs, onToggleFav, podeRemover, onRemover })
             {m.tags.map(t => <Etiqueta key={t.nome} nome={t.nome} cor={t.cor} />)}
           </div>
         )}
+        {m.trecho && (
+          <p className="mb-3 rounded-xl px-3 py-2" style={{ fontSize: 12.5, lineHeight: 1.5, background: "rgba(var(--color-gold-rgb),0.10)", border: "1px solid rgba(var(--color-gold-rgb),0.30)", color: "var(--text-body)" }}>
+            <span className="text-[10px] font-bold uppercase mr-1.5" style={{ letterSpacing: "0.1em", color: "var(--color-gold-dark)" }}>No conteúdo</span>{m.trecho}
+          </p>
+        )}
         <p style={{ fontSize: 13, color: "var(--text-faint)", marginBottom: 20 }}>
           {m.autor} · {new Date(m.data_upload).toLocaleDateString("pt-PT")}
+          {(m.visualizacoes > 0 || m.downloads > 0) && <span title="Aberturas · downloads"> · 👁 {m.visualizacoes ?? 0} · ⬇ {m.downloads ?? 0}</span>}
+          {m.versao > 1 && <span> · v{m.versao}</span>}
         </p>
 
         <div
@@ -122,6 +130,7 @@ const Repositorio = ({ usuarioLogado }) => {
   const [materiais,       setMateriais]       = useState([]);
   const [filtroCadeira,   setFiltroCadeira]   = useState("Todas");
   const [filtroTag,       setFiltroTag]       = useState("");
+  const [ordem,           setOrdem]           = useState("recentes");
   const [tagsDisponiveis, setTagsDisponiveis] = useState([]);
   const [filtroTipo,      setFiltroTipo]      = useState(searchParams.get('tipo') || "Todos");
   const [buscaTermo,      setBuscaTermo]      = useState(searchParams.get('q') || "");
@@ -136,7 +145,7 @@ const Repositorio = ({ usuarioLogado }) => {
   const [enviando,        setEnviando]        = useState(false);
   const [uploadSucesso,   setUploadSucesso]   = useState(false);
   const [uploadPublicado, setUploadPublicado] = useState(false);
-  const [favs,            setFavs]            = useState(getFavoritos);
+  const { favoritos: favs, alternar: alternarFavorito } = useFavoritos();
   const [debouncedBusca,  setDebouncedBusca]  = useState(buscaTermo);
   const [aRemover,        setARemover]        = useState(null); // material seleccionado para confirmar remoção
   const [removendo,       setRemovendo]       = useState(false);
@@ -147,10 +156,19 @@ const Repositorio = ({ usuarioLogado }) => {
   const TIPOS_MATERIAL_DISPONIVEIS = useMemo(() => {
     const tiposPermitidos = (config.tipos_ficheiro_permitidos || '').split(',');
     return [
-      ...(tiposPermitidos.includes('pdf') ? ['PDF'] : []),
+      ...(['pdf', 'docx', 'pptx', 'doc', 'ppt'].some(t => tiposPermitidos.includes(t)) ? ['PDF'] : []),
       ...(['mp4', 'webm', 'ogg', 'mov'].some(t => tiposPermitidos.includes(t)) ? ['Vídeo'] : []),
     ];
   }, [config.tipos_ficheiro_permitidos]);
+
+  // Extensões aceites no upload de "PDF": os documentos Office só aparecem se
+  // o admin os permitiu E o servidor os consegue converter.
+  const { capacidades } = useConfig();
+  const ACEITA_PDF = useMemo(() => {
+    const tipos = (config.tipos_ficheiro_permitidos || '').split(',');
+    const office = capacidades?.conversao_documentos ? ['docx', 'pptx', 'doc', 'ppt'].filter(t => tipos.includes(t)) : [];
+    return ['.pdf', ...office.map(t => '.' + t)].join(',');
+  }, [config.tipos_ficheiro_permitidos, capacidades]);
 
   /* Debounce da pesquisa: só actualiza o termo usado no pedido 350ms depois
      de o utilizador parar de escrever — evita disparar um pedido por tecla. */
@@ -174,6 +192,7 @@ const Repositorio = ({ usuarioLogado }) => {
       if (filtroTipo !== 'Todos')   params.set('tipo',    filtroTipo);
       if (filtroCadeira !== 'Todas') params.set('cadeira', filtroCadeira);
       if (filtroTag)                params.set('tag',     filtroTag);
+      if (ordem !== 'recentes')     params.set('ordem',   ordem);
 
       const res = await api.get(`/materiais?${params}`, { signal: controller.signal });
       setMateriais(res.data.materiais || []);
@@ -186,7 +205,7 @@ const Repositorio = ({ usuarioLogado }) => {
     } finally {
       if (!controller.signal.aborted) setLoading(false);
     }
-  }, [debouncedBusca, filtroTipo, filtroCadeira, filtroTag]);
+  }, [debouncedBusca, filtroTipo, filtroCadeira, filtroTag, ordem]);
 
   useEffect(() => {
     api.get('/tags').then(res => setTagsDisponiveis(res.data.filter(t => t.quantidade > 0))).catch(() => setTagsDisponiveis([]));
@@ -254,8 +273,7 @@ const Repositorio = ({ usuarioLogado }) => {
   };
 
   const handleToggleFav = (id) => {
-    toggleFavorito(id);
-    setFavs(getFavoritos());
+    alternarFavorito(id).catch(() => setToast({ message: "Não foi possível guardar o favorito.", type: "error" }));
   };
 
   const podeRemover = (m) => usuarioLogado && (usuarioLogado.papel === "admin" || m.autor_id === usuarioLogado.id);
@@ -433,8 +451,19 @@ const Repositorio = ({ usuarioLogado }) => {
             ))}
           </div>
 
-          {/* Stats */}
-          <div className="flex items-center gap-4">
+          {/* Ordenação + stats */}
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="inline-flex rounded-2xl p-1.5" style={{ background: "var(--surface-hover)", border: "1.5px solid var(--border-subtle-strong)" }}>
+              {[["recentes", "Recentes"], ["populares", "Mais vistos"]].map(([k, label]) => (
+                <button key={k} type="button" onClick={() => setOrdem(k)}
+                  className="rounded-xl px-3.5 py-2 text-xs font-bold transition-all duration-200"
+                  style={ordem === k
+                    ? { background: "var(--surface-card)", color: "var(--text-heading)", boxShadow: "0 2px 8px rgba(var(--color-navy-mid-rgb),0.10)" }
+                    : { color: "var(--text-muted)" }}>
+                  {label}
+                </button>
+              ))}
+            </div>
             <span style={{ fontSize: 13, color: "var(--text-faint)", fontWeight: 600 }}>
               {totalResultados} resultado{totalResultados !== 1 ? 's' : ''} · Pág. {currentPage}/{totalPages}
             </span>
@@ -593,13 +622,16 @@ const Repositorio = ({ usuarioLogado }) => {
                 <label style={{ display: "block", marginBottom: 10, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.28em", color: "var(--text-muted)" }}>Ficheiro</label>
                 <input
                   type="file"
-                  accept={newMaterial.tipo === 'PDF' ? '.pdf' : 'video/mp4,video/x-m4v,video/*'}
+                  accept={newMaterial.tipo === 'PDF' ? ACEITA_PDF : 'video/mp4,video/x-m4v,video/*'}
                   onChange={e => setArquivoReal(e.target.files[0])}
                   required
                   className="w-full rounded-2xl px-4 py-5 text-sm cursor-pointer transition-all duration-200"
                   style={{ background: "var(--surface-input)", border: "2px dashed var(--border-subtle-strong)", color: "var(--text-muted)" }}
                 />
-                <p style={{ fontSize: 11, color: "var(--text-faint)", marginTop: 8 }}>Tamanho máximo: {config.tamanho_maximo_mb} MB</p>
+                <p style={{ fontSize: 11, color: "var(--text-faint)", marginTop: 8 }}>
+                  Tamanho máximo: {config.tamanho_maximo_mb} MB
+                  {newMaterial.tipo === 'PDF' && ACEITA_PDF.includes('.docx') && " · Word e PowerPoint são convertidos para PDF automaticamente"}
+                </p>
               </div>
 
               <button

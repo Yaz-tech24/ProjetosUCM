@@ -9,6 +9,8 @@ import { aplicarPaleta } from "../utils/palette";
 import Toast from "../components/Toast";
 import ConfirmModal from "../components/ConfirmModal";
 import { Etiqueta } from "../components/TagsMaterial";
+import FilaDenuncias from "../components/FilaDenuncias";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 const TIPOS_FICHEIRO_OPCOES = [
   { valor: "pdf",  label: "PDF" },
@@ -16,11 +18,18 @@ const TIPOS_FICHEIRO_OPCOES = [
   { valor: "webm", label: "WebM" },
   { valor: "ogg",  label: "Ogg" },
   { valor: "mov",  label: "QuickTime (.mov)" },
+  { valor: "docx", label: "Word (.docx) → PDF" },
+  { valor: "pptx", label: "PowerPoint (.pptx) → PDF" },
+  { valor: "doc",  label: "Word antigo (.doc) → PDF" },
+  { valor: "ppt",  label: "PowerPoint antigo (.ppt) → PDF" },
 ];
 
 const Admin = ({ usuarioLogado }) => {
-  const { config, cursos, refetchConfig } = useConfig();
-  const [aba, setAba]           = useState('materiais'); // 'materiais' | 'chat' | 'utilizadores' | 'config'
+  const { config, cursos, capacidades, refetchConfig } = useConfig();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const [aba, setAba]           = useState(() => (['materiais', 'chat', 'utilizadores', 'config', 'denuncias'].includes(searchParams.get('aba')) ? searchParams.get('aba') : 'materiais'));
+  const [denunciasPendentes, setDenunciasPendentes] = useState(0);
   const [pendentes, setPendentes] = useState([]);
   const [loading, setLoading]   = useState(true);
   const [sistemaStatus, setSistemaStatus] = useState(null);
@@ -90,6 +99,10 @@ const Admin = ({ usuarioLogado }) => {
     try { const res = await api.get('/tags'); setTags(res.data); } catch { setTags([]); }
   }, []);
   useEffect(() => { if (aba === 'config') fetchTags(); }, [aba, fetchTags]);
+
+  useEffect(() => {
+    api.get('/admin/denuncias', { params: { estado: 'pendente', limit: 1 } }).then(r => setDenunciasPendentes(r.data.pendentes || 0)).catch(() => {});
+  }, []);
 
   const fetchPendentes = useCallback(async () => {
     pendentesAbortRef.current?.abort();
@@ -468,6 +481,7 @@ const Admin = ({ usuarioLogado }) => {
             { key: 'materiais',    label: 'Fila de Aprovação', icon: Clock, badge: pendentes.length },
             { key: 'chat',         label: 'Moderação do Chat', icon: MessageCircle, badge: mensagens.length },
             { key: 'utilizadores', label: 'Utilizadores',      icon: Users, badge: 0 },
+            { key: 'denuncias',    label: 'Denúncias',         icon: AlertTriangle, badge: denunciasPendentes },
             { key: 'config',       label: 'Configurações',     icon: Settings, badge: 0 },
           ].map(({ key, label, icon: Icon, badge }) => (
             <button
@@ -903,6 +917,10 @@ const Admin = ({ usuarioLogado }) => {
         )}
 
         {/* ═══ CONFIGURAÇÕES ════════════════════════════════════════ */}
+        {aba === 'denuncias' && (
+          <FilaDenuncias navigate={navigate} onToast={showToast} onContagem={setDenunciasPendentes} />
+        )}
+
         {aba === 'config' && configForm && (
           <div className="space-y-6">
 
@@ -1099,6 +1117,11 @@ const Admin = ({ usuarioLogado }) => {
                         );
                       })}
                     </div>
+                    <p style={{ fontSize: 11.5, color: capacidades?.conversao_documentos ? "var(--text-faint)" : "var(--status-warning-text)", marginTop: 8 }}>
+                      {capacidades?.conversao_documentos
+                        ? "Documentos Word/PowerPoint são convertidos para PDF no servidor (LibreOffice detectado)."
+                        : "Conversão de Word/PowerPoint indisponível: o servidor não tem LibreOffice. Se activar estes tipos, os uploads serão recusados com aviso."}
+                    </p>
                   </div>
 
                   <div className="max-w-xs">

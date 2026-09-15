@@ -99,6 +99,7 @@ require("./routes/materiais")(app);
 require("./routes/config")(app);
 require("./routes/stats")(app);
 require("./routes/chat")(app, io);
+require("./services/notificacoes").ligarSocket(io);
 require("./routes/status")(app);
 require("./routes/avaliacoes")(app);
 require("./routes/comentarios")(app);
@@ -106,6 +107,13 @@ require("./routes/subscricoes")(app);
 require("./routes/reputacao")(app);
 require("./routes/analytics")(app);
 require("./routes/2fa")(app);
+require("./routes/sessoes")(app);
+require("./routes/notificacoes")(app);
+require("./routes/quiz")(app);
+require("./routes/colecoes")(app);
+require("./routes/perguntas")(app);
+require("./routes/denuncias")(app);
+require("./routes/calendario")(app);
 require("./routes/tags")(app);
 
 // ==========================================
@@ -139,6 +147,12 @@ async function iniciar() {
   // Migrações correm ANTES de aceitar pedidos — evita respostas a /api/config,
   // /api/register, etc. antes de as tabelas novas existirem.
   await correrMigracoes();
+  // Tarefas de fundo: indexação de PDFs para pesquisa, lembretes do calendário
+  // e limpeza de sessões expiradas. Todas com .unref() — não seguram o processo.
+  require("./services/indexacao").agendarIndexacao();
+  require("./services/lembretes").agendarLembretes();
+  const { purgarSessoesAntigas } = require("./services/sessoes");
+  setInterval(purgarSessoesAntigas, 24 * 60 * 60 * 1000).unref?.();
   server.listen(PORT, () => {
     console.log(`[SmartHub] Servidor activo na porta ${PORT} | ${new Date().toISOString()}`);
     if (!genAI) console.warn("[SmartHub] GEMINI_API_KEY não definida — funcionalidades de IA desactivadas.");

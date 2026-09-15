@@ -1,17 +1,40 @@
 import React, { useState } from "react";
 import api from "../services/api";
+import { useNavigate } from "react-router-dom";
 import {
   User, Mail, GraduationCap, ShieldCheck, Lock, Upload, Trash2,
-  Save, KeyRound, IdCard, Phone,
+  Save, KeyRound, IdCard, Phone, AlertTriangle, UserX,
 } from "lucide-react";
 import { useConfig } from "../context/ConfigContext";
 import Toast from "../components/Toast";
-import { Cartao, Campo, BotaoPrimario } from "../components/ui";
+import { Cartao, Campo, BotaoPrimario, BotaoSecundario } from "../components/ui";
+import ConfirmModal from "../components/ConfirmModal";
 import Reputacao from "../components/Reputacao";
 import Subscricoes from "../components/Subscricoes";
 
-const Perfil = ({ usuarioLogado, onUpdateUsuario }) => {
+const Perfil = ({ usuarioLogado, onUpdateUsuario, onLogout }) => {
   const { config } = useConfig();
+  const navigate = useNavigate();
+  const [eliminarAberto, setEliminarAberto] = useState(false);
+  const [senhaEliminar, setSenhaEliminar] = useState("");
+  const [codigoEliminar, setCodigoEliminar] = useState("");
+  const [confirmarEliminar, setConfirmarEliminar] = useState("");
+  const [aEliminar, setAEliminar] = useState(false);
+
+  const handleEliminarConta = async () => {
+    setConfirmarEliminar("");
+    setAEliminar(true);
+    try {
+      await api.delete("/perfil", { data: { senha: senhaEliminar, codigo: codigoEliminar || undefined } });
+      localStorage.removeItem("usuarioLogado");
+      onLogout?.();
+      navigate("/");
+    } catch (err) {
+      showToast(err.response?.data?.erro || "Não foi possível eliminar a conta.", "error");
+    } finally {
+      setAEliminar(false);
+    }
+  };
 
   const [nome, setNome]           = useState(usuarioLogado?.nome || "");
   const [numeroEstudante, setNumeroEstudante] = useState(usuarioLogado?.numero_estudante || "");
@@ -207,7 +230,41 @@ const Perfil = ({ usuarioLogado, onUpdateUsuario }) => {
           </form>
         </Cartao>
 
+        {/* ═══ ZONA DE PERIGO ═════════════════════════════════ */}
+        <Cartao icon={UserX} titulo="Eliminar a conta" subtitulo="Os materiais, comentários e perguntas que publicou ficam na plataforma como “Conta eliminada”; tudo o resto é apagado">
+          {!eliminarAberto ? (
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <p style={{ fontSize: 13.5, color: "var(--text-body)", maxWidth: 460 }}>
+                Esta acção é definitiva. Favoritos, colecções, subscrições, reputação e sessões desaparecem; não há forma de recuperar a conta depois.
+              </p>
+              <BotaoSecundario type="button" onClick={() => setEliminarAberto(true)} style={{ color: "var(--status-danger-text)", borderColor: "var(--status-danger-border)" }}>
+                <Trash2 size={15} /> Quero eliminar a conta
+              </BotaoSecundario>
+            </div>
+          ) : (
+            <form onSubmit={e => { e.preventDefault(); setConfirmarEliminar("Eliminar a conta definitivamente? Não há volta atrás."); }} className="space-y-4">
+              <div className="flex items-start gap-3 rounded-2xl p-4" style={{ background: "var(--status-danger-bg)", border: "1px solid var(--status-danger-border)" }}>
+                <AlertTriangle size={18} style={{ color: "var(--status-danger-text)", flexShrink: 0, marginTop: 2 }} />
+                <p style={{ fontSize: 13, color: "var(--status-danger-text)", lineHeight: 1.6 }}>
+                  Confirme a palavra-passe{usuarioLogado?.["2fa_ativado"] ? " e um código 2FA (da app ou de recuperação)" : ""} para continuar.
+                </p>
+              </div>
+              <Campo label="Palavra-passe" icon={<KeyRound size={16} />} type="password" value={senhaEliminar} onChange={e => setSenhaEliminar(e.target.value)} required autoComplete="current-password" />
+              {usuarioLogado?.["2fa_ativado"] && (
+                <Campo label="Código 2FA" icon={<ShieldCheck size={16} />} type="text" value={codigoEliminar} onChange={e => setCodigoEliminar(e.target.value)} required autoComplete="one-time-code" placeholder="000000 ou XXXX-XXXX" />
+              )}
+              <div className="flex justify-end gap-2">
+                <BotaoSecundario type="button" onClick={() => { setEliminarAberto(false); setSenhaEliminar(""); setCodigoEliminar(""); }}>Cancelar</BotaoSecundario>
+                <BotaoPrimario type="submit" loading={aEliminar} disabled={!senhaEliminar} style={{ background: "linear-gradient(135deg,#dc2626,#ef4444)", boxShadow: "0 6px 20px rgba(239,68,68,0.35)" }}>
+                  <Trash2 size={15} /> Eliminar definitivamente
+                </BotaoPrimario>
+              </div>
+            </form>
+          )}
+        </Cartao>
+
       </div>
+      <ConfirmModal message={confirmarEliminar} onConfirm={handleEliminarConta} onCancel={() => setConfirmarEliminar("")} />
     </>
   );
 };

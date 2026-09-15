@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { BookOpen, Home, Library, ShieldCheck, Search, MessageCircle, LogOut, Bell, X, FileText, PlayCircle, Sun, Moon, Menu, KeyRound, BarChart3 } from 'lucide-react';
+import { BookOpen, Home, Library, ShieldCheck, Search, MessageCircle, LogOut, Bell, X, Sun, Moon, Menu, KeyRound, BarChart3, MessageCircleQuestion, FolderOpen, CalendarDays } from 'lucide-react';
+import NotificacoesDropdown from './NotificacoesDropdown';
 import Chatbot from './Chatbot';
-import api from '../services/api';
 import { useConfig } from '../context/ConfigContext';
 import { useTheme } from '../context/ThemeContext';
 
@@ -10,6 +10,9 @@ const NAV_ITEMS = [
   { label: 'Painel Inicial',  icon: Home,          path: '/dashboard'   },
   { label: 'Repositório',     icon: Library,       path: '/repositorio' },
   { label: 'Chat Estudantes', icon: MessageCircle, path: '/chat'        },
+  { label: 'Perguntas',       icon: MessageCircleQuestion, path: '/perguntas' },
+  { label: 'Colecções',       icon: FolderOpen,    path: '/colecoes'    },
+  { label: 'Calendário',      icon: CalendarDays,  path: '/calendario'  },
   { label: 'Segurança',       icon: KeyRound,      path: '/seguranca'   },
 ];
 
@@ -19,16 +22,15 @@ const Layout = ({ usuarioLogado, onLogout }) => {
   const navigate  = useNavigate();
   const location  = useLocation();
   const [searchTerm,   setSearchTerm]   = useState('');
-  const [notifOpen,    setNotifOpen]    = useState(false);
-  const [notifMats,    setNotifMats]    = useState([]);
-  const [notifLoading, setNotifLoading] = useState(false);
   const [chatOpen,     setChatOpen]     = useState(false);
   const [sidebarOpen,  setSidebarOpen]  = useState(false);
-  const notifRef = useRef(null);
   const searchInputRef = useRef(null);
 
-  /* Fecha a aba lateral (mobile) ao mudar de página e trava o scroll do fundo enquanto está aberta */
-  useEffect(() => { setSidebarOpen(false); }, [location.pathname]);
+  /* Fecha a aba lateral (mobile) ao mudar de página — padrão "estado derivado
+     do render anterior" (React docs), sem efeito nem render extra em cascata */
+  const [ultimoPath, setUltimoPath] = useState(location.pathname);
+  if (ultimoPath !== location.pathname) { setUltimoPath(location.pathname); setSidebarOpen(false); }
+  /* Trava o scroll do fundo enquanto a aba lateral está aberta */
   useEffect(() => {
     document.body.style.overflow = sidebarOpen ? 'hidden' : '';
     return () => { document.body.style.overflow = ''; };
@@ -50,24 +52,6 @@ const Layout = ({ usuarioLogado, onLogout }) => {
     return () => document.removeEventListener('keydown', handler);
   }, []);
 
-  /* Carrega os 5 materiais mais recentes para as notificações */
-  const loadNotifs = async () => {
-    if (notifMats.length > 0) { setNotifOpen(o => !o); return; }
-    setNotifLoading(true);
-    setNotifOpen(true);
-    try {
-      const res = await api.get('/materiais?page=1&limit=5');
-      setNotifMats(res.data.materiais || []);
-    } catch { setNotifMats([]); }
-    finally { setNotifLoading(false); }
-  };
-
-  /* Fecha ao clicar fora */
-  useEffect(() => {
-    const handler = (e) => { if (notifRef.current && !notifRef.current.contains(e.target)) setNotifOpen(false); };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
 
   const handleLogout = () => { if (onLogout) onLogout(); navigate('/login'); };
 
@@ -93,7 +77,7 @@ const Layout = ({ usuarioLogado, onLogout }) => {
     );
   }
 
-  const isActive = (path) => location.pathname === path;
+  const isActive = (path) => location.pathname === path || (path !== '/dashboard' && location.pathname.startsWith(path + '/'));
 
   return (
     <div className="flex min-h-screen font-sans" style={{
@@ -370,71 +354,7 @@ const Layout = ({ usuarioLogado, onLogout }) => {
                 {tema === 'escuro' ? <Sun size={18} /> : <Moon size={18} />}
               </button>
 
-              {/* Notificações — dropdown com materiais recentes */}
-              <div className="relative" ref={notifRef}>
-                <button
-                  onClick={loadNotifs}
-                  className="relative w-11 h-11 rounded-2xl grid place-items-center transition-all duration-200"
-                  style={{ background: notifOpen ? "var(--color-navy-mid)" : "var(--surface-card-glass)", border: "1.5px solid var(--border-subtle-strong)", boxShadow: "0 2px 12px rgba(var(--color-navy-mid-rgb),0.05)", color: notifOpen ? "var(--color-gold)" : "var(--text-muted)" }}
-                  onMouseEnter={e => (e.currentTarget.style.background = "var(--color-navy-mid)", e.currentTarget.style.color = "var(--color-gold)")}
-                  onMouseLeave={e => !notifOpen && (e.currentTarget.style.background = "var(--surface-card-glass)", e.currentTarget.style.color = "var(--text-muted)")}
-                  title="Materiais recentes"
-                  aria-label="Ver materiais recentes"
-                >
-                  <Bell size={18} />
-                </button>
-
-                {notifOpen && (
-                  <div className="absolute right-0 top-14 z-50 w-[min(320px,calc(100vw-2rem))] rounded-[20px] overflow-hidden animate-scale-in"
-                    style={{ background: "var(--surface-card)", border: "1px solid var(--border-subtle-strong)", boxShadow: "0 20px 60px rgba(var(--color-navy-mid-rgb),0.18)" }}>
-                    {/* Header */}
-                    <div className="flex items-center justify-between px-5 py-4"
-                      style={{ borderBottom: "1px solid rgba(var(--color-navy-mid-rgb),0.07)", background: "linear-gradient(135deg,var(--color-navy-deep),var(--color-navy-mid))" }}>
-                      <span style={{ fontSize: 13, fontWeight: 800, color: "#fff" }}>Materiais Recentes</span>
-                      <button onClick={() => setNotifOpen(false)} aria-label="Fechar notificações" style={{ color: "rgba(255,255,255,0.50)", background: "none", border: "none", cursor: "pointer" }}>
-                        <X size={15} />
-                      </button>
-                    </div>
-                    {/* Lista */}
-                    <div className="py-2">
-                      {notifLoading ? (
-                        <div className="flex justify-center py-6">
-                          <div className="w-6 h-6 rounded-full border-[3px] animate-spin" style={{ borderColor: "rgba(var(--color-navy-mid-rgb),0.10)", borderTopColor: "var(--text-accent)" }} />
-                        </div>
-                      ) : notifMats.length === 0 ? (
-                        <p className="text-center py-6 text-sm" style={{ color: "var(--text-faint)" }}>Nenhum material disponível.</p>
-                      ) : notifMats.map(m => (
-                        <button key={m.id} onClick={() => { navigate(`/video/${m.id}`); setNotifOpen(false); }}
-                          className="w-full flex items-center gap-3 px-4 py-3 text-left transition-all"
-                          style={{ background: "transparent" }}
-                          onMouseEnter={e => e.currentTarget.style.background = "var(--surface-hover)"}
-                          onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-                        >
-                          <div style={{ width: 34, height: 34, borderRadius: 10, flexShrink: 0, display: "grid", placeItems: "center",
-                            background: m.tipo === 'Vídeo' ? "#eff6ff" : "#fff1f2",
-                            border: `1px solid ${m.tipo === 'Vídeo' ? "#bfdbfe" : "#fecdd3"}` }}>
-                            {m.tipo === 'Vídeo' ? <PlayCircle size={15} style={{ color: "var(--color-navy-mid)" }} /> : <FileText size={15} style={{ color: "#be123c" }} />}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate" style={{ fontSize: 13, fontWeight: 700, color: "var(--text-heading)" }}>{m.titulo}</p>
-                            <p style={{ fontSize: 11, color: "var(--text-faint)" }}>{m.cadeira}</p>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                    <div className="px-4 py-3" style={{ borderTop: "1px solid var(--border-subtle)" }}>
-                      <button onClick={() => { navigate('/repositorio'); setNotifOpen(false); }}
-                        className="w-full rounded-xl py-2 text-xs font-bold transition-all"
-                        style={{ background: "var(--surface-hover)", color: "var(--text-accent)" }}
-                        onMouseEnter={e => e.currentTarget.style.background = "var(--color-ice-mid)"}
-                        onMouseLeave={e => e.currentTarget.style.background = "var(--surface-hover)"}
-                      >
-                        Ver todos no Repositório →
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
+              <NotificacoesDropdown navigate={navigate} />
             </div>
           </div>
         </header>

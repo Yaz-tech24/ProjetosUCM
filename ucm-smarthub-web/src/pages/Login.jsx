@@ -150,6 +150,7 @@ const Login = ({ onLogin }) => {
   // intermédio (só serve para /login/2fa) em vez da sessão.
   const [token2FA,         setToken2FA]         = useState("");
   const [codigo2FA,        setCodigo2FA]        = useState("");
+  const [usarRecuperacao,  setUsarRecuperacao]  = useState(false);
   const [emailPorVerificar, setEmailPorVerificar] = useState(false);
 
   /* navbar mobile */
@@ -224,13 +225,16 @@ const Login = ({ onLogin }) => {
     } finally { setLoading(false); }
   };
 
+  const codigoPronto = usarRecuperacao ? codigo2FA.replace(/[^A-Za-z0-9]/g, "").length === 8 : codigo2FA.length === 6;
+
   const handleLogin2FA = async (e) => {
     e.preventDefault();
-    if (codigo2FA.length !== 6) return;
+    if (!codigoPronto) return;
     setMensagem({ texto: "", tipo: "" });
     setLoading(true);
     try {
-      const res = await api.post("/login/2fa", { token_2fa: token2FA, codigo: codigo2FA });
+      const corpo = usarRecuperacao ? { token_2fa: token2FA, codigo_recuperacao: codigo2FA } : { token_2fa: token2FA, codigo: codigo2FA };
+      const res = await api.post("/login/2fa", corpo);
       onLogin(res.data.utilizador);
       navigate("/dashboard");
     } catch (err) {
@@ -244,6 +248,7 @@ const Login = ({ onLogin }) => {
   const cancelar2FA = () => {
     setToken2FA("");
     setCodigo2FA("");
+    setUsarRecuperacao(false);
     setMensagem({ texto: "", tipo: "" });
   };
 
@@ -610,17 +615,29 @@ const Login = ({ onLogin }) => {
               {token2FA ? (
                 <form onSubmit={handleLogin2FA} className="space-y-4">
                   <p style={{ fontSize: 13.5, color: "var(--text-muted)", lineHeight: 1.6 }}>
-                    Esta conta tem autenticação de dois factores. Abra a app de autenticação e introduza o código de 6 dígitos.
+                    {usarRecuperacao
+                      ? "Introduza um dos códigos de recuperação que guardou ao activar o 2FA (formato XXXX-XXXX). Cada código só funciona uma vez."
+                      : "Esta conta tem autenticação de dois factores. Abra a app de autenticação e introduza o código de 6 dígitos."}
                   </p>
-                  <input
-                    type="text" inputMode="numeric" autoComplete="one-time-code" pattern="\d{6}" maxLength={6} autoFocus required
-                    value={codigo2FA} onChange={e => setCodigo2FA(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                    placeholder="000000" aria-label="Código de 6 dígitos"
-                    className="w-full rounded-2xl py-4 px-4 text-center outline-none transition-all duration-200"
-                    style={{ background:"var(--surface-input)", border:"1.5px solid var(--border-subtle-strong)", color:"var(--text-heading)", fontSize: 26, letterSpacing: "0.5em", fontWeight: 800 }}
-                  />
+                  {usarRecuperacao ? (
+                    <input
+                      type="text" autoComplete="off" maxLength={9} autoFocus required
+                      value={codigo2FA} onChange={e => setCodigo2FA(e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, "").slice(0, 9))}
+                      placeholder="XXXX-XXXX" aria-label="Código de recuperação"
+                      className="w-full rounded-2xl py-4 px-4 text-center outline-none transition-all duration-200"
+                      style={{ background:"var(--surface-input)", border:"1.5px solid var(--border-subtle-strong)", color:"var(--text-heading)", fontSize: 22, letterSpacing: "0.25em", fontWeight: 800 }}
+                    />
+                  ) : (
+                    <input
+                      type="text" inputMode="numeric" autoComplete="one-time-code" pattern="\d{6}" maxLength={6} autoFocus required
+                      value={codigo2FA} onChange={e => setCodigo2FA(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                      placeholder="000000" aria-label="Código de 6 dígitos"
+                      className="w-full rounded-2xl py-4 px-4 text-center outline-none transition-all duration-200"
+                      style={{ background:"var(--surface-input)", border:"1.5px solid var(--border-subtle-strong)", color:"var(--text-heading)", fontSize: 26, letterSpacing: "0.5em", fontWeight: 800 }}
+                    />
+                  )}
                   <button
-                    disabled={loading || codigo2FA.length !== 6}
+                    disabled={loading || !codigoPronto}
                     className="w-full flex items-center justify-center gap-2.5 rounded-2xl py-[14px] text-sm font-black uppercase tracking-[.10em] transition-all duration-250 disabled:opacity-60 mt-1"
                     style={{
                       background:"linear-gradient(135deg,var(--color-navy-deep) 0%,var(--color-navy-mid) 60%,var(--color-navy-bright) 100%)",
@@ -632,6 +649,11 @@ const Login = ({ onLogin }) => {
                       ? <div className="w-5 h-5 rounded-full border-2 border-white/25 border-t-white animate-spin" />
                       : <>Confirmar e entrar<ArrowRight size={17} /></>
                     }
+                  </button>
+                  <button type="button" onClick={() => { setUsarRecuperacao(v => !v); setCodigo2FA(""); setMensagem({ texto: "", tipo: "" }); }}
+                    className="w-full text-center text-xs font-bold pt-1 transition-colors hover:text-[var(--color-navy-mid)]"
+                    style={{ color:"var(--text-accent)" }}>
+                    {usarRecuperacao ? "Tenho o telemóvel — usar código da app" : "Perdi o telemóvel — usar código de recuperação"}
                   </button>
                   <button type="button" onClick={cancelar2FA}
                     className="w-full text-center text-xs font-semibold pt-1 transition-colors hover:text-[var(--color-navy-mid)]"

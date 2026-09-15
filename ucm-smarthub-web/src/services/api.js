@@ -31,24 +31,3 @@ api.interceptors.response.use(
 );
 
 export default api;
-
-// ─── Utilitário: favoritos em localStorage ───────────────────────────────────
-const FAVORITOS_KEY = 'ucm_favoritos';
-
-export const getFavoritos = () => {
-  try {
-    return JSON.parse(localStorage.getItem(FAVORITOS_KEY) || '[]');
-  } catch {
-    return [];
-  }
-};
-
-export const isFavorito = (id) => getFavoritos().includes(Number(id));
-
-export const toggleFavorito = (id) => {
-  const favs = getFavoritos();
-  const numId = Number(id);
-  const novos = favs.includes(numId) ? favs.filter(f => f !== numId) : [...favs, numId];
-  localStorage.setItem(FAVORITOS_KEY, JSON.stringify(novos));
-  return novos.includes(numId);
-};

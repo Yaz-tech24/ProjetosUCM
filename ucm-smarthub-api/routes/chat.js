@@ -4,6 +4,7 @@ const db = require("../config/db");
 const { getConfiguracoes } = require("../services/plataforma");
 const { genAI, gerarResumoIA, MENSAGEM_IA_MAX } = require("../services/ia");
 const { autenticar, apenasAdmin, verificarSessao } = require("../middleware/auth");
+const { salaDoUtilizador } = require("../services/notificacoes");
 const { limitarChat } = require("../middleware/rateLimiters");
 const { analisarMensagem, mensagemAviso } = require("../utils/filtroChat");
 
@@ -140,7 +141,7 @@ Pergunta do estudante: ${mensagem}`;
   // podia enviar `userId`/`userName` arbitrários e falsificar a identidade de
   // outro utilizador no chat — o token verificado aqui é a ÚNICA fonte de
   // identidade usada em sendMessage, nunca o payload do evento.
-  io.use((socket, next) => {
+  io.use(async (socket, next) => {
     // Uma excepção aqui dentro (ex: um cabeçalho Cookie malformado) derrubava
     // o processo Node inteiro — isto corre fora do try/catch global do Express,
     // por ser middleware do socket.io, não uma rota HTTP normal. Uma ligação de
@@ -159,7 +160,7 @@ Pergunta do estudante: ${mensagem}`;
       return next(erro);
     }
     try {
-      socket.utilizador = verificarSessao(token);
+      socket.utilizador = await verificarSessao(token);
       next();
     } catch {
       // `data.codigo` é o que o cliente usa para decidir a mensagem a
@@ -172,12 +173,18 @@ Pergunta do estudante: ${mensagem}`;
   });
 
   io.on("connection", (socket) => {
+    // Sala pessoal — é para aqui que services/notificacoes.js empurra as
+    // notificações em tempo real. Fica sempre activa, independentemente da
+    // sala de chat escolhida.
+    const salaPessoal = salaDoUtilizador(socket.utilizador.id);
+    socket.join(salaPessoal);
+
     // Cliente pede para entrar numa sala de curso
     socket.on("joinRoom", ({ curso }) => {
       const sala = curso || "Geral";
-      // Sai de todas as salas excepto a própria do socket
+      // Sai de todas as salas de chat (mantém a própria do socket e a pessoal)
       socket.rooms.forEach((room) => {
-        if (room !== socket.id) socket.leave(room);
+        if (room !== socket.id && room !== salaPessoal) socket.leave(room);
       });
       socket.join(sala);
     });

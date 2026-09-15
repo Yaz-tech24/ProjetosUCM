@@ -14,6 +14,11 @@ const ASSINATURAS = {
   png:  [{ offset: 0, bytes: Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]) }],
   jpg:  [{ offset: 0, bytes: Buffer.from([0xff, 0xd8, 0xff]) }],
   webp: [{ offset: 0, bytes: Buffer.from("RIFF", "ascii") }, { offset: 8, bytes: Buffer.from("WEBP", "ascii") }],
+  // Office moderno é um ZIP ("PK"); Office legado é um contentor OLE.
+  docx: [{ offset: 0, bytes: Buffer.from([0x50, 0x4b, 0x03, 0x04]) }],
+  pptx: [{ offset: 0, bytes: Buffer.from([0x50, 0x4b, 0x03, 0x04]) }],
+  doc:  [{ offset: 0, bytes: Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]) }],
+  ppt:  [{ offset: 0, bytes: Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]) }],
 };
 
 const MIME_PARA_TIPO = {
@@ -26,6 +31,10 @@ const MIME_PARA_TIPO = {
   "image/png": "png",
   "image/jpeg": "jpg",
   "image/webp": "webp",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx",
+  "application/msword": "doc",
+  "application/vnd.ms-powerpoint": "ppt",
 };
 
 const BYTES_CABECALHO = 16;

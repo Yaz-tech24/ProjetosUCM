@@ -6,6 +6,7 @@ import SplashScreen from "./components/SplashScreen";
 import Layout      from "./components/Layout";
 import api          from "./services/api";
 import { useConfig } from "./context/ConfigContext";
+import { limparCacheFavoritos } from "./services/favoritos";
 
 // ─── Lazy loading: cada página só carrega quando for acedida ──
 // Isto divide o bundle inicial de ~1 MB em pedaços de ~100–200 KB
@@ -20,6 +21,9 @@ const ReporSenha  = lazy(() => import("./pages/ReporSenha"));
 const Analytics   = lazy(() => import("./pages/Analytics"));
 const VerificarEmail = lazy(() => import("./pages/VerificarEmail"));
 const Seguranca   = lazy(() => import("./pages/Seguranca"));
+const Colecoes    = lazy(() => import("./pages/Colecoes"));
+const Perguntas   = lazy(() => import("./pages/Perguntas"));
+const Calendario  = lazy(() => import("./pages/Calendario"));
 
 // ─── Fallback de carregamento entre páginas ───────────────────
 const PageLoader = () => (
@@ -84,6 +88,7 @@ const App = () => {
   const handleLogout = useCallback(() => {
     api.post('/logout').catch(() => {}); // limpa o cookie no servidor; falha aqui não impede o logout local
     localStorage.removeItem('usuarioLogado');
+    limparCacheFavoritos();
     setUsuario(null);
     setLoggedIn(false);
   }, []);
@@ -168,8 +173,13 @@ const App = () => {
           <Route path="admin"       element={<Admin       usuarioLogado={usuarioLogado} />} />
           <Route path="analytics"   element={usuarioLogado?.papel === 'admin' ? <Analytics /> : <Navigate to="/dashboard" replace />} />
           <Route path="chat"        element={<Chat        usuarioLogado={usuarioLogado} />} />
-          <Route path="perfil"      element={<Perfil      usuarioLogado={usuarioLogado} onUpdateUsuario={handleUpdateUsuario} />} />
+          <Route path="perfil"      element={<Perfil      usuarioLogado={usuarioLogado} onUpdateUsuario={handleUpdateUsuario} onLogout={handleLogout} />} />
           <Route path="seguranca"   element={<Seguranca   usuarioLogado={usuarioLogado} onUpdateUsuario={handleUpdateUsuario} />} />
+          <Route path="colecoes"    element={<Colecoes />} />
+          <Route path="colecoes/:slug" element={<Colecoes />} />
+          <Route path="perguntas"   element={<Perguntas   usuarioLogado={usuarioLogado} />} />
+          <Route path="perguntas/:id" element={<Perguntas usuarioLogado={usuarioLogado} />} />
+          <Route path="calendario"  element={<Calendario  usuarioLogado={usuarioLogado} />} />
         </Route>
 
         {/* ─── 404 ────────────────────────────────────────── */}

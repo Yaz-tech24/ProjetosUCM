@@ -4,6 +4,12 @@ FROM node:22-bookworm-slim
 
 WORKDIR /app
 
+# LibreOffice (só Writer e Impress) para converter DOCX/PPTX enviados pelos
+# estudantes em PDF no servidor — ver services/conversao.js. Acrescenta
+# ~400 MB à imagem; para prescindir, remova este bloco e a conversão fica
+# indisponível de forma controlada (o upload de Office é recusado com aviso).
+RUN apt-get update  && apt-get install -y --no-install-recommends libreoffice-writer libreoffice-impress fonts-dejavu fonts-liberation  && rm -rf /var/lib/apt/lists/*
+
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 

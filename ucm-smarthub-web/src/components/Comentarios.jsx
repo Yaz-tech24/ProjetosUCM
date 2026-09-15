@@ -3,6 +3,7 @@ import { MessageCircle, Send, Trash2 } from "lucide-react";
 import api from "../services/api";
 import Toast from "./Toast";
 import ConfirmModal from "./ConfirmModal";
+import BotaoReportar from "./Reportar";
 import { Cartao, BotaoPrimario, BotaoSecundario, Vazio, Spinner, Avatar, formatarData } from "./ui";
 
 const LIMITE = 1000;
@@ -103,18 +104,21 @@ const Comentarios = ({ materialId, usuarioId, ehAdmin = false }) => {
                         <span style={{ fontSize: 14, fontWeight: 800, color: "var(--text-heading)" }}>{c.usuario}</span>
                         <span style={{ fontSize: 11.5, color: "var(--text-faint)" }}>{formatarData(c.data_criacao)}</span>
                       </div>
-                      {podeRemover && (
-                        <button
-                          type="button"
-                          onClick={() => setConfirmar({ message: "Remover este comentário? Esta acção não pode ser desfeita.", id: c.id })}
-                          className="rounded-xl p-1.5 transition-colors hover:bg-red-50"
-                          style={{ color: "var(--text-faint)" }}
-                          aria-label="Remover comentário"
-                          title="Remover"
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      )}
+                      <div className="flex items-center gap-1 shrink-0">
+                        {c.usuario_id !== usuarioId && <BotaoReportar tipo="comentario" recursoId={c.id} compacto onToast={showToast} />}
+                        {podeRemover && (
+                          <button
+                            type="button"
+                            onClick={() => setConfirmar({ message: "Remover este comentário? Esta acção não pode ser desfeita.", id: c.id })}
+                            className="rounded-xl p-1.5 transition-colors hover:bg-red-50"
+                            style={{ color: "var(--text-faint)" }}
+                            aria-label="Remover comentário"
+                            title="Remover"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        )}
+                      </div>
                     </div>
                     <p className="mt-1.5 whitespace-pre-wrap break-words" style={{ fontSize: 13.5, color: "var(--text-body)", lineHeight: 1.6 }}>{c.conteudo}</p>
                   </div>

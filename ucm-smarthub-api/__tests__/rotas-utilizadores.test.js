@@ -88,7 +88,7 @@ describe("GET /api/admin/utilizadores", () => {
   });
 
   it("lista utilizadores para o admin", async () => {
-    mockSql([[/FROM usuarios ORDER BY data_criacao/, [[{ id: 1, nome: "Ana", email: "a@b.com", papel: "estudante", curso: "Geral", avatar_url: null }]]]]);
+    mockSql([[/FROM usuarios WHERE email <> 'conta-eliminada@sistema.local' ORDER BY data_criacao/, [[{ id: 1, nome: "Ana", email: "a@b.com", papel: "estudante", curso: "Geral", avatar_url: null }]]]]);
     const res = await request(app).get("/api/admin/utilizadores").set("Authorization", `Bearer ${tokenAdmin}`);
     expect(res.status).toBe(200);
     expect(res.body).toHaveLength(1);

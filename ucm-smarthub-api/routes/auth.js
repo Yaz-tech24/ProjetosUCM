@@ -7,9 +7,12 @@ const mailer = require("../services/email");
 const { getConfiguracoes, getCursos } = require("../services/plataforma");
 const { paraUrlAbsoluto } = require("../utils/urls");
 const validar = require("../middleware/validar");
-const { autenticar, JWT_SECRET } = require("../middleware/auth");
+const { autenticar, extrairToken, JWT_SECRET } = require("../middleware/auth");
 const { auditar } = require("../middleware/auditoria");
 const totp = require("../services/totp");
+const sessoes = require("../services/sessoes");
+const { consumirCodigoRecuperacao, contarCodigosRestantes } = require("../services/codigosRecuperacao");
+const { criarNotificacao } = require("../services/notificacoes");
 const {
   limitarLogin, limitarRegisto, limitarEsqueciSenha, limitarReporSenha, limitarVerificarEmail,
   contaBloqueada, registarFalhaLogin, limparFalhasLogin,
@@ -69,11 +72,13 @@ const OPCOES_COOKIE_SESSAO = {
 // validada, mas não dá acesso a nada — só serve para o segundo passo.
 const VALIDADE_TOKEN_2FA = "5m";
 
-function emitirSessao(res, utilizador) {
+async function emitirSessao(req, res, utilizador) {
+  // jti liga o token a uma linha em `sessoes` — ver services/sessoes.js.
+  const { jti } = await sessoes.criarSessao({ usuarioId: utilizador.id, req });
   const token = jwt.sign(
     { id: utilizador.id, papel: utilizador.papel, nome: utilizador.nome, curso: utilizador.curso },
     JWT_SECRET,
-    { expiresIn: "8h" }
+    { expiresIn: "8h", jwtid: jti }
   );
 
   // Cookie httpOnly é a forma "real" de autenticação da SPA (ver
@@ -267,7 +272,7 @@ module.exports = function registarRotasAuth(app) {
         return res.status(200).json({ requer_2fa: true, token_2fa: token2fa });
       }
 
-      emitirSessao(res, utilizador);
+      await emitirSessao(req, res, utilizador);
     } catch (erro) {
       console.error("Erro no login:", erro.message);
       res.status(500).json({ erro: "Erro interno ao validar credenciais." });
@@ -287,10 +292,11 @@ module.exports = function registarRotasAuth(app) {
    *         application/json:
    *           schema:
    *             type: object
-   *             required: [token_2fa, codigo]
+   *             required: [token_2fa]
    *             properties:
    *               token_2fa: { type: string }
-   *               codigo: { type: string, pattern: '^\\d{6}$' }
+   *               codigo: { type: string, pattern: '^\\d{6}$', description: Código da app de autenticação }
+   *               codigo_recuperacao: { type: string, description: "Alternativa: um dos códigos de recuperação de uso único (XXXX-XXXX)" }
    *     responses:
    *       200: { description: Login aprovado }
    *       400: { description: Código inválido }
@@ -298,9 +304,11 @@ module.exports = function registarRotasAuth(app) {
    */
   app.post("/api/login/2fa", limitarLogin, async (req, res) => {
     try {
-      const { token_2fa, codigo } = req.body || {};
-      if (typeof token_2fa !== "string" || !/^\d{6}$/.test(String(codigo || ""))) {
-        return res.status(400).json({ erro: "Token e código de 6 dígitos são obrigatórios." });
+      const { token_2fa, codigo, codigo_recuperacao } = req.body || {};
+      const temTotp = /^\d{6}$/.test(String(codigo || ""));
+      const temRecuperacao = typeof codigo_recuperacao === "string" && codigo_recuperacao.trim().length >= 8;
+      if (typeof token_2fa !== "string" || (!temTotp && !temRecuperacao)) {
+        return res.status(400).json({ erro: "Token e um código (6 dígitos da app ou código de recuperação) são obrigatórios." });
       }
 
       let payload;
@@ -321,13 +329,31 @@ module.exports = function registarRotasAuth(app) {
       if (contaBloqueada(utilizador.email)) {
         return res.status(429).json({ erro: "Demasiadas tentativas falhadas. Tente novamente dentro de 15 minutos." });
       }
-      if (!(await totp.verificarCodigo(utilizador["2fa_secret"], codigo))) {
+      let valido = false;
+      if (temTotp) {
+        valido = await totp.verificarCodigo(utilizador["2fa_secret"], codigo);
+      } else {
+        valido = await consumirCodigoRecuperacao(utilizador.id, codigo_recuperacao);
+        if (valido) {
+          const restantes = await contarCodigosRestantes(utilizador.id);
+          auditar(utilizador.id, "login_codigo_recuperacao", "usuarios", utilizador.id, `Entrou com código de recuperação (restam ${restantes})`, req.ip);
+          criarNotificacao(utilizador.id, {
+            tipo: "seguranca",
+            titulo: "Entrou com um código de recuperação",
+            mensagem: restantes === 0
+              ? "Não lhe restam códigos de recuperação. Gere novos em Segurança antes que precise deles."
+              : `Restam ${restantes} código${restantes === 1 ? "" : "s"} de recuperação. Se não foi você, desactive o 2FA e mude a palavra-passe.`,
+            link: "/seguranca",
+          });
+        }
+      }
+      if (!valido) {
         registarFalhaLogin(utilizador.email);
-        return res.status(400).json({ erro: "Código inválido." });
+        return res.status(400).json({ erro: temTotp ? "Código inválido." : "Código de recuperação inválido ou já usado." });
       }
       limparFalhasLogin(utilizador.email);
 
-      emitirSessao(res, utilizador);
+      await emitirSessao(req, res, utilizador);
     } catch (erro) {
       console.error("Erro no login 2FA:", erro.message);
       res.status(500).json({ erro: "Erro interno ao validar o código." });
@@ -443,8 +469,15 @@ module.exports = function registarRotasAuth(app) {
    *     responses:
    *       200: { description: Sessão terminada }
    */
-  app.post("/api/logout", (req, res) => {
+  app.post("/api/logout", async (req, res) => {
     res.clearCookie("token", { ...OPCOES_COOKIE_SESSAO, maxAge: undefined });
+    // Revoga a sessão no servidor — sem isto o token continuava válido até
+    // expirar, mesmo depois de "sair". Falha silenciosa: o cookie já foi limpo.
+    try {
+      const token = extrairToken(req);
+      const payload = token ? jwt.verify(token, JWT_SECRET) : null;
+      if (payload?.jti) await sessoes.revogarSessao(payload.jti, payload.id);
+    } catch { /* token inválido/expirado — nada a revogar */ }
     res.json({ mensagem: "Sessão terminada." });
   });
 

@@ -15,6 +15,11 @@ const MAPA_TIPOS_MIME = {
   webm: ["video/webm"],
   ogg:  ["video/ogg"],
   mov:  ["video/quicktime"],
+  // Documentos Office — convertidos para PDF no servidor (services/conversao.js)
+  docx: ["application/vnd.openxmlformats-officedocument.wordprocessingml.document"],
+  pptx: ["application/vnd.openxmlformats-officedocument.presentationml.presentation"],
+  doc:  ["application/msword"],
+  ppt:  ["application/vnd.ms-powerpoint"],
 };
 
 // Extensão do ficheiro guardado em disco vem SEMPRE daqui, nunca do nome
@@ -33,6 +38,10 @@ const MAPA_EXTENSAO_MIME = {
   "image/png":         ".png",
   "image/jpeg":        ".jpg",
   "image/webp":        ".webp",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation": ".pptx",
+  "application/msword": ".doc",
+  "application/vnd.ms-powerpoint": ".ppt",
 };
 const extensaoSegura = (mimetype) => MAPA_EXTENSAO_MIME[mimetype] || "";
 

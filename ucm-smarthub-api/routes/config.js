@@ -9,6 +9,7 @@ const { autenticar, apenasAdmin } = require("../middleware/auth");
 const { auditar } = require("../middleware/auditoria");
 const { uploadsDir, uploadLogo } = require("../middleware/upload");
 const { schemaConfig, schemaCurso } = require("../schemas");
+const { conversaoDisponivel } = require("../services/conversao");
 
 module.exports = function registarRotasConfig(app) {
   // ==========================================
@@ -35,7 +36,7 @@ module.exports = function registarRotasConfig(app) {
   app.get("/api/config", async (req, res) => {
     try {
       const [configuracoes, cursos] = await Promise.all([getConfiguracoes(), getCursos()]);
-      res.json({ configuracoes, cursos });
+      res.json({ configuracoes, cursos, capacidades: { conversao_documentos: await conversaoDisponivel() } });
     } catch (erro) {
       console.error("Erro ao buscar configuração:", erro.message);
       res.status(500).json({ erro: "Falha ao buscar configuração." });

@@ -1,12 +1,18 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import api, { isFavorito, toggleFavorito } from "../services/api";
+import api from "../services/api";
+import useFavoritos from "../hooks/useFavoritos";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, ExternalLink, DownloadCloud, Sparkles, RotateCcw, Heart, Share2, Trash2, Send, MessageCircle } from "lucide-react";
+import { ArrowLeft, ExternalLink, DownloadCloud, Sparkles, RotateCcw, Heart, Share2, Trash2, Send, MessageCircle, Eye, WifiOff, CloudDownload, CloudOff } from "lucide-react";
 import { useConfig } from "../context/ConfigContext";
 import Toast from "../components/Toast";
 import Avaliacoes from "../components/Avaliacoes";
 import Comentarios from "../components/Comentarios";
 import TagsMaterial from "../components/TagsMaterial";
+import Quiz from "../components/Quiz";
+import VersoesMaterial from "../components/VersoesMaterial";
+import GuardarEmColecao from "../components/GuardarEmColecao";
+import BotaoReportar from "../components/Reportar";
+import { guardarMaterialOffline, removerMaterialOffline, estaGuardadoOffline, obterMaterialOffline, obterUrlLocal } from "../services/offline";
 
 /* ── Renderiza o resumo estruturado devolvido pela IA ── */
 const SummaryRenderer = ({ text }) => {
@@ -84,7 +90,7 @@ const Visualizador = ({ usuarioLogado }) => {
   const [summary,        setSummary]        = useState('');
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError,   setSummaryError]   = useState(null);
-  const [fav,            setFav]            = useState(false);
+  const { ehFavorito, alternar: alternarFavorito } = useFavoritos();
   const [copiado,        setCopiado]        = useState(false);
   const [confirmRemover, setConfirmRemover] = useState(false);
   const [removendo,      setRemovendo]      = useState(false);
@@ -92,6 +98,10 @@ const Visualizador = ({ usuarioLogado }) => {
   const [chatMessages,   setChatMessages]   = useState([]);
   const [chatInput,      setChatInput]      = useState('');
   const [chatEnviando,   setChatEnviando]   = useState(false);
+  const [offline,        setOffline]        = useState(false);   // guardado para leitura offline
+  const [aGuardarOffline, setAGuardarOffline] = useState(false);
+  const [urlLocal,       setUrlLocal]       = useState(null);    // blob URL do PDF em cache
+  const [semRede,        setSemRede]        = useState(false);   // a mostrar a cópia offline
 
   const summaryAbortRef = useRef(null);
   const chatEndRef      = useRef(null);
@@ -102,10 +112,19 @@ const Visualizador = ({ usuarioLogado }) => {
     const controller = new AbortController();
     setLoading(true);
     setErroCarregar(null);
+    setSemRede(false);
+    setOffline(estaGuardadoOffline(id));
     api.get(`/materiais/${id}`, { signal: controller.signal })
-      .then(res => { setMaterial(res.data); setFav(isFavorito(res.data.id)); })
+      .then(res => {
+        setMaterial(res.data);
+        // Conta uma abertura (o servidor ignora repetições em 30 min).
+        api.post(`/materiais/${id}/acesso`, { tipo: 'abertura' }).catch(() => {});
+      })
       .catch(err => {
         if (err.code === 'ERR_CANCELED' || err.name === 'CanceledError' || err.name === 'AbortError') return;
+        // Sem rede mas com cópia guardada: abre a cópia offline.
+        const copia = !err.response && obterMaterialOffline(id);
+        if (copia) { setMaterial(copia); setSemRede(true); return; }
         setMaterial(null);
         // Distingue "não existe" de "não foi possível verificar" — mostrar a
         // mesma mensagem para os dois esconde uma falha de rede real atrás
@@ -115,6 +134,40 @@ const Visualizador = ({ usuarioLogado }) => {
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [id]);
+
+  /* Se o PDF estiver guardado offline, mostra-o a partir da cache (blob URL) */
+  useEffect(() => {
+    let activo = true;
+    let urlCriado = null;
+    if (material?.url_arquivo && material.tipo === 'PDF' && offline) {
+      obterUrlLocal(material.url_arquivo).then(u => { if (activo) { urlCriado = u; setUrlLocal(u); } });
+    } else {
+      setUrlLocal(null);
+    }
+    return () => { activo = false; if (urlCriado) URL.revokeObjectURL(urlCriado); };
+  }, [material, offline]);
+
+  const handleOffline = async () => {
+    if (!material || aGuardarOffline) return;
+    setAGuardarOffline(true);
+    try {
+      if (offline) {
+        await removerMaterialOffline(material.id);
+        setOffline(false);
+        setToast({ message: "Cópia offline removida.", type: "success" });
+      } else {
+        await guardarMaterialOffline(material);
+        setOffline(true);
+        setToast({ message: "Guardado. Pode abrir este PDF sem ligação à internet.", type: "success" });
+      }
+    } catch (err) {
+      setToast({ message: err.message || "Não foi possível guardar para offline.", type: "error" });
+    } finally {
+      setAGuardarOffline(false);
+    }
+  };
+
+  const registarDownload = () => { api.post(`/materiais/${material.id}/acesso`, { tipo: 'download' }).catch(() => {}); };
 
   const fetchSummary = useCallback(async (forcar = false) => {
     if (!material) return;
@@ -167,9 +220,9 @@ const Visualizador = ({ usuarioLogado }) => {
     }
   };
 
+  const fav = material ? ehFavorito(material.id) : false;
   const handleToggleFav = () => {
-    const novo = toggleFavorito(material.id);
-    setFav(novo);
+    alternarFavorito(material.id).catch(() => setToast({ message: "Não foi possível guardar o favorito.", type: "error" }));
   };
 
   const handleCopiarLink = () => {
@@ -301,6 +354,30 @@ const Visualizador = ({ usuarioLogado }) => {
               {fav ? "Guardado" : "Guardar"}
             </button>
 
+            {!semRede && (
+              <GuardarEmColecao
+                materialId={material.id}
+                onToast={(m, t = "success") => setToast({ message: m, type: t })}
+                className="inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-bold transition-all duration-200"
+                estiloBotao={{ background: "var(--surface-card)", border: "1.5px solid var(--border-subtle-strong)", color: "var(--text-muted)", boxShadow: "0 2px 10px rgba(var(--color-navy-mid-rgb),0.06)" }}
+              />
+            )}
+
+            {isPDF && (
+              <button
+                onClick={handleOffline}
+                disabled={aGuardarOffline}
+                className="inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-bold transition-all duration-200 disabled:opacity-60"
+                style={offline
+                  ? { background: "var(--status-success-bg)", border: "1.5px solid var(--status-success-border)", color: "var(--status-success-text)" }
+                  : { background: "var(--surface-card)", border: "1.5px solid var(--border-subtle-strong)", color: "var(--text-muted)", boxShadow: "0 2px 10px rgba(var(--color-navy-mid-rgb),0.06)" }}
+                title={offline ? "Remover a cópia offline" : "Guardar para ler sem internet"}
+              >
+                {offline ? <CloudOff size={16} /> : <CloudDownload size={16} />}
+                {aGuardarOffline ? "A guardar…" : offline ? "Offline ✓" : "Offline"}
+              </button>
+            )}
+
             {/* Copiar link */}
             <button
               onClick={handleCopiarLink}
@@ -314,10 +391,11 @@ const Visualizador = ({ usuarioLogado }) => {
             {/* Download (apenas PDF) */}
             {isPDF && (
               <a
-                href={material.url_arquivo}
+                href={urlLocal || material.url_arquivo}
                 download
                 target="_blank"
                 rel="noreferrer"
+                onClick={registarDownload}
                 className="inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-black transition-all duration-200"
                 style={{ background: "linear-gradient(135deg,var(--color-gold-dark),var(--color-gold))", color: "var(--color-navy-deep)", boxShadow: "0 4px 16px rgba(var(--color-gold-rgb),0.40)" }}
                 onMouseEnter={e => (e.currentTarget.style.transform = "translateY(-1px)", e.currentTarget.style.boxShadow = "0 6px 22px rgba(var(--color-gold-rgb),0.60)")}
@@ -341,6 +419,13 @@ const Visualizador = ({ usuarioLogado }) => {
           </div>
         </div>
 
+        {semRede && (
+          <div className="flex items-center gap-3 rounded-2xl px-5 py-3" style={{ background: "var(--status-warning-bg)", border: "1px solid var(--status-warning-border)", color: "var(--status-warning-text)" }}>
+            <WifiOff size={18} />
+            <p style={{ fontSize: 13.5, fontWeight: 600 }}>Sem ligação — a mostrar a cópia guardada neste dispositivo. Avaliações, comentários e resumo ficam disponíveis quando a ligação voltar.</p>
+          </div>
+        )}
+
         {/* Player de media */}
         <div
           className="overflow-hidden"
@@ -353,7 +438,7 @@ const Visualizador = ({ usuarioLogado }) => {
             </video>
           ) : isPDF ? (
             <iframe
-              src={material.url_arquivo}
+              src={urlLocal || material.url_arquivo}
               className="w-full"
               style={{ minHeight: "72vh", background: "#fff" }}
               title={`PDF — ${material.titulo}`}
@@ -390,15 +475,24 @@ const Visualizador = ({ usuarioLogado }) => {
               { label: `📚 ${material.cadeira}`, bg: "var(--surface-hover)",              border: "var(--border-subtle-strong)", color: "var(--text-body)" },
               { label: `👤 ${material.autor}`,   bg: "rgba(var(--color-navy-mid-rgb),0.06)", border: "rgba(var(--color-navy-mid-rgb),0.12)", color: "var(--text-accent)" },
               { label: `📅 ${new Date(material.data_upload).toLocaleDateString("pt-PT")}`, bg: "var(--surface-hover)", border: "var(--border-subtle-strong)", color: "var(--text-muted)" },
-              { label: material.tipo === 'Vídeo' ? '🎬 Vídeo' : '📄 PDF',    bg: material.tipo === 'Vídeo' ? "#eff6ff" : "#fff1f2", border: material.tipo === 'Vídeo' ? "#bfdbfe" : "#fecdd3", color: material.tipo === 'Vídeo' ? "var(--color-navy-mid)" : "#be123c" },
+              { label: material.tipo === 'Vídeo' ? '🎬 Vídeo' : material.formato_original ? `📄 PDF (de ${material.formato_original.toUpperCase()})` : '📄 PDF',    bg: material.tipo === 'Vídeo' ? "#eff6ff" : "#fff1f2", border: material.tipo === 'Vídeo' ? "#bfdbfe" : "#fecdd3", color: material.tipo === 'Vídeo' ? "var(--color-navy-mid)" : "#be123c" },
+              ...(material.versao > 1 ? [{ label: `v${material.versao}`, bg: "var(--surface-hover)", border: "var(--border-subtle-strong)", color: "var(--text-accent)" }] : []),
             ].map(({ label, bg, border, color }) => (
               <span key={label} className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold" style={{ background: bg, border: `1px solid ${border}`, color }}>
                 {label}
               </span>
             ))}
           </div>
-          <div className="mt-4">
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
             <TagsMaterial materialId={material.id} ehAdmin={usuarioLogado?.papel === 'admin'} onErro={msg => setToast({ message: msg, type: 'error' })} />
+            {!semRede && (
+              <div className="flex items-center gap-3">
+                <span className="inline-flex items-center gap-1.5" style={{ fontSize: 12.5, color: "var(--text-faint)" }} title="Aberturas · downloads">
+                  <Eye size={14} /> {material.visualizacoes ?? 0} · <DownloadCloud size={14} /> {material.downloads ?? 0}
+                </span>
+                <BotaoReportar tipo="material" recursoId={material.id} onToast={(m, t = "success") => setToast({ message: m, type: t })} />
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -547,9 +641,21 @@ const Visualizador = ({ usuarioLogado }) => {
           </div>
         </div>
 
-        {/* Avaliações e Comentários */}
-        <Avaliacoes materialId={material.id} usuarioId={usuarioLogado?.id} />
-        <Comentarios materialId={material.id} usuarioId={usuarioLogado?.id} ehAdmin={usuarioLogado?.papel === 'admin'} />
+        {/* Quiz, versões, avaliações e comentários — só com ligação */}
+        {!semRede && (
+          <>
+            {config.ia_activada && <Quiz materialId={material.id} tipo={material.tipo} onToast={(m, t = "success") => setToast({ message: m, type: t })} />}
+            <VersoesMaterial
+              material={material}
+              podeEditar={podeRemover}
+              aceitaFicheiros={material.tipo === 'PDF' ? (config.tipos_ficheiro_permitidos?.includes('docx') || config.tipos_ficheiro_permitidos?.includes('pptx') ? '.pdf,.docx,.pptx,.doc,.ppt' : '.pdf') : 'video/*'}
+              onToast={(m, t = "success") => setToast({ message: m, type: t })}
+              onAtualizado={(d) => setMaterial(m => ({ ...m, versao: d.versao, url_arquivo: d.url_arquivo }))}
+            />
+            <Avaliacoes materialId={material.id} usuarioId={usuarioLogado?.id} />
+            <Comentarios materialId={material.id} usuarioId={usuarioLogado?.id} ehAdmin={usuarioLogado?.papel === 'admin'} />
+          </>
+        )}
       </div>
     </div>
 

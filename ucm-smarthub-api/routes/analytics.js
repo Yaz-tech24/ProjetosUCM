@@ -24,7 +24,9 @@ module.exports = function registarRotasAnalytics(app) {
            SUM(CASE WHEN status = 'pendente' THEN 1 ELSE 0 END) as pendentes,
            SUM(CASE WHEN status = 'rejeitado' THEN 1 ELSE 0 END) as rejeitados,
            SUM(CASE WHEN tipo = 'PDF' THEN 1 ELSE 0 END) as pdfs,
-           SUM(CASE WHEN tipo = 'Vídeo' THEN 1 ELSE 0 END) as videos
+           SUM(CASE WHEN tipo = 'Vídeo' THEN 1 ELSE 0 END) as videos,
+           COALESCE(SUM(visualizacoes), 0) as aberturas,
+           COALESCE(SUM(downloads), 0) as downloads
          FROM materiais`
       );
 
@@ -117,13 +119,13 @@ module.exports = function registarRotasAnalytics(app) {
     try {
       const [materiais] = await db.query(
         `SELECT
-           m.id, m.titulo, m.cadeira, m.tipo, m.data_upload,
+           m.id, m.titulo, m.cadeira, m.tipo, m.data_upload, m.visualizacoes, m.downloads,
            (SELECT COUNT(*) FROM avaliacoes a WHERE a.material_id = m.id) AS total_avaliacoes,
            (SELECT AVG(a.nota) FROM avaliacoes a WHERE a.material_id = m.id) AS media_nota,
            (SELECT COUNT(*) FROM comentarios_materiais c WHERE c.material_id = m.id) AS total_comentarios
          FROM materiais m
          WHERE m.status = 'aprovado'
-         ORDER BY total_avaliacoes DESC, total_comentarios DESC, m.data_upload DESC
+         ORDER BY m.visualizacoes DESC, total_avaliacoes DESC, m.data_upload DESC
          LIMIT 10`
       );
 

@@ -6,8 +6,13 @@ const db = require("../config/db");
 const { paraUrlAbsoluto } = require("../utils/urls");
 const validar = require("../middleware/validar");
 const { autenticar } = require("../middleware/auth");
+const { auditar } = require("../middleware/auditoria");
 const { uploadsDir, uploadAvatar } = require("../middleware/upload");
 const { schemaPerfilDados, schemaPerfilSenha } = require("../schemas");
+const sessoes = require("../services/sessoes");
+const totp = require("../services/totp");
+const { consumirCodigoRecuperacao } = require("../services/codigosRecuperacao");
+const { eliminarConta } = require("../services/eliminarConta");
 
 module.exports = function registarRotasPerfil(app) {
   // ==========================================
@@ -79,7 +84,11 @@ module.exports = function registarRotasPerfil(app) {
       }
       const senhaCriptografada = await bcrypt.hash(nova_senha, await bcrypt.genSalt(10));
       await db.query("UPDATE usuarios SET senha = ? WHERE id = ?", [senhaCriptografada, req.utilizador.id]);
-      res.json({ mensagem: "Palavra-passe alterada com sucesso!" });
+      // Quem muda a palavra-passe normalmente é porque desconfia que alguém
+      // a tinha — as outras sessões (possivelmente do intruso) caem já.
+      const terminadas = await sessoes.revogarOutrasSessoes(req.utilizador.id, req.sessaoJti);
+      auditar(req.utilizador.id, "alterar_senha", "usuarios", req.utilizador.id, `Alterou a palavra-passe (${terminadas} outra(s) sessão(ões) terminada(s))`, req.ip);
+      res.json({ mensagem: terminadas > 0 ? `Palavra-passe alterada. ${terminadas} sessão${terminadas === 1 ? "" : "ões"} noutros dispositivos foi${terminadas === 1 ? "" : "ram"} terminada${terminadas === 1 ? "" : "s"}.` : "Palavra-passe alterada com sucesso!" });
     } catch (erro) {
       console.error("Erro ao mudar password:", erro.message);
       res.status(500).json({ erro: "Falha ao alterar a palavra-passe." });
@@ -121,6 +130,59 @@ module.exports = function registarRotasPerfil(app) {
       if (req.file) fs.unlink(req.file.path, () => {});
       console.error("Erro ao gravar avatar:", erro.message);
       res.status(500).json({ erro: "Falha ao actualizar avatar." });
+    }
+  });
+
+  /**
+   * @openapi
+   * /api/perfil:
+   *   delete:
+   *     summary: Elimina a própria conta. Materiais, comentários, perguntas e respostas ficam anonimizados ("Conta eliminada"); o resto é apagado.
+   *     tags: [Perfil]
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required: [senha]
+   *             properties:
+   *               senha: { type: string }
+   *               codigo: { type: string, description: "Obrigatório se o 2FA estiver activo: código da app ou código de recuperação" }
+   *     responses:
+   *       200: { description: Conta eliminada }
+   *       400: { description: Palavra-passe/código errados ou único administrador }
+   */
+  app.delete("/api/perfil", autenticar, async (req, res) => {
+    try {
+      const { senha, codigo } = req.body || {};
+      if (typeof senha !== "string" || !senha) return res.status(400).json({ erro: "Confirme a palavra-passe." });
+
+      const [[utilizador]] = await db.query("SELECT id, senha, papel, 2fa_ativado, 2fa_secret FROM usuarios WHERE id = ?", [req.utilizador.id]);
+      if (!utilizador) return res.status(404).json({ erro: "Utilizador não encontrado." });
+      if (!(await bcrypt.compare(senha, utilizador.senha || ""))) {
+        return res.status(400).json({ erro: "Palavra-passe incorrecta." });
+      }
+      if (utilizador["2fa_ativado"] === 1) {
+        const c = String(codigo || "").trim();
+        const ok = /^\d{6}$/.test(c)
+          ? await totp.verificarCodigo(utilizador["2fa_secret"], c)
+          : await consumirCodigoRecuperacao(utilizador.id, c);
+        if (!ok) return res.status(400).json({ erro: "Código 2FA inválido." });
+      }
+      if (utilizador.papel === "admin") {
+        const [[{ total }]] = await db.query("SELECT COUNT(*) AS total FROM usuarios WHERE papel = 'admin'");
+        if (total <= 1) return res.status(400).json({ erro: "É o único administrador. Nomeie outro antes de eliminar a sua conta." });
+      }
+
+      const { email } = await eliminarConta(utilizador.id);
+      auditar(null, "eliminar_conta", "usuarios", utilizador.id, `Conta ${email} eliminada pelo próprio`, req.ip);
+      res.clearCookie("token", { path: "/" });
+      res.json({ mensagem: "A sua conta foi eliminada. Até breve." });
+    } catch (erro) {
+      if (erro.status) return res.status(erro.status).json({ erro: erro.message });
+      console.error("Erro ao eliminar conta:", erro.message);
+      res.status(500).json({ erro: "Não foi possível eliminar a conta. Tente novamente." });
     }
   });
 

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import api, { getFavoritos } from "../services/api";
+import api from "../services/api";
+import { obterFavoritos } from "../services/favoritos";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import {
   Library, PlayCircle, FileText, ChevronRight,
@@ -104,16 +105,11 @@ const Dashboard = ({ usuarioLogado }) => {
 
     Promise.allSettled([pMateriais, pMeus]).then(() => setLoadingInicial(false));
 
-    /* Favoritos */
-    const ids = getFavoritos();
-    if (ids.length > 0) {
-      api.get("/materiais?limit=50")
-        .then(res => {
-          const todos = res.data.materiais || [];
-          setFavMateriais(todos.filter(m => ids.includes(m.id)));
-        })
-        .catch(() => setFavMateriais([]));
-    }
+    /* Favoritos — vêm do servidor, já com os materiais completos */
+    obterFavoritos().then(ids => {
+      if (ids.length === 0) return;
+      api.get("/favoritos/materiais").then(res => setFavMateriais(res.data || [])).catch(() => setFavMateriais([]));
+    });
   }, []);
 
   const statCards = [

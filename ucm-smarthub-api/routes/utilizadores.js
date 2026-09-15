@@ -48,7 +48,7 @@ module.exports = function registarRotasUtilizadores(app) {
   app.get("/api/admin/utilizadores", autenticar, apenasAdmin, async (req, res) => {
     try {
       const [utilizadores] = await db.query(
-        "SELECT id, nome, email, papel, curso, numero_estudante, telefone, avatar_url, data_criacao FROM usuarios ORDER BY data_criacao DESC"
+        "SELECT id, nome, email, papel, curso, numero_estudante, telefone, avatar_url, data_criacao FROM usuarios WHERE email <> 'conta-eliminada@sistema.local' ORDER BY data_criacao DESC"
       );
       res.json(utilizadores.map(u => ({ ...u, avatar_url: paraUrlAbsoluto(u.avatar_url) })));
     } catch (erro) {

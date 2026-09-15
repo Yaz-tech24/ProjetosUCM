@@ -245,6 +245,245 @@ async function correrMigracoes() {
   `);
   await garantirChaveEstrangeira("materiais_tags", "materiais_tags_ibfk_1", "(material_id) REFERENCES materiais (id) ON DELETE CASCADE");
   await garantirChaveEstrangeira("materiais_tags", "materiais_tags_ibfk_2", "(tag_id) REFERENCES tags (id) ON DELETE CASCADE");
+
+  // ── Segurança: códigos de recuperação 2FA e sessões ────────────────────
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS codigos_recuperacao_2fa (
+      id          INT NOT NULL AUTO_INCREMENT,
+      usuario_id  INT NOT NULL,
+      codigo_hash CHAR(64) NOT NULL,
+      usado_em    DATETIME NULL,
+      criado_em   TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      UNIQUE KEY codigo_hash (codigo_hash),
+      KEY usuario_id (usuario_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+  await garantirChaveEstrangeira("codigos_recuperacao_2fa", "codigos_2fa_ibfk_1", "(usuario_id) REFERENCES usuarios (id) ON DELETE CASCADE");
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS sessoes (
+      jti         CHAR(36) NOT NULL,
+      usuario_id  INT NOT NULL,
+      dispositivo VARCHAR(255) NULL,
+      ip          VARCHAR(45) NULL,
+      criado_em   TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+      ultimo_uso  TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+      expira_em   DATETIME NOT NULL,
+      revogada_em DATETIME NULL,
+      PRIMARY KEY (jti),
+      KEY usuario_revogada (usuario_id, revogada_em)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+  await garantirChaveEstrangeira("sessoes", "sessoes_ibfk_1", "(usuario_id) REFERENCES usuarios (id) ON DELETE CASCADE");
+
+  // ── Materiais: contagens, texto para pesquisa, versões, formato original ─
+  await adicionarColuna("materiais", "visualizacoes", "INT NOT NULL DEFAULT 0");
+  await adicionarColuna("materiais", "downloads", "INT NOT NULL DEFAULT 0");
+  await adicionarColuna("materiais", "texto_extraido", "MEDIUMTEXT NULL");
+  await adicionarColuna("materiais", "texto_indexado_em", "DATETIME NULL");
+  await adicionarColuna("materiais", "versao", "INT NOT NULL DEFAULT 1");
+  await adicionarColuna("materiais", "formato_original", "VARCHAR(10) NULL");
+  if (!(await indiceExiste("materiais", "ft_materiais_texto"))) {
+    await db.query("CREATE FULLTEXT INDEX ft_materiais_texto ON materiais (titulo, texto_extraido)");
+    console.log("✅ Migração: índice FULLTEXT criado em materiais.");
+  }
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS materiais_acessos (
+      id          INT NOT NULL AUTO_INCREMENT,
+      material_id INT NOT NULL,
+      usuario_id  INT NULL,
+      tipo        ENUM('abertura','download') NOT NULL,
+      criado_em   TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      KEY material_data (material_id, criado_em),
+      KEY usuario_id (usuario_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+  await garantirChaveEstrangeira("materiais_acessos", "acessos_ibfk_1", "(material_id) REFERENCES materiais (id) ON DELETE CASCADE");
+  await garantirChaveEstrangeira("materiais_acessos", "acessos_ibfk_2", "(usuario_id) REFERENCES usuarios (id) ON DELETE SET NULL");
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS versoes_materiais (
+      id          INT NOT NULL AUTO_INCREMENT,
+      material_id INT NOT NULL,
+      versao      INT NOT NULL,
+      url_arquivo VARCHAR(255) NOT NULL,
+      notas       VARCHAR(500) NULL,
+      autor_id    INT NULL,
+      criado_em   TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      UNIQUE KEY material_versao (material_id, versao)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+  await garantirChaveEstrangeira("versoes_materiais", "versoes_ibfk_1", "(material_id) REFERENCES materiais (id) ON DELETE CASCADE");
+  await garantirChaveEstrangeira("versoes_materiais", "versoes_ibfk_2", "(autor_id) REFERENCES usuarios (id) ON DELETE SET NULL");
+
+  // ── Quizzes por IA ─────────────────────────────────────────────────────
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS quizzes (
+      id          INT NOT NULL AUTO_INCREMENT,
+      material_id INT NOT NULL,
+      perguntas   JSON NOT NULL,
+      modelo      VARCHAR(60) NULL,
+      gerado_em   TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      UNIQUE KEY material_id (material_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+  await garantirChaveEstrangeira("quizzes", "quizzes_ibfk_1", "(material_id) REFERENCES materiais (id) ON DELETE CASCADE");
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS quiz_resultados (
+      id         INT NOT NULL AUTO_INCREMENT,
+      quiz_id    INT NOT NULL,
+      usuario_id INT NOT NULL,
+      pontuacao  INT NOT NULL,
+      total      INT NOT NULL,
+      respostas  JSON NOT NULL,
+      criado_em  TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      KEY usuario_quiz (usuario_id, quiz_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+  await garantirChaveEstrangeira("quiz_resultados", "quiz_resultados_ibfk_1", "(quiz_id) REFERENCES quizzes (id) ON DELETE CASCADE");
+  await garantirChaveEstrangeira("quiz_resultados", "quiz_resultados_ibfk_2", "(usuario_id) REFERENCES usuarios (id) ON DELETE CASCADE");
+
+  // ── Favoritos e colecções ──────────────────────────────────────────────
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS favoritos (
+      id          INT NOT NULL AUTO_INCREMENT,
+      usuario_id  INT NOT NULL,
+      material_id INT NOT NULL,
+      criado_em   TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      UNIQUE KEY usuario_material (usuario_id, material_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+  await garantirChaveEstrangeira("favoritos", "favoritos_ibfk_1", "(usuario_id) REFERENCES usuarios (id) ON DELETE CASCADE");
+  await garantirChaveEstrangeira("favoritos", "favoritos_ibfk_2", "(material_id) REFERENCES materiais (id) ON DELETE CASCADE");
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS colecoes (
+      id            INT NOT NULL AUTO_INCREMENT,
+      usuario_id    INT NOT NULL,
+      nome          VARCHAR(100) NOT NULL,
+      descricao     VARCHAR(500) NULL,
+      publica       TINYINT(1) NOT NULL DEFAULT 0,
+      slug          CHAR(12) NOT NULL,
+      criado_em     TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+      atualizado_em TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      UNIQUE KEY slug (slug),
+      KEY usuario_id (usuario_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+  await garantirChaveEstrangeira("colecoes", "colecoes_ibfk_1", "(usuario_id) REFERENCES usuarios (id) ON DELETE CASCADE");
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS colecoes_materiais (
+      id            INT NOT NULL AUTO_INCREMENT,
+      colecao_id    INT NOT NULL,
+      material_id   INT NOT NULL,
+      ordem         INT NOT NULL DEFAULT 0,
+      adicionado_em TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      UNIQUE KEY colecao_material (colecao_id, material_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+  await garantirChaveEstrangeira("colecoes_materiais", "colecoes_materiais_ibfk_1", "(colecao_id) REFERENCES colecoes (id) ON DELETE CASCADE");
+  await garantirChaveEstrangeira("colecoes_materiais", "colecoes_materiais_ibfk_2", "(material_id) REFERENCES materiais (id) ON DELETE CASCADE");
+
+  // ── Perguntas e respostas ──────────────────────────────────────────────
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS perguntas (
+      id                 INT NOT NULL AUTO_INCREMENT,
+      disciplina         VARCHAR(150) NOT NULL,
+      usuario_id         INT NOT NULL,
+      titulo             VARCHAR(200) NOT NULL,
+      conteudo           TEXT NOT NULL,
+      resolvida          TINYINT(1) NOT NULL DEFAULT 0,
+      resposta_aceite_id INT NULL,
+      visualizacoes      INT NOT NULL DEFAULT 0,
+      criado_em          TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+      atualizado_em      TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      KEY disciplina_data (disciplina, criado_em),
+      KEY usuario_id (usuario_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+  await garantirChaveEstrangeira("perguntas", "perguntas_ibfk_1", "(usuario_id) REFERENCES usuarios (id) ON DELETE CASCADE");
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS respostas (
+      id          INT NOT NULL AUTO_INCREMENT,
+      pergunta_id INT NOT NULL,
+      usuario_id  INT NOT NULL,
+      conteudo    TEXT NOT NULL,
+      criado_em   TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      KEY pergunta_id (pergunta_id),
+      KEY usuario_id (usuario_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+  await garantirChaveEstrangeira("respostas", "respostas_ibfk_1", "(pergunta_id) REFERENCES perguntas (id) ON DELETE CASCADE");
+  await garantirChaveEstrangeira("respostas", "respostas_ibfk_2", "(usuario_id) REFERENCES usuarios (id) ON DELETE CASCADE");
+
+  // ── Notificações, denúncias, calendário ────────────────────────────────
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS notificacoes (
+      id         INT NOT NULL AUTO_INCREMENT,
+      usuario_id INT NOT NULL,
+      tipo       VARCHAR(40) NOT NULL,
+      titulo     VARCHAR(150) NOT NULL,
+      mensagem   VARCHAR(500) NULL,
+      link       VARCHAR(255) NULL,
+      lida       TINYINT(1) NOT NULL DEFAULT 0,
+      criado_em  TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      KEY usuario_lida_data (usuario_id, lida, criado_em)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+  await garantirChaveEstrangeira("notificacoes", "notificacoes_ibfk_1", "(usuario_id) REFERENCES usuarios (id) ON DELETE CASCADE");
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS denuncias (
+      id           INT NOT NULL AUTO_INCREMENT,
+      tipo         ENUM('material','comentario','mensagem','pergunta','resposta') NOT NULL,
+      recurso_id   INT NOT NULL,
+      usuario_id   INT NULL,
+      motivo       VARCHAR(40) NOT NULL,
+      detalhes     VARCHAR(1000) NULL,
+      estado       ENUM('pendente','resolvida','ignorada') NOT NULL DEFAULT 'pendente',
+      resolvida_por INT NULL,
+      resolvida_em DATETIME NULL,
+      criado_em    TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      KEY estado_data (estado, criado_em),
+      KEY recurso (tipo, recurso_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+  await garantirChaveEstrangeira("denuncias", "denuncias_ibfk_1", "(usuario_id) REFERENCES usuarios (id) ON DELETE SET NULL");
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS eventos_calendario (
+      id                INT NOT NULL AUTO_INCREMENT,
+      disciplina        VARCHAR(150) NOT NULL,
+      titulo            VARCHAR(150) NOT NULL,
+      descricao         TEXT NULL,
+      tipo              ENUM('teste','entrega','aula','outro') NOT NULL DEFAULT 'outro',
+      data_inicio       DATETIME NOT NULL,
+      data_fim          DATETIME NULL,
+      criado_por        INT NULL,
+      lembrete_enviado  TINYINT(1) NOT NULL DEFAULT 0,
+      criado_em         TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      KEY disciplina_data (disciplina, data_inicio),
+      KEY lembrete (lembrete_enviado, data_inicio)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+  await garantirChaveEstrangeira("eventos_calendario", "eventos_ibfk_1", "(criado_por) REFERENCES usuarios (id) ON DELETE SET NULL");
 }
 
 module.exports = { correrMigracoes };

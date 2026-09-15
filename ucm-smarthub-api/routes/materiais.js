@@ -6,15 +6,64 @@ const mailer = require("../services/email");
 const { getConfiguracoes, getCursos } = require("../services/plataforma");
 const { genAI, extractPdfText, gerarResumoIA, verificarConformidadeIA, MENSAGEM_IA_MAX } = require("../services/ia");
 const { paraUrlAbsoluto } = require("../utils/urls");
-const { validarFicheiroPorMime } = require("../utils/security");
+const { validarFicheiroPorMime, MIME_PARA_TIPO } = require("../utils/security");
 const validar = require("../middleware/validar");
 const { autenticar, apenasAdmin } = require("../middleware/auth");
 const { auditar } = require("../middleware/auditoria");
 const { atualizarReputacao } = require("../services/reputacao");
-const { notificarSubscritores } = require("../services/notificacoes");
-const { limitarChat } = require("../middleware/rateLimiters");
+const { notificarSubscritores, criarNotificacao } = require("../services/notificacoes");
+const { formatoConvertivel, conversaoDisponivel, converterParaPdf } = require("../services/conversao");
+const { indexarMaterial, consultaBooleana } = require("../services/indexacao");
+const { limitarChat, limitarAvaliacoes } = require("../middleware/rateLimiters");
 const { uploadsDir, upload } = require("../middleware/upload");
 const { schemaMaterial } = require("../schemas");
+
+const MAX_VERSOES_GUARDADAS = 5;
+
+// Validações comuns ao upload inicial e ao envio de uma nova versão: tamanho
+// configurado, assinatura real do ficheiro e, para DOCX/PPTX/DOC/PPT,
+// conversão para PDF. Devolve o ficheiro final (já convertido, se for o
+// caso) ou lança um erro com `status` para a rota responder.
+async function prepararFicheiro(file, config, tipoDeclarado) {
+  const falhar = (mensagem) => { throw Object.assign(new Error(mensagem), { status: 400 }); };
+
+  const limiteBytes = (config.tamanho_maximo_mb || 100) * 1024 * 1024;
+  if (file.size > limiteBytes) falhar(`Ficheiro demasiado grande. Limite actual: ${config.tamanho_maximo_mb} MB.`);
+
+  // O Content-Type e a extensão vêm do cliente; o cabeçalho real do
+  // ficheiro é a única coisa que não controla. Um .exe renomeado para
+  // .pdf passa o fileFilter do multer, mas não passa aqui.
+  let assinaturaValida = false;
+  try { assinaturaValida = validarFicheiroPorMime(file.path, file.mimetype); } catch { /* tratado abaixo */ }
+  if (!assinaturaValida) falhar("O conteúdo do ficheiro não corresponde ao tipo indicado. Verifique que é um PDF, vídeo ou documento Office válido.");
+
+  const formato = formatoConvertivel(file.mimetype);
+  const tipoDetectado = (formato || MIME_PARA_TIPO[file.mimetype] === "pdf") ? "PDF" : "Vídeo";
+  if (tipoDeclarado && tipoDeclarado !== tipoDetectado) {
+    falhar(tipoDetectado === "PDF" ? "Escolheu \"Vídeo\" mas enviou um documento." : "Escolheu \"PDF\" mas enviou um vídeo.");
+  }
+
+  if (!formato) return { caminho: file.path, nome: file.filename, formatoOriginal: null, tipo: tipoDetectado };
+
+  if (!(await conversaoDisponivel())) {
+    falhar("Este servidor não consegue converter documentos Office para PDF. Exporte o ficheiro como PDF e volte a enviar.");
+  }
+  let caminhoPdf;
+  try {
+    caminhoPdf = await converterParaPdf(file.path);
+  } catch (erro) {
+    console.error("Conversão para PDF falhou:", erro.message);
+    falhar("Não foi possível converter o documento para PDF. Confirme que o ficheiro abre correctamente e tente de novo, ou envie-o já em PDF.");
+  } finally {
+    fs.unlink(file.path, () => {});
+  }
+  return { caminho: caminhoPdf, nome: path.basename(caminhoPdf), formatoOriginal: formato, tipo: "PDF" };
+}
+
+const nomeSeguro = (urlArquivo) => {
+  const nome = path.basename(String(urlArquivo || ""));
+  return nome && !nome.includes("..") ? nome : null;
+};
 
 module.exports = function registarRotasMateriais(app) {
   // ==========================================
@@ -81,11 +130,29 @@ module.exports = function registarRotasMateriais(app) {
       const tipo    = req.query.tipo    || null; // "PDF" | "Vídeo" | null = todos
       const cadeira = req.query.cadeira || null; // filtro por disciplina
       const tag     = req.query.tag     || null; // filtro por tag (nome)
+      const ordem   = req.query.ordem === "populares" ? "m.visualizacoes DESC, m.downloads DESC, m.data_upload DESC" : "m.data_upload DESC";
 
       const params = [];
       let where = "WHERE m.status = 'aprovado'";
 
-      if (busca)   { where += " AND m.titulo LIKE ?"; params.push(busca);   }
+      // Pesquisa: título por LIKE (funciona com 1–2 letras) e conteúdo dos
+      // PDFs por FULLTEXT (ver services/indexacao.js). O trecho devolvido é
+      // o contexto da primeira ocorrência da primeira palavra pesquisada.
+      const termoBruto = (req.query.busca || "").trim();
+      const consultaFt = consultaBooleana(termoBruto);
+      let selectTrecho = "NULL AS trecho";
+      if (busca) {
+        if (consultaFt) {
+          where += " AND (m.titulo LIKE ? OR MATCH(m.titulo, m.texto_extraido) AGAINST(? IN BOOLEAN MODE))";
+          params.push(busca, consultaFt);
+          const primeiraPalavra = termoBruto.split(/\s+/)[0];
+          selectTrecho = "CASE WHEN m.texto_extraido IS NOT NULL AND LOCATE(?, m.texto_extraido) > 0 THEN SUBSTRING(m.texto_extraido, GREATEST(1, LOCATE(?, m.texto_extraido) - 80), 240) ELSE NULL END AS trecho";
+          params.unshift(primeiraPalavra, primeiraPalavra);
+        } else {
+          where += " AND m.titulo LIKE ?";
+          params.push(busca);
+        }
+      }
       if (tipo)    { where += " AND m.tipo = ?";      params.push(tipo);    }
       if (cadeira) { where += " AND m.cadeira = ?";   params.push(cadeira); }
       if (tag)     { where += " AND EXISTS (SELECT 1 FROM materiais_tags mt JOIN tags t ON t.id = mt.tag_id WHERE mt.material_id = m.id AND t.nome = ?)"; params.push(tag); }
@@ -94,26 +161,31 @@ module.exports = function registarRotasMateriais(app) {
       // consulta por material só para desenhar as etiquetas nos cartões.
       const [materiais] = await db.query(
         `SELECT m.id, m.titulo, m.cadeira, m.tipo, m.url_arquivo, m.data_upload, m.status, m.autor_id, u.nome AS autor,
+                m.visualizacoes, m.downloads, m.versao, m.formato_original,
                 (SELECT GROUP_CONCAT(CONCAT(t.nome, '|', t.cor) ORDER BY t.nome SEPARATOR ';')
-                 FROM materiais_tags mt JOIN tags t ON t.id = mt.tag_id WHERE mt.material_id = m.id) AS tags_raw
+                 FROM materiais_tags mt JOIN tags t ON t.id = mt.tag_id WHERE mt.material_id = m.id) AS tags_raw,
+                ${selectTrecho}
          FROM materiais m
          JOIN usuarios u ON m.autor_id = u.id
          ${where}
-         ORDER BY m.data_upload DESC
+         ORDER BY ${ordem}
          LIMIT ? OFFSET ?`,
         [...params, limit, offset]
       );
 
+      // O COUNT não tem a coluna do trecho — retira os dois parâmetros dele.
+      const paramsContagem = selectTrecho.startsWith("CASE") ? params.slice(2) : params;
       const [[{ total }]] = await db.query(
         `SELECT COUNT(*) as total FROM materiais m ${where}`,
-        params
+        paramsContagem
       );
 
       res.status(200).json({
-        materiais: materiais.map(({ tags_raw, ...m }) => ({
+        materiais: materiais.map(({ tags_raw, trecho, ...m }) => ({
           ...m,
           url_arquivo: paraUrlAbsoluto(m.url_arquivo),
           tags: tags_raw ? tags_raw.split(";").map(par => { const [nome, cor] = par.split("|"); return { nome, cor }; }) : [],
+          trecho: trecho ? `…${String(trecho).trim()}…` : null,
         })),
         pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
       });
@@ -143,7 +215,8 @@ module.exports = function registarRotasMateriais(app) {
     try {
       const materialId = parseInt(req.params.id, 10);
       const [resultado] = await db.query(
-        `SELECT m.id, m.titulo, m.cadeira, m.tipo, m.url_arquivo, m.data_upload, m.status, m.autor_id, u.nome AS autor
+        `SELECT m.id, m.titulo, m.cadeira, m.tipo, m.url_arquivo, m.data_upload, m.status, m.autor_id, u.nome AS autor,
+                m.visualizacoes, m.downloads, m.versao, m.formato_original
          FROM materiais m
          JOIN usuarios u ON m.autor_id = u.id
          WHERE m.status = 'aprovado' AND m.id = ?`,
@@ -192,7 +265,7 @@ module.exports = function registarRotasMateriais(app) {
 
       const materialId = parseInt(req.params.id, 10);
       const [resultado] = await db.query(
-        `SELECT m.id, m.titulo, m.cadeira, m.tipo, m.url_arquivo, m.resumo_texto, u.nome AS autor
+        `SELECT m.id, m.titulo, m.cadeira, m.tipo, m.url_arquivo, m.resumo_texto, m.texto_extraido, u.nome AS autor
          FROM materiais m
          JOIN usuarios u ON m.autor_id = u.id
          WHERE m.status = 'aprovado' AND m.id = ?`,
@@ -233,12 +306,15 @@ module.exports = function registarRotasMateriais(app) {
           return res.status(404).json({ erro: "Ficheiro PDF não encontrado no servidor." });
         }
 
-        let pdfText = "";
-        try {
-          pdfText = await extractPdfText(filePath);
-        } catch (pdfErro) {
-          console.error("Erro ao extrair texto do PDF:", pdfErro.message);
-          // Continua sem texto — Gemini usará título e disciplina
+        // Texto já indexado (services/indexacao.js) evita reextrair o PDF.
+        let pdfText = material.texto_extraido || "";
+        if (!pdfText) {
+          try {
+            pdfText = await extractPdfText(filePath);
+          } catch (pdfErro) {
+            console.error("Erro ao extrair texto do PDF:", pdfErro.message);
+            // Continua sem texto — Gemini usará título e disciplina
+          }
         }
 
         const trimmedText = pdfText.slice(0, 12000);
@@ -483,31 +559,23 @@ Pergunta do estudante: ${mensagem.trim()}`;
 
       const config = await getConfiguracoes();
 
-      const limiteBytes = (config.tamanho_maximo_mb || 100) * 1024 * 1024;
-      if (req.file.size > limiteBytes) {
-        limparFicheiroOrfao();
-        return res.status(400).json({ erro: `Ficheiro demasiado grande. Limite actual: ${config.tamanho_maximo_mb} MB.` });
-      }
-
-      // O Content-Type e a extensão vêm do cliente; o cabeçalho real do
-      // ficheiro é a única coisa que não controla. Um .exe renomeado para
-      // .pdf passa o fileFilter do multer, mas não passa aqui.
-      let assinaturaValida = false;
-      try {
-        assinaturaValida = validarFicheiroPorMime(req.file.path, req.file.mimetype);
-      } catch (erroLeitura) {
-        console.error("Erro ao ler cabeçalho do ficheiro:", erroLeitura.message);
-      }
-      if (!assinaturaValida) {
-        limparFicheiroOrfao();
-        return res.status(400).json({ erro: "O conteúdo do ficheiro não corresponde ao tipo indicado. Verifique que é um PDF ou vídeo válido." });
-      }
-
       const cursos = await getCursos();
       if (!cursos.some(c => c.nome === cadeira)) {
         limparFicheiroOrfao();
         return res.status(400).json({ erro: "Disciplina inválida." });
       }
+
+      let ficheiro;
+      try {
+        ficheiro = await prepararFicheiro(req.file, config, tipo);
+      } catch (erroFicheiro) {
+        limparFicheiroOrfao();
+        if (erroFicheiro.status) return res.status(erroFicheiro.status).json({ erro: erroFicheiro.message });
+        throw erroFicheiro;
+      }
+      // A partir daqui o ficheiro "do pedido" é o final (pode ser o PDF convertido)
+      req.file.path = ficheiro.caminho;
+      req.file.filename = ficheiro.nome;
 
       const { sinalizado, motivo } = await verificarConformidadeIA(config, { titulo, cadeira, tipo });
 
@@ -524,8 +592,8 @@ Pergunta do estudante: ${mensagem.trim()}`;
       const autor_id = req.utilizador.id;
       const url_arquivo = `/uploads/${req.file.filename}`;
       const [resultado] = await db.query(
-        "INSERT INTO materiais (titulo, cadeira, tipo, url_arquivo, autor_id, status, ia_sinalizado, ia_motivo) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        [titulo, cadeira, tipo, url_arquivo, autor_id, statusInicial, sinalizado, motivo]
+        "INSERT INTO materiais (titulo, cadeira, tipo, url_arquivo, autor_id, status, ia_sinalizado, ia_motivo, formato_original) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        [titulo, cadeira, tipo, url_arquivo, autor_id, statusInicial, sinalizado, motivo, ficheiro.formatoOriginal]
       );
 
       res.status(201).json({
@@ -537,11 +605,193 @@ Pergunta do estudante: ${mensagem.trim()}`;
       });
 
       atualizarReputacao(autor_id);
-      if (statusInicial === "aprovado") notificarSubscritores({ id: resultado.insertId, titulo, cadeira, tipo });
+      if (tipo === "PDF") indexarMaterial(resultado.insertId, url_arquivo);
+      if (statusInicial === "aprovado") notificarSubscritores({ id: resultado.insertId, titulo, cadeira, tipo, autor_id });
     } catch (erro) {
       limparFicheiroOrfao();
       console.error("Erro ao gravar material:", erro.message);
       res.status(500).json({ erro: "Erro ao gravar ficheiro na base de dados." });
+    }
+  });
+
+  /**
+   * @openapi
+   * /api/materiais/{id}/acesso:
+   *   post:
+   *     summary: Regista uma abertura ou download do material (uma por utilizador/material/tipo a cada 30 minutos)
+   *     tags: [Materiais]
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema: { type: integer }
+   *     requestBody:
+   *       content:
+   *         application/json:
+   *           schema: { type: object, properties: { tipo: { type: string, enum: [abertura, download] } } }
+   *     responses:
+   *       204: { description: Registado (ou ignorado por repetição) }
+   */
+  const acessosRecentes = new Map(); // "user:material:tipo" -> timestamp
+  const JANELA_ACESSO_MS = 30 * 60 * 1000;
+  setInterval(() => {
+    const agora = Date.now();
+    for (const [k, t] of acessosRecentes) if (agora - t > JANELA_ACESSO_MS) acessosRecentes.delete(k);
+  }, 10 * 60 * 1000).unref?.();
+
+  app.post("/api/materiais/:id/acesso", autenticar, limitarAvaliacoes, async (req, res) => {
+    try {
+      const materialId = parseInt(req.params.id, 10);
+      const tipo = req.body?.tipo === "download" ? "download" : "abertura";
+      if (!Number.isInteger(materialId)) return res.status(400).json({ erro: "ID inválido." });
+
+      const chave = `${req.utilizador.id}:${materialId}:${tipo}`;
+      const agora = Date.now();
+      if (agora - (acessosRecentes.get(chave) || 0) < JANELA_ACESSO_MS) return res.status(204).end();
+      acessosRecentes.set(chave, agora);
+
+      const coluna = tipo === "download" ? "downloads" : "visualizacoes";
+      const [r] = await db.query(`UPDATE materiais SET ${coluna} = ${coluna} + 1 WHERE id = ? AND status = 'aprovado'`, [materialId]);
+      if (r.affectedRows > 0) {
+        await db.query("INSERT INTO materiais_acessos (material_id, usuario_id, tipo) VALUES (?, ?, ?)", [materialId, req.utilizador.id, tipo]);
+      }
+      res.status(204).end();
+    } catch (erro) {
+      console.error("Erro ao registar acesso:", erro.message);
+      res.status(204).end();
+    }
+  });
+
+  /**
+   * @openapi
+   * /api/materiais/{id}/versoes:
+   *   get:
+   *     summary: Histórico de versões anteriores do material (ficheiros continuam descarregáveis)
+   *     tags: [Materiais]
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema: { type: integer }
+   *     responses:
+   *       200: { description: Versão actual e lista de anteriores }
+   *   post:
+   *     summary: Envia uma nova versão do ficheiro (só o autor ou um admin). Mantém avaliações e comentários; volta a passar pela moderação por IA.
+   *     tags: [Materiais]
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         multipart/form-data:
+   *           schema:
+   *             type: object
+   *             required: [arquivo]
+   *             properties:
+   *               arquivo: { type: string, format: binary }
+   *               notas: { type: string, maxLength: 500, description: O que mudou nesta versão }
+   *     responses:
+   *       200: { description: Nova versão gravada }
+   *       403: { description: Não é o autor nem admin }
+   */
+  app.get("/api/materiais/:id/versoes", autenticar, async (req, res) => {
+    try {
+      const materialId = parseInt(req.params.id, 10);
+      const [[material]] = await db.query("SELECT id, versao, url_arquivo, data_upload FROM materiais WHERE id = ?", [materialId]);
+      if (!material) return res.status(404).json({ erro: "Material não encontrado." });
+      const [versoes] = await db.query(
+        `SELECT v.id, v.versao, v.url_arquivo, v.notas, v.criado_em, u.nome AS autor
+         FROM versoes_materiais v LEFT JOIN usuarios u ON u.id = v.autor_id
+         WHERE v.material_id = ? ORDER BY v.versao DESC`,
+        [materialId]
+      );
+      res.json({
+        actual: { versao: material.versao, url_arquivo: paraUrlAbsoluto(material.url_arquivo), data: material.data_upload },
+        anteriores: versoes.map(v => ({ ...v, url_arquivo: paraUrlAbsoluto(v.url_arquivo) })),
+      });
+    } catch (erro) {
+      console.error("Erro ao listar versões:", erro.message);
+      res.status(500).json({ erro: "Erro ao listar versões." });
+    }
+  });
+
+  app.post("/api/materiais/:id/versoes", autenticar, upload.single("arquivo"), async (req, res) => {
+    const limparFicheiroOrfao = () => { if (req.file) fs.unlink(req.file.path, () => {}); };
+    try {
+      const materialId = parseInt(req.params.id, 10);
+      if (!req.file) return res.status(400).json({ erro: "Anexe o novo ficheiro." });
+      const notas = typeof req.body?.notas === "string" ? req.body.notas.trim().slice(0, 500) : null;
+
+      const [[material]] = await db.query(
+        "SELECT id, titulo, cadeira, tipo, url_arquivo, autor_id, status, versao FROM materiais WHERE id = ?",
+        [materialId]
+      );
+      if (!material) { limparFicheiroOrfao(); return res.status(404).json({ erro: "Material não encontrado." }); }
+      if (material.autor_id !== req.utilizador.id && req.utilizador.papel !== "admin") {
+        limparFicheiroOrfao();
+        return res.status(403).json({ erro: "Só o autor ou um administrador podem enviar uma nova versão." });
+      }
+
+      const config = await getConfiguracoes();
+      let ficheiro;
+      try {
+        ficheiro = await prepararFicheiro(req.file, config, material.tipo);
+      } catch (erroFicheiro) {
+        limparFicheiroOrfao();
+        if (erroFicheiro.status) return res.status(erroFicheiro.status).json({ erro: erroFicheiro.message });
+        throw erroFicheiro;
+      }
+
+      // Volta a passar pela moderação: uma versão nova é conteúdo novo.
+      const { sinalizado, motivo } = await verificarConformidadeIA(config, { titulo: material.titulo, cadeira: material.cadeira, tipo: material.tipo });
+      const passaAPendente = material.status === "aprovado" && !(config.moderacao_ia_activada && genAI && sinalizado === false);
+      const novoStatus = passaAPendente ? "pendente" : material.status;
+
+      const novaUrl = `/uploads/${ficheiro.nome}`;
+      await db.query(
+        "INSERT INTO versoes_materiais (material_id, versao, url_arquivo, notas, autor_id) VALUES (?, ?, ?, ?, ?)",
+        [materialId, material.versao, material.url_arquivo, null, material.autor_id]
+      );
+      await db.query(
+        `UPDATE materiais SET url_arquivo = ?, versao = versao + 1, status = ?, ia_sinalizado = ?, ia_motivo = ?,
+                              formato_original = ?, resumo_texto = NULL, resumo_gerado_em = NULL,
+                              texto_extraido = NULL, texto_indexado_em = NULL
+         WHERE id = ?`,
+        [novaUrl, novoStatus, sinalizado, motivo, ficheiro.formatoOriginal, materialId]
+      );
+      // As notas descrevem a versão NOVA — ficam na linha que a vai substituir
+      // quando houver outra; até lá vivem na resposta e no histórico via UPDATE.
+      if (notas) await db.query("UPDATE versoes_materiais SET notas = ? WHERE material_id = ? AND versao = ?", [`(substituída) ${notas}`, materialId, material.versao]);
+      // Quiz e resumo eram sobre o conteúdo antigo.
+      await db.query("DELETE FROM quizzes WHERE material_id = ?", [materialId]).catch(() => {});
+
+      // Só as últimas N versões ficam em disco.
+      const [antigas] = await db.query(
+        "SELECT id, url_arquivo FROM versoes_materiais WHERE material_id = ? ORDER BY versao DESC LIMIT 100 OFFSET ?",
+        [materialId, MAX_VERSOES_GUARDADAS]
+      );
+      for (const v of antigas) {
+        const nome = nomeSeguro(v.url_arquivo);
+        if (nome) fs.unlink(path.join(uploadsDir, nome), () => {});
+        await db.query("DELETE FROM versoes_materiais WHERE id = ?", [v.id]);
+      }
+
+      auditar(req.utilizador.id, "nova_versao_material", "materiais", materialId, `Versão ${material.versao + 1} de "${material.titulo}"${notas ? ` — ${notas}` : ""}`, req.ip);
+      if (material.tipo === "PDF") indexarMaterial(materialId, novaUrl);
+      if (passaAPendente) {
+        criarNotificacao(material.autor_id, { tipo: "moderacao", titulo: "Nova versão aguarda aprovação", mensagem: material.titulo, link: "/repositorio" });
+      }
+
+      res.json({
+        mensagem: passaAPendente
+          ? "Nova versão enviada. Fica invisível no repositório até um administrador a aprovar."
+          : "Nova versão publicada.",
+        versao: material.versao + 1,
+        status: novoStatus,
+        url_arquivo: paraUrlAbsoluto(novaUrl),
+      });
+    } catch (erro) {
+      limparFicheiroOrfao();
+      console.error("Erro ao enviar nova versão:", erro.message);
+      res.status(500).json({ erro: "Erro ao gravar a nova versão." });
     }
   });
 
@@ -682,6 +932,7 @@ Pergunta do estudante: ${mensagem.trim()}`;
       if (acao === "aprovar") {
         await db.query("UPDATE materiais SET status = 'aprovado' WHERE id = ?", [id]);
         auditar(req.utilizador.id, "aprovar_material", "materiais", material.id, `Aprovou "${material.titulo}"`, req.ip);
+        criarNotificacao(material.autor_id, { tipo: "moderacao", titulo: "O seu material foi aprovado", mensagem: material.titulo, link: `/video/${material.id}` });
         res.json({ mensagem: "Material aprovado com sucesso!" });
         // Só avisa os subscritores na primeira aprovação — reaprovar um
         // material já aprovado não deve repetir o email a toda a gente.
@@ -693,6 +944,7 @@ Pergunta do estudante: ${mensagem.trim()}`;
           fs.unlink(path.join(uploadsDir, fileName), () => {});
         }
         auditar(req.utilizador.id, "rejeitar_material", "materiais", material.id, `Rejeitou "${material.titulo}"`, req.ip);
+        criarNotificacao(material.autor_id, { tipo: "moderacao", titulo: "O seu material foi rejeitado", mensagem: material.titulo, link: "/repositorio" });
         res.json({ mensagem: "Material rejeitado e apagado." });
       }
       atualizarReputacao(material.autor_id);

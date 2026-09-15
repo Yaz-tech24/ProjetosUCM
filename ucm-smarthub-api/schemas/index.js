@@ -1,7 +1,7 @@
 const { z } = require("zod");
 
 const HEX_COLOR_REGEX = /^#[0-9a-fA-F]{6}$/;
-const TIPOS_FICHEIRO_VALIDOS = ["pdf", "mp4", "webm", "ogg", "mov"];
+const TIPOS_FICHEIRO_VALIDOS = ["pdf", "mp4", "webm", "ogg", "mov", "docx", "pptx", "doc", "ppt"];
 // Tecto técnico absoluto (multer + validação) — independente do limite
 // configurado pelo admin, que é sempre aplicado depois, no handler da rota.
 const TAMANHO_MAXIMO_TECTO_MB = 500;

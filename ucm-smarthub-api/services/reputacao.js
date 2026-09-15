@@ -2,6 +2,8 @@ const db = require("../config/db");
 
 const PONTOS_POR_MATERIAL_APROVADO = 10;
 const PONTOS_POR_ESTRELA_MEDIA = 5;
+const PONTOS_POR_QUIZ_PASSADO = 2;   // ≥ 70% num quiz, contado uma vez por quiz
+const PONTOS_POR_RESPOSTA_ACEITE = 5;
 
 function calcularEmblema({ aprovados, media }) {
   if (aprovados >= 5 && media >= 4.0) return "Confiável";
@@ -28,9 +30,19 @@ async function atualizarReputacao(usuarioId) {
       [usuarioId]
     );
 
+    const [[extras]] = await db.query(
+      `SELECT
+         (SELECT COUNT(DISTINCT quiz_id) FROM quiz_resultados WHERE usuario_id = ? AND pontuacao * 100 >= total * 70) AS quizzes,
+         (SELECT COUNT(*) FROM perguntas p JOIN respostas r ON r.id = p.resposta_aceite_id WHERE r.usuario_id = ?) AS respostas_aceites`,
+      [usuarioId, usuarioId]
+    );
+
     const aprovados = Number(stats.aprovados) || 0;
     const media = Number(stats.media) || 0;
-    const pontos = aprovados * PONTOS_POR_MATERIAL_APROVADO + Math.round(media * PONTOS_POR_ESTRELA_MEDIA);
+    const pontos = aprovados * PONTOS_POR_MATERIAL_APROVADO
+      + Math.round(media * PONTOS_POR_ESTRELA_MEDIA)
+      + (Number(extras?.quizzes) || 0) * PONTOS_POR_QUIZ_PASSADO
+      + (Number(extras?.respostas_aceites) || 0) * PONTOS_POR_RESPOSTA_ACEITE;
     const emblema = calcularEmblema({ aprovados, media });
 
     await db.query(

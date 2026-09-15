@@ -2,6 +2,7 @@ const db = require("../config/db");
 const { autenticar } = require("../middleware/auth");
 const { auditar } = require("../middleware/auditoria");
 const { limitarComentarios } = require("../middleware/rateLimiters");
+const { criarNotificacao } = require("../services/notificacoes");
 const { z } = require("zod");
 const validar = require("../middleware/validar");
 
@@ -19,7 +20,7 @@ module.exports = function registarRotasComentarios(app) {
 
       // Verificar que material existe
       const [[material]] = await db.query(
-        "SELECT id FROM materiais WHERE id = ? AND status = 'aprovado'",
+        "SELECT id, titulo, autor_id FROM materiais WHERE id = ? AND status = 'aprovado'",
         [materialId]
       );
       if (!material) {
@@ -32,6 +33,9 @@ module.exports = function registarRotasComentarios(app) {
       );
 
       auditar(usuarioId, "comentar_material", "materiais", materialId, "Adicionou um comentário", req.ip);
+      if (material.autor_id !== usuarioId) {
+        criarNotificacao(material.autor_id, { tipo: "comentario", titulo: `${req.utilizador.nome} comentou o seu material`, mensagem: `${material.titulo}: "${conteudo.slice(0, 120)}"`, link: `/video/${materialId}` });
+      }
 
       res.status(201).json({
         id: resultado.insertId,

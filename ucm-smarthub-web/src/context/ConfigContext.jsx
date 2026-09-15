@@ -32,6 +32,7 @@ const CONFIG_DEFEITO = {
 const ConfigContext = createContext({
   config: CONFIG_DEFEITO,
   cursos: [],
+  capacidades: { conversao_documentos: false },
   loading: true,
   refetchConfig: () => {},
 });
@@ -39,6 +40,7 @@ const ConfigContext = createContext({
 export const ConfigProvider = ({ children }) => {
   const [config, setConfig] = useState(CONFIG_DEFEITO);
   const [cursos, setCursos] = useState([]);
+  const [capacidades, setCapacidades] = useState({ conversao_documentos: false });
   const [loading, setLoading] = useState(true);
 
   const carregar = useCallback(async () => {
@@ -46,6 +48,7 @@ export const ConfigProvider = ({ children }) => {
       const res = await api.get("/config");
       setConfig({ ...CONFIG_DEFEITO, ...res.data.configuracoes });
       setCursos(res.data.cursos || []);
+      setCapacidades(res.data.capacidades || { conversao_documentos: false });
     } catch {
       // Falha de rede/API — mantém os defaults, a app continua utilizável
     } finally {
@@ -76,7 +79,7 @@ export const ConfigProvider = ({ children }) => {
   }, [config.logo_url]);
 
   return (
-    <ConfigContext.Provider value={{ config, cursos, loading, refetchConfig: carregar }}>
+    <ConfigContext.Provider value={{ config, cursos, capacidades, loading, refetchConfig: carregar }}>
       {children}
     </ConfigContext.Provider>
   );
