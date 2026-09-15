@@ -70,13 +70,13 @@ const Reputacao = ({ usuarioId }) => {
             <div className="flex flex-wrap items-center gap-4 rounded-2xl p-5 text-white"
               style={{ background: "linear-gradient(135deg,var(--color-navy-deep),var(--color-navy-mid))", boxShadow: "0 10px 30px rgba(var(--color-navy-deep-rgb),0.30)" }}>
               <Avatar nome={perfil.nome} url={perfil.avatar_url} tamanho={52} />
-              <div className="min-w-0 flex-1">
-                <p style={{ fontSize: 17, fontWeight: 900 }}>{perfil.nome}</p>
+              <div className="min-w-0 flex-1 basis-40">
+                <p className="truncate" style={{ fontSize: 17, fontWeight: 900 }}>{perfil.nome}</p>
                 <p style={{ fontSize: 12.5, opacity: 0.75 }}>
                   {perfil.emblema ? `Emblema: ${perfil.emblema}` : "Publique materiais de qualidade para ganhar um emblema"}
                 </p>
               </div>
-              <div className="text-right">
+              <div className="text-right ml-auto">
                 <p style={{ fontSize: 30, fontWeight: 900, color: "var(--color-gold)", lineHeight: 1 }}>{perfil.pontos}</p>
                 <p className="text-[10.5px] font-bold uppercase" style={{ letterSpacing: "0.12em", opacity: 0.7 }}>pontos · #{perfil.posicao}</p>
               </div>

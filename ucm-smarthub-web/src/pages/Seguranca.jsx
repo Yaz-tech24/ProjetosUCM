@@ -335,9 +335,9 @@ const Seguranca = ({ usuarioLogado, onUpdateUsuario }) => {
                   style={{ border: `1px solid ${s.actual ? "rgba(var(--color-gold-rgb),0.55)" : "var(--border-subtle)"}`, background: s.actual ? "rgba(var(--color-gold-rgb),0.07)" : "transparent" }}>
                   <MonitorSmartphone size={18} style={{ color: "var(--text-accent)" }} />
                   <div className="min-w-0 flex-1">
-                    <p style={{ fontSize: 14, fontWeight: 800, color: "var(--text-heading)" }}>
-                      {s.dispositivo || "Dispositivo desconhecido"}
-                      {s.actual && <span className="ml-2 rounded-full px-2 py-0.5 text-[10px] font-black uppercase" style={{ background: "rgba(var(--color-gold-rgb),0.2)", color: "var(--color-gold-dark)" }}>Esta sessão</span>}
+                    <p className="flex flex-wrap items-center gap-x-2 gap-y-1" style={{ fontSize: 14, fontWeight: 800, color: "var(--text-heading)" }}>
+                      <span>{s.dispositivo || "Dispositivo desconhecido"}</span>
+                      {s.actual && <span className="rounded-full px-2 py-0.5 text-[10px] font-black uppercase whitespace-nowrap" style={{ background: "rgba(var(--color-gold-rgb),0.2)", color: "var(--color-gold-dark)" }}>Esta sessão</span>}
                     </p>
                     <p style={{ fontSize: 12, color: "var(--text-faint)" }}>
                       IP {s.ip || "—"} · último uso {formatarQuando(s.ultimo_uso)} · iniciada {formatarQuando(s.criado_em)}

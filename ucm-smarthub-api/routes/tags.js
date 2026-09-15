@@ -14,7 +14,7 @@ module.exports = function registarRotasTags(app) {
   app.get("/api/tags", async (req, res) => {
     try {
       const [tags] = await db.query(
-        `SELECT id, nome, cor, COUNT(DISTINCT mt.material_id) as quantidade
+        `SELECT t.id, t.nome, t.cor, COUNT(DISTINCT mt.material_id) as quantidade
          FROM tags t
          LEFT JOIN materiais_tags mt ON t.id = mt.tag_id
          GROUP BY t.id

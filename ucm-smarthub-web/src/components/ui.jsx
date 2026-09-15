@@ -9,16 +9,17 @@ export const Cartao = ({ icon: Icon, titulo, subtitulo, accao, children }) => (
     className="rounded-[28px] p-7 animate-fade-in"
     style={{ background: "var(--surface-card)", border: "1px solid var(--border-subtle)", boxShadow: "0 4px 24px rgba(var(--color-navy-mid-rgb),0.06)" }}
   >
-    <div className="flex items-center gap-3 mb-6">
+    <div className="flex flex-wrap items-center gap-3 mb-6">
       <div className="w-11 h-11 rounded-2xl grid place-items-center shrink-0"
         style={{ background: "rgba(var(--color-navy-mid-rgb),0.07)", border: "1px solid var(--border-subtle-strong)" }}>
         <Icon size={19} style={{ color: "var(--text-accent)" }} />
       </div>
-      <div className="min-w-0 flex-1">
+      {/* basis-48: o título reserva ~12rem; se a acção não couber ao lado, desce para a linha seguinte */}
+      <div className="min-w-0 flex-1 basis-48">
         <h3 style={{ fontSize: 16, fontWeight: 900, color: "var(--text-heading)" }}>{titulo}</h3>
         {subtitulo && <p style={{ fontSize: 12.5, color: "var(--text-faint)" }}>{subtitulo}</p>}
       </div>
-      {accao && <div className="shrink-0">{accao}</div>}
+      {accao && <div className="shrink-0 ml-auto">{accao}</div>}
     </div>
     {children}
   </section>

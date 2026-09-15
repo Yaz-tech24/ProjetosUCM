@@ -476,7 +476,7 @@ const Admin = ({ usuarioLogado }) => {
         </section>
 
         {/* ═══ ABAS ════════════════════════════════════════════════ */}
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {[
             { key: 'materiais',    label: 'Fila de Aprovação', icon: Clock, badge: pendentes.length },
             { key: 'chat',         label: 'Moderação do Chat', icon: MessageCircle, badge: mensagens.length },

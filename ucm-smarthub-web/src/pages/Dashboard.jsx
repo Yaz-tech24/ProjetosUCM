@@ -20,11 +20,11 @@ const StatCard = ({ icon: Icon, label, value, iconBg, glow, delay }) => (
       animationDelay: delay,
     }}
   >
-    <div className="flex items-center justify-between">
-      <div className="w-11 h-11 rounded-2xl grid place-items-center" style={{ background: iconBg, boxShadow: glow }}>
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="w-11 h-11 rounded-2xl grid place-items-center shrink-0" style={{ background: iconBg, boxShadow: glow }}>
         <Icon size={20} style={{ color: "var(--color-gold)" }} />
       </div>
-      <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.28em", color: "rgba(var(--color-blue-sky-rgb),0.55)", textTransform: "uppercase" }}>
+      <span className="text-right" style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.18em", color: "rgba(var(--color-blue-sky-rgb),0.55)", textTransform: "uppercase" }}>
         {label}
       </span>
     </div>

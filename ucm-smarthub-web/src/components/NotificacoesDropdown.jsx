@@ -115,7 +115,7 @@ const NotificacoesDropdown = ({ navigate }) => {
       </button>
 
       {aberto && (
-        <div className="absolute right-0 top-14 z-50 w-[min(380px,calc(100vw-2rem))] rounded-[20px] overflow-hidden animate-scale-in"
+        <div className="fixed inset-x-4 top-36 sm:absolute sm:inset-x-auto sm:right-0 sm:top-14 z-50 sm:w-[380px] rounded-[20px] overflow-hidden animate-scale-in"
           style={{ background: "var(--surface-card)", border: "1px solid var(--border-subtle-strong)", boxShadow: "0 20px 60px rgba(var(--color-navy-mid-rgb),0.18)" }}>
           <div className="flex items-center justify-between px-5 py-4"
             style={{ borderBottom: "1px solid rgba(var(--color-navy-mid-rgb),0.07)", background: "linear-gradient(135deg,var(--color-navy-deep),var(--color-navy-mid))" }}>

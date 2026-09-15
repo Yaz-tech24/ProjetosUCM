@@ -89,7 +89,7 @@ const FilaDenuncias = ({ navigate, onToast, onContagem }) => {
                     {d.detalhes && <p className="mt-1" style={{ fontSize: 13, color: "var(--text-body)" }}>“{d.detalhes}”</p>}
                     {d.resolvida_por_nome && <p className="mt-1" style={{ fontSize: 11.5, color: "var(--text-faint)" }}>Fechada por {d.resolvida_por_nome} em {formatarData(d.resolvida_em)}</p>}
                   </div>
-                  <div className="flex flex-wrap gap-1.5 shrink-0">
+                  <div className="flex flex-wrap gap-1.5 w-full lg:w-auto lg:shrink-0">
                     {d.recurso.link && d.recurso.existe && (
                       <BotaoSecundario type="button" onClick={() => navigate(d.recurso.link)} className="!px-3 !py-2 text-xs"><ExternalLink size={14} /> Ver</BotaoSecundario>
                     )}

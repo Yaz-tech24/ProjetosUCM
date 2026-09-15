@@ -10,8 +10,19 @@ import { useConfig } from "../context/ConfigContext";
 import Toast from "../components/Toast";
 import { Etiqueta } from "../components/TagsMaterial";
 
+/* Realça o termo pesquisado dentro do trecho devolvido pelo servidor */
+const Trecho = ({ texto, termo }) => {
+  const palavra = (termo || "").trim().split(/\s+/)[0];
+  if (!palavra) return texto;
+  const escapada = palavra.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const partes = texto.split(new RegExp(`(${escapada})`, "ig"));
+  return partes.map((p, i) => (p.toLowerCase() === palavra.toLowerCase()
+    ? <mark key={i} style={{ background: "rgba(var(--color-gold-rgb),0.35)", color: "inherit", borderRadius: 3, padding: "0 2px" }}>{p}</mark>
+    : p));
+};
+
 /* Card de material com botão de favorito e (para o autor ou um admin) de remover */
-const MaterialCard = ({ m, onClick, favs, onToggleFav, podeRemover, onRemover }) => {
+const MaterialCard = ({ m, onClick, favs, onToggleFav, podeRemover, onRemover, termo }) => {
   const isFav = favs.includes(m.id);
   return (
     <article
@@ -97,9 +108,10 @@ const MaterialCard = ({ m, onClick, favs, onToggleFav, podeRemover, onRemover })
           </div>
         )}
         {m.trecho && (
-          <p className="mb-3 rounded-xl px-3 py-2" style={{ fontSize: 12.5, lineHeight: 1.5, background: "rgba(var(--color-gold-rgb),0.10)", border: "1px solid rgba(var(--color-gold-rgb),0.30)", color: "var(--text-body)" }}>
-            <span className="text-[10px] font-bold uppercase mr-1.5" style={{ letterSpacing: "0.1em", color: "var(--color-gold-dark)" }}>No conteúdo</span>{m.trecho}
-          </p>
+          <div className="mb-3 rounded-xl px-3 py-2" style={{ background: "rgba(var(--color-gold-rgb),0.10)", border: "1px solid rgba(var(--color-gold-rgb),0.30)" }}>
+            <span className="block text-[10px] font-bold uppercase mb-0.5" style={{ letterSpacing: "0.1em", color: "var(--color-gold-dark)" }}>No conteúdo</span>
+            <p className="line-clamp-3" style={{ fontSize: 12.5, lineHeight: 1.5, color: "var(--text-body)" }}><Trecho texto={m.trecho} termo={termo} /></p>
+          </div>
         )}
         <p style={{ fontSize: 13, color: "var(--text-faint)", marginBottom: 20 }}>
           {m.autor} · {new Date(m.data_upload).toLocaleDateString("pt-PT")}
@@ -394,7 +406,7 @@ const Repositorio = ({ usuarioLogado }) => {
             <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2" size={17} style={{ color: "var(--text-faint)" }} />
             <input
               type="text"
-              placeholder="Buscar por título..."
+              placeholder="Pesquisar por título ou dentro dos PDFs…"
               value={buscaTermo}
               onChange={e => setBuscaTermo(e.target.value)}
               className="w-full rounded-2xl py-3.5 pl-12 pr-4 text-sm outline-none transition-all duration-200"
@@ -494,6 +506,7 @@ const Repositorio = ({ usuarioLogado }) => {
                 key={m.id}
                 m={m}
                 favs={favs}
+                termo={debouncedBusca}
                 onToggleFav={handleToggleFav}
                 onClick={() => navigate(`/video/${m.id}`)}
                 podeRemover={podeRemover(m)}
