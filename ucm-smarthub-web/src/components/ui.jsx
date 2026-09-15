@@ -24,6 +24,24 @@ export const Cartao = ({ icon: Icon, titulo, subtitulo, accao, children }) => (
   </section>
 );
 
+/* Dentro de um painel com separadores, o cartão completo (ícone + título)
+   repetiria o rótulo do separador — fica só a linha de subtítulo/acção. */
+export const CartaoOuSeccao = ({ embutido, icon, titulo, subtitulo, accao, children }) => (
+  embutido ? (
+    <div>
+      {(subtitulo || accao) && (
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+          <p style={{ fontSize: 13, color: "var(--text-faint)" }}>{subtitulo}</p>
+          {accao && <div className="shrink-0">{accao}</div>}
+        </div>
+      )}
+      {children}
+    </div>
+  ) : (
+    <Cartao icon={icon} titulo={titulo} subtitulo={subtitulo} accao={accao}>{children}</Cartao>
+  )
+);
+
 export const Campo = ({ label, icon, hint, ...props }) => (
   <label className="block">
     <span className="block mb-2 text-xs font-bold uppercase" style={{ letterSpacing: "0.10em", color: "var(--text-muted)" }}>{label}</span>

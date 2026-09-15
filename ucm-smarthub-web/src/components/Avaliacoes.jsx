@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { Star, Trash2, MessageSquareQuote } from "lucide-react";
 import api from "../services/api";
 import Toast from "./Toast";
-import { Cartao, BotaoPrimario, BotaoSecundario, Vazio, Spinner, Avatar, formatarData } from "./ui";
+import { CartaoOuSeccao, BotaoPrimario, BotaoSecundario, Vazio, Spinner, Avatar, formatarData } from "./ui";
 
 const Estrelas = ({ valor, onChange, tamanho = 22, interactivo = false, hover, setHover }) => (
   <div className="inline-flex items-center gap-1" role={interactivo ? "radiogroup" : undefined} aria-label={interactivo ? "Nota" : `${valor} em 5 estrelas`}>
@@ -27,7 +27,7 @@ const Estrelas = ({ valor, onChange, tamanho = 22, interactivo = false, hover, s
   </div>
 );
 
-const Avaliacoes = ({ materialId, usuarioId }) => {
+const Avaliacoes = ({ materialId, usuarioId, embutido = false }) => {
   const [avaliacoes, setAvaliacoes] = useState([]);
   const [estatisticas, setEstatisticas] = useState({ media: 0, total: 0, totalPages: 1 });
   const [pagina, setPagina] = useState(1);
@@ -102,7 +102,8 @@ const Avaliacoes = ({ materialId, usuarioId }) => {
   return (
     <>
       <Toast message={toast.message} type={toast.type} onClose={() => setToast({ message: "", type: "" })} />
-      <Cartao
+      <CartaoOuSeccao
+        embutido={embutido}
         icon={Star}
         titulo="Avaliações"
         subtitulo={estatisticas.total > 0 ? `${estatisticas.total} avaliação${estatisticas.total > 1 ? "ões" : ""}` : "Seja o primeiro a avaliar este material"}
@@ -171,7 +172,7 @@ const Avaliacoes = ({ materialId, usuarioId }) => {
             <BotaoSecundario type="button" onClick={() => carregar(pagina + 1)}>Carregar mais</BotaoSecundario>
           </div>
         )}
-      </Cartao>
+      </CartaoOuSeccao>
     </>
   );
 };

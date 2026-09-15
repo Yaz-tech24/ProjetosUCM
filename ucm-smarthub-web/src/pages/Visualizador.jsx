@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import api from "../services/api";
 import useFavoritos from "../hooks/useFavoritos";
-import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, ExternalLink, DownloadCloud, Sparkles, RotateCcw, Heart, Share2, Trash2, Send, MessageCircle, Eye, WifiOff, CloudDownload, CloudOff } from "lucide-react";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { ArrowLeft, ExternalLink, DownloadCloud, Sparkles, RotateCcw, Heart, Share2, Trash2, Send, MessageCircle, Eye, WifiOff, CloudDownload, CloudOff, Star, BrainCircuit, History } from "lucide-react";
 import { useConfig } from "../context/ConfigContext";
 import Toast from "../components/Toast";
 import Avaliacoes from "../components/Avaliacoes";
@@ -102,6 +102,8 @@ const Visualizador = ({ usuarioLogado }) => {
   const [aGuardarOffline, setAGuardarOffline] = useState(false);
   const [urlLocal,       setUrlLocal]       = useState(null);    // blob URL do PDF em cache
   const [semRede,        setSemRede]        = useState(false);   // a mostrar a cópia offline
+  const [searchParams]   = useSearchParams();
+  const [separador,      setSeparador]      = useState(() => searchParams.get('sep') || 'avaliacoes');
 
   const summaryAbortRef = useRef(null);
   const chatEndRef      = useRef(null);
@@ -322,7 +324,7 @@ const Visualizador = ({ usuarioLogado }) => {
   return (
     <>
     <Toast message={toast.message} type={toast.type} onClose={() => setToast({ message: '', type: '' })} />
-    <div className="animate-fade-in h-full flex flex-col xl:flex-row gap-7">
+    <div className="animate-fade-in h-full flex flex-col xl:flex-row gap-7 pb-24 xl:pb-0">
 
       {/* ─── Coluna esquerda ─── */}
       <div className="flex-1 space-y-6">
@@ -339,7 +341,7 @@ const Visualizador = ({ usuarioLogado }) => {
             <ArrowLeft size={17} /> Voltar
           </button>
 
-          <div className="flex items-center gap-2 ml-auto">
+          <div className="flex items-center gap-2 ml-auto flex-wrap justify-end">
             {/* Favorito */}
             <button
               onClick={handleToggleFav}
@@ -351,7 +353,7 @@ const Visualizador = ({ usuarioLogado }) => {
               title={fav ? "Remover dos favoritos" : "Adicionar aos favoritos"}
             >
               <Heart size={16} fill={fav ? "#dc2626" : "none"} />
-              {fav ? "Guardado" : "Guardar"}
+              <span className="hidden sm:inline xl:hidden 2xl:inline">{fav ? "Guardado" : "Guardar"}</span>
             </button>
 
             {!semRede && (
@@ -374,7 +376,7 @@ const Visualizador = ({ usuarioLogado }) => {
                 title={offline ? "Remover a cópia offline" : "Guardar para ler sem internet"}
               >
                 {offline ? <CloudOff size={16} /> : <CloudDownload size={16} />}
-                {aGuardarOffline ? "A guardar…" : offline ? "Offline ✓" : "Offline"}
+                <span className="hidden sm:inline xl:hidden 2xl:inline">{aGuardarOffline ? "A guardar…" : offline ? "Offline ✓" : "Offline"}</span>
               </button>
             )}
 
@@ -385,7 +387,7 @@ const Visualizador = ({ usuarioLogado }) => {
               style={{ background: "var(--surface-card)", border: "1.5px solid var(--border-subtle-strong)", color: "var(--text-muted)", boxShadow: "0 2px 10px rgba(var(--color-navy-mid-rgb),0.06)" }}
             >
               <Share2 size={16} />
-              {copiado ? "Copiado!" : "Partilhar"}
+              <span className="hidden sm:inline xl:hidden 2xl:inline">{copiado ? "Copiado!" : "Partilhar"}</span>
             </button>
 
             {/* Download (apenas PDF) */}
@@ -401,7 +403,7 @@ const Visualizador = ({ usuarioLogado }) => {
                 onMouseEnter={e => (e.currentTarget.style.transform = "translateY(-1px)", e.currentTarget.style.boxShadow = "0 6px 22px rgba(var(--color-gold-rgb),0.60)")}
                 onMouseLeave={e => (e.currentTarget.style.transform = "", e.currentTarget.style.boxShadow = "0 4px 16px rgba(var(--color-gold-rgb),0.40)")}
               >
-                <DownloadCloud size={16} /> Download PDF
+                <DownloadCloud size={16} /><span className="sm:hidden xl:inline 2xl:hidden">PDF</span><span className="hidden sm:inline xl:hidden 2xl:inline">Download PDF</span>
               </a>
             )}
 
@@ -413,7 +415,7 @@ const Visualizador = ({ usuarioLogado }) => {
                 style={{ background: "rgba(239,68,68,0.09)", border: "1.5px solid rgba(239,68,68,0.28)", color: "#dc2626" }}
                 title="Remover material"
               >
-                <Trash2 size={16} /> Remover
+                <Trash2 size={16} /><span className="hidden sm:inline xl:hidden 2xl:inline">Remover</span>
               </button>
             )}
           </div>
@@ -495,6 +497,55 @@ const Visualizador = ({ usuarioLogado }) => {
             )}
           </div>
         </div>
+
+        {/* Avaliações, comentários, quiz e versões num só painel com separadores — só com ligação */}
+        {!semRede && (() => {
+          const mostrarToast = (m, t = "success") => setToast({ message: m, type: t });
+          const separadores = [
+            { key: 'avaliacoes', label: 'Avaliações', icon: Star },
+            { key: 'comentarios', label: 'Comentários', icon: MessageCircle },
+            ...(config.ia_activada && isPDF ? [{ key: 'quiz', label: 'Quiz', icon: BrainCircuit }] : []),
+            ...(podeRemover || material.versao > 1 ? [{ key: 'versoes', label: material.versao > 1 ? `Versões (v${material.versao})` : 'Versões', icon: History }] : []),
+          ];
+          const activo = separadores.some(s => s.key === separador) ? separador : 'avaliacoes';
+          return (
+            <section className="rounded-[28px] overflow-hidden" style={{ background: "var(--surface-card)", border: "1px solid var(--border-subtle)", boxShadow: "0 4px 28px rgba(var(--color-navy-mid-rgb),0.07)" }}>
+              <div role="tablist" aria-label="Secções do material" className="flex gap-1 p-2 overflow-x-auto" style={{ borderBottom: "1px solid var(--border-subtle)" }}>
+                {separadores.map(({ key, label, icon: Icon }) => (
+                  <button
+                    key={key}
+                    role="tab"
+                    aria-selected={activo === key}
+                    onClick={() => setSeparador(key)}
+                    className="inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-bold whitespace-nowrap transition-all duration-200"
+                    style={activo === key
+                      ? { background: "linear-gradient(135deg,var(--color-navy-deep),var(--color-navy-mid))", color: "#fff", boxShadow: "0 4px 14px rgba(var(--color-navy-deep-rgb),0.28)" }
+                      : { color: "var(--text-muted)" }}
+                    onMouseEnter={e => activo !== key && (e.currentTarget.style.background = "var(--surface-hover)")}
+                    onMouseLeave={e => activo !== key && (e.currentTarget.style.background = "")}
+                  >
+                    <Icon size={15} /> {label}
+                  </button>
+                ))}
+              </div>
+              <div role="tabpanel" className="p-5 sm:p-7">
+                {activo === 'avaliacoes' && <Avaliacoes embutido materialId={material.id} usuarioId={usuarioLogado?.id} />}
+                {activo === 'comentarios' && <Comentarios embutido materialId={material.id} usuarioId={usuarioLogado?.id} ehAdmin={usuarioLogado?.papel === 'admin'} />}
+                {activo === 'quiz' && <Quiz embutido materialId={material.id} tipo={material.tipo} onToast={mostrarToast} />}
+                {activo === 'versoes' && (
+                  <VersoesMaterial
+                    embutido
+                    material={material}
+                    podeEditar={podeRemover}
+                    aceitaFicheiros={material.tipo === 'PDF' ? (config.tipos_ficheiro_permitidos?.includes('docx') || config.tipos_ficheiro_permitidos?.includes('pptx') ? '.pdf,.docx,.pptx,.doc,.ppt' : '.pdf') : 'video/*'}
+                    onToast={mostrarToast}
+                    onAtualizado={(d) => setMaterial(m => ({ ...m, versao: d.versao, url_arquivo: d.url_arquivo }))}
+                  />
+                )}
+              </div>
+            </section>
+          );
+        })()}
       </div>
 
       {/* ─── Coluna direita: resumo IA ─── */}
@@ -640,22 +691,6 @@ const Visualizador = ({ usuarioLogado }) => {
             </p>
           </div>
         </div>
-
-        {/* Quiz, versões, avaliações e comentários — só com ligação */}
-        {!semRede && (
-          <>
-            {config.ia_activada && <Quiz materialId={material.id} tipo={material.tipo} onToast={(m, t = "success") => setToast({ message: m, type: t })} />}
-            <VersoesMaterial
-              material={material}
-              podeEditar={podeRemover}
-              aceitaFicheiros={material.tipo === 'PDF' ? (config.tipos_ficheiro_permitidos?.includes('docx') || config.tipos_ficheiro_permitidos?.includes('pptx') ? '.pdf,.docx,.pptx,.doc,.ppt' : '.pdf') : 'video/*'}
-              onToast={(m, t = "success") => setToast({ message: m, type: t })}
-              onAtualizado={(d) => setMaterial(m => ({ ...m, versao: d.versao, url_arquivo: d.url_arquivo }))}
-            />
-            <Avaliacoes materialId={material.id} usuarioId={usuarioLogado?.id} />
-            <Comentarios materialId={material.id} usuarioId={usuarioLogado?.id} ehAdmin={usuarioLogado?.papel === 'admin'} />
-          </>
-        )}
       </div>
     </div>
 

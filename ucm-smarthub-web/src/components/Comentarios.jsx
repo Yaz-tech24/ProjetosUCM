@@ -4,11 +4,11 @@ import api from "../services/api";
 import Toast from "./Toast";
 import ConfirmModal from "./ConfirmModal";
 import BotaoReportar from "./Reportar";
-import { Cartao, BotaoPrimario, BotaoSecundario, Vazio, Spinner, Avatar, formatarData } from "./ui";
+import { CartaoOuSeccao, BotaoPrimario, BotaoSecundario, Vazio, Spinner, Avatar, formatarData } from "./ui";
 
 const LIMITE = 1000;
 
-const Comentarios = ({ materialId, usuarioId, ehAdmin = false }) => {
+const Comentarios = ({ materialId, usuarioId, ehAdmin = false, embutido = false }) => {
   const [comentarios, setComentarios] = useState([]);
   const [paginacao, setPaginacao] = useState({ page: 1, totalPages: 1, total: 0 });
   const [novo, setNovo] = useState("");
@@ -67,7 +67,7 @@ const Comentarios = ({ materialId, usuarioId, ehAdmin = false }) => {
       <Toast message={toast.message} type={toast.type} onClose={() => setToast({ message: "", type: "" })} />
       <ConfirmModal message={confirmar.message} onConfirm={confirmarRemocao} onCancel={() => setConfirmar({ message: "", id: null })} />
 
-      <Cartao icon={MessageCircle} titulo="Comentários" subtitulo={paginacao.total > 0 ? `${paginacao.total} comentário${paginacao.total > 1 ? "s" : ""}` : "Partilhe dúvidas ou notas sobre este material"}>
+      <CartaoOuSeccao embutido={embutido} icon={MessageCircle} titulo="Comentários" subtitulo={paginacao.total > 0 ? `${paginacao.total} comentário${paginacao.total > 1 ? "s" : ""}` : "Partilhe dúvidas ou notas sobre este material"}>
         {usuarioId && (
           <form onSubmit={enviar} className="mb-6">
             <textarea
@@ -133,7 +133,7 @@ const Comentarios = ({ materialId, usuarioId, ehAdmin = false }) => {
             <BotaoSecundario type="button" onClick={() => carregar(paginacao.page + 1)}>Carregar mais</BotaoSecundario>
           </div>
         )}
-      </Cartao>
+      </CartaoOuSeccao>
     </>
   );
 };

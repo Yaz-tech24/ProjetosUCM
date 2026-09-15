@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { History, Upload, Download, FileUp } from "lucide-react";
 import api from "../services/api";
-import { Cartao, BotaoPrimario, BotaoSecundario, Spinner, Etiqueta, formatarData } from "./ui";
+import { CartaoOuSeccao, BotaoPrimario, BotaoSecundario, Spinner, Etiqueta, formatarData } from "./ui";
 
 // Histórico de versões do ficheiro; o autor (ou um admin) pode enviar uma
 // versão nova sem perder avaliações e comentários.
-const VersoesMaterial = ({ material, podeEditar, aceitaFicheiros, onToast, onAtualizado }) => {
+const VersoesMaterial = ({ material, podeEditar, aceitaFicheiros, onToast, onAtualizado, embutido = false }) => {
   const [dados, setDados] = useState(null);
   const [aCarregar, setACarregar] = useState(true);
   const [aEnviar, setAEnviar] = useState(false);
@@ -52,10 +52,11 @@ const VersoesMaterial = ({ material, podeEditar, aceitaFicheiros, onToast, onAtu
   if (!podeEditar && anteriores.length === 0) return null;
 
   return (
-    <Cartao
+    <CartaoOuSeccao
+      embutido={embutido}
       icon={History}
       titulo={`Versão ${dados?.actual?.versao || material.versao || 1}`}
-      subtitulo={anteriores.length > 0 ? `${anteriores.length} versão${anteriores.length > 1 ? "ões" : ""} anterior${anteriores.length > 1 ? "es" : ""} disponível${anteriores.length > 1 ? "eis" : ""}` : "Primeira versão deste material"}
+      subtitulo={`${embutido ? `Versão actual: ${dados?.actual?.versao || material.versao || 1} · ` : ""}${anteriores.length > 0 ? `${anteriores.length} versão${anteriores.length > 1 ? "ões" : ""} anterior${anteriores.length > 1 ? "es" : ""} disponível${anteriores.length > 1 ? "eis" : ""}` : "primeira versão deste material"}`}
       accao={podeEditar && !formAberto && (
         <BotaoSecundario type="button" onClick={() => setFormAberto(true)}><Upload size={15} /> Nova versão</BotaoSecundario>
       )}
@@ -103,7 +104,7 @@ const VersoesMaterial = ({ material, podeEditar, aceitaFicheiros, onToast, onAtu
           ))}
         </ul>
       )}
-    </Cartao>
+    </CartaoOuSeccao>
   );
 };
 

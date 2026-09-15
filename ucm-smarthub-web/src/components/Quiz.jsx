@@ -1,11 +1,11 @@
 import React, { useState } from "react";
 import { BrainCircuit, CheckCircle2, XCircle, RotateCcw, Sparkles, Trophy } from "lucide-react";
 import api from "../services/api";
-import { Cartao, BotaoPrimario, BotaoSecundario, Spinner } from "./ui";
+import { CartaoOuSeccao, BotaoPrimario, BotaoSecundario, Spinner } from "./ui";
 
 // Quiz de escolha múltipla gerado por IA a partir do PDF. Só é pedido ao
 // servidor quando o utilizador quer — gerar custa uma chamada ao Gemini.
-const Quiz = ({ materialId, tipo, onToast }) => {
+const Quiz = ({ materialId, tipo, onToast, embutido = false }) => {
   const [estado, setEstado] = useState("inicio"); // inicio | a-carregar | a-responder | corrigido | erro
   const [quiz, setQuiz] = useState(null);
   const [respostas, setRespostas] = useState([]);
@@ -45,7 +45,8 @@ const Quiz = ({ materialId, tipo, onToast }) => {
   if (tipo !== "PDF") return null;
 
   return (
-    <Cartao
+    <CartaoOuSeccao
+      embutido={embutido}
       icon={BrainCircuit}
       titulo="Testar conhecimentos"
       subtitulo="10 perguntas de escolha múltipla geradas por IA a partir deste documento"
@@ -135,7 +136,7 @@ const Quiz = ({ materialId, tipo, onToast }) => {
           </div>
         </div>
       )}
-    </Cartao>
+    </CartaoOuSeccao>
   );
 };
 

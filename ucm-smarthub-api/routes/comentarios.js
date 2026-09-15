@@ -34,7 +34,7 @@ module.exports = function registarRotasComentarios(app) {
 
       auditar(usuarioId, "comentar_material", "materiais", materialId, "Adicionou um comentário", req.ip);
       if (material.autor_id !== usuarioId) {
-        criarNotificacao(material.autor_id, { tipo: "comentario", titulo: `${req.utilizador.nome} comentou o seu material`, mensagem: `${material.titulo}: "${conteudo.slice(0, 120)}"`, link: `/video/${materialId}` });
+        criarNotificacao(material.autor_id, { tipo: "comentario", titulo: `${req.utilizador.nome} comentou o seu material`, mensagem: `${material.titulo}: "${conteudo.slice(0, 120)}"`, link: `/video/${materialId}?sep=comentarios` });
       }
 
       res.status(201).json({

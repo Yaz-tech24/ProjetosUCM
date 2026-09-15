@@ -70,7 +70,7 @@ const GuardarEmColecao = ({ materialId, onToast, estiloBotao, className }) => {
   return (
     <div className="relative" ref={ref}>
       <button type="button" onClick={abrir} className={className} style={estiloBotao} title="Guardar numa colecção" aria-expanded={aberto}>
-        <FolderPlus size={16} /> Colecção{contem.size > 0 ? ` (${contem.size})` : ""}
+        <FolderPlus size={16} /><span className="hidden sm:inline xl:hidden 2xl:inline">Colecção{contem.size > 0 ? ` (${contem.size})` : ""}</span>
       </button>
       {aberto && (
         <div className="absolute left-0 top-12 z-40 w-[min(300px,calc(100vw-2rem))] rounded-[20px] p-2 animate-scale-in"
