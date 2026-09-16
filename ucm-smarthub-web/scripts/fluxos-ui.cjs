@@ -147,8 +147,10 @@ async function localizarChrome() {
       await page.evaluate(() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true, bubbles: true })));
       await page.waitForSelector('[role="dialog"][aria-label="Pesquisa global"]', { timeout: 10000 });
       ok(true, "Ctrl+K abre a paleta");
+      await page.waitForSelector('[role="dialog"] input', { timeout: 5000 });
       await page.keyboard.press("Escape");
       await page.waitForSelector('[role="dialog"][aria-label="Pesquisa global"]', { state: "detached", timeout: 5000 });
+      ok(true, "Esc fecha a paleta");
       await page.click('button[aria-label="Pesquisar (Ctrl+K)"]');
       await page.waitForSelector('[role="dialog"][aria-label="Pesquisa global"]', { timeout: 10000 });
       ok(true, "o botão de pesquisa do cabeçalho também abre a paleta");

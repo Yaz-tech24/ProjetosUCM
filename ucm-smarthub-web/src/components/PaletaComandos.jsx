@@ -22,7 +22,7 @@ const PAGINAS_ADMIN = [
   { label: "Analytics", path: "/analytics", icon: BarChart3 },
 ];
 
-const normalizar = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+const normalizar = (s) => String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
 const PaletaComandos = ({ aberta, onFechar, navigate, ehAdmin }) => {
   const [q, setQ] = useState("");
@@ -35,6 +35,16 @@ const PaletaComandos = ({ aberta, onFechar, navigate, ehAdmin }) => {
   useEffect(() => {
     if (aberta) { setQ(""); setResultados(null); setIndice(0); setTimeout(() => inputRef.current?.focus(), 30); }
   }, [aberta]);
+
+  /* Esc fecha a paleta seja qual for o elemento com foco — o onKeyDown do
+     input só apanha a tecla depois de o foco lá chegar (num render lento, o
+     Esc carregado logo a seguir a abrir ficava sem efeito). */
+  useEffect(() => {
+    if (!aberta) return;
+    const handler = (e) => { if (e.key === "Escape") { e.preventDefault(); onFechar(); } };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [aberta, onFechar]);
 
   useEffect(() => {
     if (!aberta) return;
@@ -91,7 +101,7 @@ const PaletaComandos = ({ aberta, onFechar, navigate, ehAdmin }) => {
       if (itens[indice]) abrir(itens[indice]);
       else if (q.trim()) { onFechar(); navigate(`/repositorio?q=${encodeURIComponent(q.trim())}`); }
     }
-    else if (e.key === "Escape") onFechar();
+    // Escape: tratado pelo listener global acima.
   };
 
   let grupoAnterior = null;

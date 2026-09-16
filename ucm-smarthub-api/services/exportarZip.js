@@ -11,7 +11,7 @@ const NOME_MAX = 80;
 
 const nomeFicheiroSeguro = (titulo) =>
   String(titulo || "material")
-    .normalize("NFKD").replace(/[̀-ͯ]/g, "")     // remove acentos
+    .normalize("NFKD").replace(/[\u0300-\u036f]/g, "")     // remove acentos
     .replace(/[^a-zA-Z0-9 _.-]+/g, " ")
     .replace(/\s+/g, " ").trim().slice(0, NOME_MAX) || "material";
 
