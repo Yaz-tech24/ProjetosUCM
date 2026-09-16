@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { FolderOpen, FolderPlus, Globe, Lock, Share2, Trash2, Pencil, FileText, PlayCircle, X, ArrowLeft, Check, WifiOff, CloudOff } from "lucide-react";
+import { FolderOpen, FolderPlus, Globe, Lock, Share2, Trash2, Pencil, FileText, PlayCircle, X, ArrowLeft, Check, WifiOff, CloudOff, FileArchive } from "lucide-react";
 import api from "../services/api";
 import Toast from "../components/Toast";
 import ConfirmModal from "../components/ConfirmModal";
@@ -146,6 +146,7 @@ const VerColecao = ({ slug, onToast }) => {
   const [aEditar, setAEditar] = useState(false);
   const [form, setForm] = useState({ nome: "", descricao: "", publica: false });
   const [copiado, setCopiado] = useState(false);
+  const [aExportar, setAExportar] = useState(false);
 
   const carregar = useCallback(async () => {
     setACarregar(true);
@@ -182,6 +183,33 @@ const VerColecao = ({ slug, onToast }) => {
     }
   };
 
+  /* ZIP com os PDFs: pedido autenticado (cookie) em blob e download local —
+     um <a href> directo não levava a sessão em desenvolvimento (origens
+     diferentes) e não permitia mostrar o estado "a preparar". */
+  const exportarZip = async () => {
+    setAExportar(true);
+    try {
+      const res = await api.get(`/colecoes/${slug}/zip`, { responseType: "blob", timeout: 10 * 60 * 1000 });
+      const url = URL.createObjectURL(res.data);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${(colecao?.nome || "colecao").replace(/[^\w\s.-]+/g, " ").trim()}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      onToast("ZIP pronto — a transferir.");
+    } catch (err) {
+      let mensagem = "Não foi possível exportar a colecção.";
+      if (err.response?.data instanceof Blob) {
+        try { mensagem = JSON.parse(await err.response.data.text()).erro || mensagem; } catch { /* corpo não-JSON */ }
+      } else if (err.response?.data?.erro) mensagem = err.response.data.erro;
+      onToast(mensagem, "error");
+    } finally {
+      setAExportar(false);
+    }
+  };
+
   const partilhar = async () => {
     const url = `${window.location.origin}/colecoes/${slug}`;
     try { await navigator.clipboard.writeText(url); setCopiado(true); setTimeout(() => setCopiado(false), 2000); }
@@ -207,6 +235,11 @@ const VerColecao = ({ slug, onToast }) => {
           <div className="flex flex-wrap gap-2">
             <BotaoSecundario type="button" onClick={() => navigate("/colecoes")}><ArrowLeft size={15} /> Voltar</BotaoSecundario>
             {colecao.publica && <BotaoSecundario type="button" onClick={partilhar}>{copiado ? <Check size={15} /> : <Share2 size={15} />} {copiado ? "Link copiado" : "Partilhar"}</BotaoSecundario>}
+            {colecao.materiais.some(m => m.tipo === "PDF") && (
+              <BotaoSecundario type="button" onClick={exportarZip} disabled={aExportar} title="Descarregar todos os PDFs num único ficheiro .zip">
+                <FileArchive size={15} /> {aExportar ? "A preparar…" : "ZIP"}
+              </BotaoSecundario>
+            )}
             {colecao.minha && <BotaoSecundario type="button" onClick={() => setAEditar(v => !v)}><Pencil size={15} /> Editar</BotaoSecundario>}
           </div>
         )}

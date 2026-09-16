@@ -35,6 +35,7 @@ async function notificarVarios(usuarioIds, dados) {
 // notificação in-app sempre; email só se houver SMTP. O autor não é avisado
 // aqui — já recebe o email de moderação.
 async function notificarSubscritores(material) {
+  await avisarPedidosAbertos(material);
   try {
     const [subscritores] = await db.query(
       `SELECT u.id, u.email, u.nome
@@ -71,4 +72,32 @@ async function notificarSubscritores(material) {
   }
 }
 
-module.exports = { ligarSocket, salaDoUtilizador, criarNotificacao, notificarVarios, notificarSubscritores };
+// Um material aprovado numa disciplina com pedidos abertos pode ser o que
+// alguém andava à procura — avisa quem pediu (e quem apoiou o pedido). Não
+// fecha o pedido sozinho: só quem pediu sabe se é mesmo aquilo.
+async function avisarPedidosAbertos(material) {
+  try {
+    const [pedidos] = await db.query(
+      "SELECT id, usuario_id, titulo FROM pedidos_materiais WHERE estado = 'aberto' AND disciplina = ? ORDER BY criado_em DESC LIMIT 50",
+      [material.cadeira]
+    );
+    if (pedidos.length === 0) return;
+    const destinatarios = new Set();
+    for (const p of pedidos) {
+      destinatarios.add(p.usuario_id);
+      const [apoiantes] = await db.query("SELECT usuario_id FROM pedidos_apoios WHERE pedido_id = ?", [p.id]);
+      apoiantes.forEach(a => destinatarios.add(a.usuario_id));
+    }
+    destinatarios.delete(material.autor_id);
+    await notificarVarios([...destinatarios], {
+      tipo: "pedido",
+      titulo: `Novo material em ${material.cadeira} — pode ser o que pediu`,
+      mensagem: material.titulo,
+      link: `/video/${material.id}`,
+    });
+  } catch (erro) {
+    console.error("[Notificações] Erro ao avisar pedidos:", erro.message);
+  }
+}
+
+module.exports = { ligarSocket, avisarPedidosAbertos, salaDoUtilizador, criarNotificacao, notificarVarios, notificarSubscritores };

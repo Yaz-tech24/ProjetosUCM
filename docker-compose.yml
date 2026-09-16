@@ -66,8 +66,13 @@ services:
       SMTP_USER: ${SMTP_USER}
       SMTP_PASS: ${SMTP_PASS}
       SMTP_FROM: ${SMTP_FROM}
+      # O monitor de saúde (Admin → Sistema) lê a pasta de backups para
+      # alertar quando o último dump tem mais de BACKUP_MAX_HORAS horas.
+      BACKUPS_DIR: /backups
+      BACKUP_MAX_HORAS: ${BACKUP_MAX_HORAS:-48}
     volumes:
       - api_uploads:/app/uploads
+      - ./backups:/backups:ro
     # Sem "ports": só é alcançável dentro da rede Docker, através do Caddy.
     # Se preferir expor a API directamente (sem o Caddy à frente), descomente:
     # ports:
@@ -162,6 +167,9 @@ services:
       # Mesma pasta usada pelo backup-db.sh manual — os 14 backups mais
       # recentes (de qualquer uma das duas origens) são mantidos.
       - ./backups:/backups
+      # Uploads (PDFs, vídeos, avatares) só de leitura: espelhados
+      # diariamente para ./backups/uploads e comprimidos ao domingo.
+      - api_uploads:/uploads:ro
     deploy:
       resources:
         limits:

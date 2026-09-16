@@ -56,6 +56,31 @@ module.exports = function registarRotasPerfil(app) {
 
   /**
    * @openapi
+   * /api/perfil/preferencias:
+   *   put:
+   *     summary: Preferências de comunicação (por agora, o resumo semanal por email/notificação)
+   *     tags: [Perfil]
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema: { type: object, properties: { digest_semanal: { type: boolean } } }
+   *     responses:
+   *       200: { description: Guardado }
+   */
+  app.put("/api/perfil/preferencias", autenticar, async (req, res) => {
+    try {
+      if (typeof req.body?.digest_semanal !== "boolean") return res.status(400).json({ erro: "Indique digest_semanal (true/false)." });
+      await db.query("UPDATE usuarios SET digest_semanal = ? WHERE id = ?", [req.body.digest_semanal ? 1 : 0, req.utilizador.id]);
+      res.json({ digest_semanal: req.body.digest_semanal });
+    } catch (erro) {
+      console.error("Erro ao guardar preferências:", erro.message);
+      res.status(500).json({ erro: "Falha ao guardar as preferências." });
+    }
+  });
+
+  /**
+   * @openapi
    * /api/perfil/senha:
    *   put:
    *     summary: Muda a palavra-passe do próprio utilizador

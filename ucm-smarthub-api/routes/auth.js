@@ -495,7 +495,7 @@ module.exports = function registarRotasAuth(app) {
   app.get("/api/me", autenticar, async (req, res) => {
     try {
       const [[utilizador]] = await db.query(
-        "SELECT id, nome, email, papel, curso, numero_estudante, telefone, avatar_url, email_verificado, 2fa_ativado FROM usuarios WHERE id = ?",
+        "SELECT id, nome, email, papel, curso, numero_estudante, telefone, avatar_url, email_verificado, 2fa_ativado, digest_semanal FROM usuarios WHERE id = ?",
         [req.utilizador.id]
       );
       if (!utilizador) {
@@ -503,6 +503,7 @@ module.exports = function registarRotasAuth(app) {
       }
       utilizador.avatar_url = paraUrlAbsoluto(utilizador.avatar_url);
       utilizador["2fa_ativado"] = utilizador["2fa_ativado"] === 1;
+      utilizador.digest_semanal = utilizador.digest_semanal !== 0;
       res.json({ utilizador });
     } catch (erro) {
       console.error("Erro ao buscar utilizador actual:", erro.message);

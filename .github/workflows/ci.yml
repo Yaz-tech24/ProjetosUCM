@@ -4,40 +4,186 @@ on:
   push:
   pull_request:
 
+# Node 22 em todos os jobs — a mesma versão do Dockerfile da API (node:22),
+# para o CI testar o que vai correr em produção.
+env:
+  NODE_VERSION: 22
+
 jobs:
   backend:
-    name: Backend (API)
+    name: Backend (API) — testes unitários
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: ucm-smarthub-api
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: ucm-smarthub-api/package-lock.json
-
       - run: npm ci
       - run: npm test
 
   frontend:
-    name: Frontend (Web)
+    name: Frontend (Web) — testes, lint e build
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: ucm-smarthub-web
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: ucm-smarthub-web/package-lock.json
-
       - run: npm ci
       - run: npm test
       - run: npm run lint
+      - run: npm run build
+
+  conversao:
+    name: Conversão DOCX → PDF (LibreOffice real)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ucm-smarthub-api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: ucm-smarthub-api/package-lock.json
+      # Os mesmos pacotes que o Dockerfile da API instala.
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libreoffice-writer libreoffice-impress fonts-dejavu fonts-liberation
+      - run: npm ci
+      - run: npm run test:conversao
+
+  smoke:
+    name: Smoke ponta-a-ponta (API + MySQL real)
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8
+        env:
+          MYSQL_ROOT_PASSWORD: ci
+          MYSQL_DATABASE: ucm_smarthub
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd "mysqladmin ping -h localhost -uroot -pci --silent"
+          --health-interval 10s --health-timeout 5s --health-retries 10
+    env:
+      DB_HOST: 127.0.0.1
+      DB_USER: root
+      DB_PASSWORD: ci
+      DB_NAME: ucm_smarthub
+      JWT_SECRET: ci-smoke-secret-nao-usar-em-producao
+      PORT: 5055
+      API_URL: http://localhost:5055
+      FRONTEND_URL: http://localhost:4173
+      CORS_ORIGINS: http://localhost:4173,http://localhost:5173
+      DESATIVAR_RATE_LIMIT: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: ucm-smarthub-api/package-lock.json
+      - name: Esquema base (tabelas que antecedem as migrações)
+        run: mysql -h 127.0.0.1 -uroot -pci ucm_smarthub < ucm-smarthub-api/init-db/01-schema.sql
+      - run: npm ci
+        working-directory: ucm-smarthub-api
+      - name: Arrancar a API (corre as migrações)
+        working-directory: ucm-smarthub-api
+        run: |
+          node server.js > api.log 2>&1 &
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:5055/api/health > /dev/null; then echo "API pronta"; break; fi
+            sleep 2
+          done
+          curl -sf http://localhost:5055/api/health || (cat api.log && exit 1)
+      - name: Smoke
+        working-directory: ucm-smarthub-api
+        run: npm run smoke
+      - name: Migrações são idempotentes (segundo arranque não aplica nada)
+        working-directory: ucm-smarthub-api
+        run: |
+          node -e "
+            const db = require('./config/db');
+            require('./db/migracoes').correrMigracoes().then(async n => {
+              console.log('migrações aplicadas no 2.º arranque:', n);
+              await db.end();
+              process.exit(n === 0 ? 0 : 1);
+            });
+          "
+      - name: Log da API (em caso de falha)
+        if: failure()
+        working-directory: ucm-smarthub-api
+        run: tail -n 200 api.log
+
+  ui:
+    name: Fluxos de UI (Chromium headless, build de produção)
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8
+        env:
+          MYSQL_ROOT_PASSWORD: ci
+          MYSQL_DATABASE: ucm_smarthub
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd "mysqladmin ping -h localhost -uroot -pci --silent"
+          --health-interval 10s --health-timeout 5s --health-retries 10
+    env:
+      DB_HOST: 127.0.0.1
+      DB_USER: root
+      DB_PASSWORD: ci
+      DB_NAME: ucm_smarthub
+      JWT_SECRET: ci-ui-secret-nao-usar-em-producao
+      PORT: 5055
+      API_URL: http://localhost:5055
+      FRONTEND_URL: http://localhost:4173
+      CORS_ORIGINS: http://localhost:4173
+      DESATIVAR_RATE_LIMIT: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - run: mysql -h 127.0.0.1 -uroot -pci ucm_smarthub < ucm-smarthub-api/init-db/01-schema.sql
+      - run: npm ci
+        working-directory: ucm-smarthub-api
+      - run: npm ci
+        working-directory: ucm-smarthub-web
+      - name: Chromium para o playwright-core
+        working-directory: ucm-smarthub-web
+        run: npx playwright-core install --with-deps chromium
+      - name: Build do frontend (API na mesma origem, via proxy do preview)
+        working-directory: ucm-smarthub-web
+        run: VITE_API_URL=/api npm run build
+      - name: Arrancar API e preview
+        run: |
+          (cd ucm-smarthub-api && node server.js > api.log 2>&1 &)
+          (cd ucm-smarthub-web && npx vite preview --port 4173 --strictPort > preview.log 2>&1 &)
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:4173/api/health > /dev/null; then echo "pilha pronta"; break; fi
+            sleep 2
+          done
+          curl -sf http://localhost:4173/api/health || (cat ucm-smarthub-api/api.log ucm-smarthub-web/preview.log && exit 1)
+      - name: Fluxos de UI
+        working-directory: ucm-smarthub-web
+        run: SHOTS_DIR=../shots-ci npm run fluxos
+      - name: Screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-ui
+          path: shots-ci
+          if-no-files-found: ignore
+      - name: Logs (em caso de falha)
+        if: failure()
+        run: tail -n 200 ucm-smarthub-api/api.log ucm-smarthub-web/preview.log

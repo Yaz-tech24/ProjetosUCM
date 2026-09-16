@@ -8,7 +8,38 @@ const { salaDoUtilizador } = require("../services/notificacoes");
 const { limitarChat } = require("../middleware/rateLimiters");
 const { analisarMensagem, mensagemAviso } = require("../utils/filtroChat");
 
+// Nome de sala: um curso (ex: "Informática") ou uma disciplina subscrita
+// com prefixo ("disc:Cálculo I"). Limitado ao tamanho da coluna.
+const PREFIXO_DISCIPLINA = "disc:";
+const normalizarSala = (valor) => {
+  const sala = String(valor || "Geral").trim().slice(0, 160);
+  return sala || "Geral";
+};
+
 module.exports = function registarRotasChat(app, io) {
+  /**
+   * @openapi
+   * /api/chat/salas:
+   *   get:
+   *     summary: Salas disponíveis ao utilizador — cursos da plataforma e disciplinas que subscreve
+   *     tags: [Chat]
+   *     responses:
+   *       200: { description: "{ cursos[], disciplinas[] } — cada disciplina traz o nome da sala (disc:...)" }
+   */
+  app.get("/api/chat/salas", autenticar, async (req, res) => {
+    try {
+      const [cursos] = await db.query("SELECT nome FROM cursos ORDER BY nome ASC");
+      const [subs] = await db.query("SELECT disciplina FROM subscricoes_disciplinas WHERE usuario_id = ? ORDER BY disciplina ASC", [req.utilizador.id]);
+      res.json({
+        cursos: cursos.map(c => ({ nome: c.nome, sala: c.nome })),
+        disciplinas: subs.map(s => ({ nome: s.disciplina, sala: PREFIXO_DISCIPLINA + s.disciplina })),
+      });
+    } catch (erro) {
+      console.error("Erro ao listar salas:", erro.message);
+      res.status(500).json({ erro: "Erro ao listar salas." });
+    }
+  });
+
   // ==========================================
   // CHAT COM IA (GEMINI) — protegido por autenticação
   // ==========================================
@@ -180,8 +211,8 @@ Pergunta do estudante: ${mensagem}`;
     socket.join(salaPessoal);
 
     // Cliente pede para entrar numa sala de curso
-    socket.on("joinRoom", ({ curso }) => {
-      const sala = curso || "Geral";
+    socket.on("joinRoom", (dados) => {
+      const sala = normalizarSala(dados?.sala ?? dados?.curso);
       // Sai de todas as salas de chat (mantém a própria do socket e a pessoal)
       socket.rooms.forEach((room) => {
         if (room !== socket.id && room !== salaPessoal) socket.leave(room);
@@ -194,11 +225,22 @@ Pergunta do estudante: ${mensagem}`;
       // Sala: vem do cliente (é só uma escolha de sala, não uma alegação de
       // identidade). Identidade: vem SEMPRE do token verificado em io.use(),
       // nunca do payload — impede um cliente de se fazer passar por outro.
-      const sala = data?.curso || "Geral";
+      const sala = normalizarSala(data?.sala ?? data?.curso);
       const userId = socket.utilizador.id;
       const userName = socket.utilizador.nome;
 
       if (typeof message !== "string" || !message.trim()) return;
+
+      // Material partilhado (cartão na mensagem): só o id é aceite do cliente;
+      // título e tipo vêm da BD, e só se estiver aprovado.
+      let material = null;
+      const materialId = Number.isInteger(data?.material_id) ? data.material_id : null;
+      if (materialId) {
+        try {
+          const [[m]] = await db.query("SELECT id, titulo, tipo, cadeira FROM materiais WHERE id = ? AND status = 'aprovado'", [materialId]);
+          if (m) material = m;
+        } catch { /* sem cartão */ }
+      }
 
       // Mesma verificação de conteúdo que a app já faz no browser (ver
       // filtroChat.js no frontend) — repetida aqui porque o filtro do lado
@@ -211,11 +253,14 @@ Pergunta do estudante: ${mensagem}`;
 
       try {
         const [resultado] = await db.query(
-          "INSERT INTO mensagens_estudantes (user_id, message, timestamp, curso) VALUES (?, ?, NOW(), ?)",
-          [userId, message, sala]
+          "INSERT INTO mensagens_estudantes (user_id, message, timestamp, curso, material_id) VALUES (?, ?, NOW(), ?, ?)",
+          [userId, message, sala, material?.id || null]
         );
         // Emite com o ID da BD para permitir apagar em tempo real
-        io.to(sala).emit("message", { id: resultado.insertId, message, userId, userName, timestamp: new Date(), curso: sala });
+        io.to(sala).emit("message", {
+          id: resultado.insertId, message, userId, userName, timestamp: new Date(), curso: sala,
+          material_id: material?.id || null, material_titulo: material?.titulo || null, material_tipo: material?.tipo || null,
+        });
       } catch (error) {
         // Fallback: se a coluna curso não existir ainda, guarda sem ela
         try {
@@ -250,13 +295,15 @@ Pergunta do estudante: ${mensagem}`;
       const [messages] = await db.query(
         `SELECT m.id, m.message, m.timestamp, m.user_id AS userId,
                 COALESCE(u.nome, 'Utilizador') AS userName,
-                COALESCE(m.curso, 'Geral') AS curso
+                COALESCE(m.curso, 'Geral') AS curso,
+                m.material_id, mat.titulo AS material_titulo, mat.tipo AS material_tipo
          FROM mensagens_estudantes m
          LEFT JOIN usuarios u ON m.user_id = u.id
+         LEFT JOIN materiais mat ON mat.id = m.material_id AND mat.status = 'aprovado'
          WHERE COALESCE(m.curso, 'Geral') = ?
          ORDER BY m.timestamp DESC
          LIMIT 60`,
-        [curso]
+        [normalizarSala(curso)]
       );
       res.status(200).json(messages.reverse());
     } catch {

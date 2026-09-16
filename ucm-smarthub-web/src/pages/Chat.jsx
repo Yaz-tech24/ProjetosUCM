@@ -1,9 +1,16 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import io from 'socket.io-client';
+import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
-import { Send, Users, ShieldAlert, Trash2 } from 'lucide-react';
+import { adquirirSocket, libertarSocket } from '../services/socket';
+import { Send, Users, ShieldAlert, Trash2, FileText, Film, BookOpen, GraduationCap } from 'lucide-react';
 import { useConfig } from '../context/ConfigContext';
 import { analisarMensagem, mensagemAviso } from '../utils/filtroChat';
+import PartilharMaterial from '../components/PartilharMaterial';
+
+/* Salas: cursos da plataforma + disciplinas que o utilizador subscreve
+   (prefixo "disc:" no nome da sala — ver /api/chat/salas). */
+const PREFIXO_DISCIPLINA = 'disc:';
+const rotuloSala = (sala) => (sala?.startsWith(PREFIXO_DISCIPLINA) ? sala.slice(PREFIXO_DISCIPLINA.length) : sala);
 
 /* "Hoje" / "Ontem" / data por extenso — para separar visualmente mensagens de dias diferentes */
 const rotuloDia = (timestamp) => {
@@ -18,8 +25,11 @@ const rotuloDia = (timestamp) => {
 
 const Chat = ({ usuarioLogado }) => {
   const { config, cursos } = useConfig();
+  const navigate = useNavigate();
   const nomesCursos = useMemo(() => cursos.map(c => c.nome), [cursos]);
+  const [disciplinas, setDisciplinas] = useState([]);   // salas de disciplina (subscrições)
   const [cursoActivo, setCursoActivo] = useState('');
+  const [materialAnexo, setMaterialAnexo] = useState(null);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [loadingMessages, setLoadingMessages] = useState(false);
@@ -37,13 +47,19 @@ const Chat = ({ usuarioLogado }) => {
     setCursoActivo(nomesCursos.includes(usuarioLogado?.curso) ? usuarioLogado.curso : nomesCursos[0]);
   }, [cursoActivo, nomesCursos, usuarioLogado]);
 
-  /* Liga o socket uma única vez, ao montar — withCredentials envia o cookie
-     httpOnly de sessão automaticamente, é como o servidor confirma quem
-     realmente está a enviar cada mensagem (ver io.use() em routes/chat.js),
-     em vez de confiar no que o cliente diga. */
+  /* Salas de disciplina: as que o utilizador subscreve (Perfil → Subscrições) */
   useEffect(() => {
-    const apiBase = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace('/api', '');
-    const sock = io(apiBase, { withCredentials: true });
+    let activo = true;
+    api.get('/chat/salas').then(res => { if (activo) setDisciplinas(res.data?.disciplinas || []); }).catch(() => {});
+    return () => { activo = false; };
+  }, []);
+
+  /* Ligação Socket.IO partilhada com o sino de notificações (services/socket.js)
+     — o cookie httpOnly de sessão é como o servidor confirma quem realmente
+     está a enviar cada mensagem (ver io.use() em routes/chat.js), nunca o
+     que o cliente diga. */
+  useEffect(() => {
+    const sock = adquirirSocket();
     socketRef.current = sock;
 
     const handleConnectError = (err) => {
@@ -58,7 +74,7 @@ const Chat = ({ usuarioLogado }) => {
     return () => {
       sock.off('connect_error', handleConnectError);
       sock.off('messageRejected', handleRejected);
-      sock.disconnect();
+      libertarSocket();
       socketRef.current = null;
     };
   }, []);
@@ -69,7 +85,7 @@ const Chat = ({ usuarioLogado }) => {
     const sock = socketRef.current;
     if (!sock || !cursoActivo) return;
 
-    sock.emit('joinRoom', { curso: cursoActivo });
+    sock.emit('joinRoom', { curso: cursoActivo, sala: cursoActivo });
 
     const handleMessage = (msg) => {
       if (msg.curso === cursoActivo || !msg.curso) {
@@ -154,8 +170,11 @@ const Chat = ({ usuarioLogado }) => {
     socketRef.current.emit('sendMessage', {
       message: newMessage,
       curso: cursoActivo,
+      sala: cursoActivo,
+      material_id: materialAnexo?.id || undefined,
     });
     setNewMessage('');
+    setMaterialAnexo(null);
   };
 
   if (!config.chat_activado) {
@@ -273,18 +292,19 @@ const Chat = ({ usuarioLogado }) => {
               style={{ background: "#34d399", boxShadow: "0 0 8px rgba(52,211,153,0.90)" }}
             />
             <span style={{ color: "rgba(255,255,255,0.65)" }}>Sala:</span>
-            <span style={{ color: "var(--color-gold)", fontWeight: 900 }}>{cursoActivo}</span>
+            <span style={{ color: "var(--color-gold)", fontWeight: 900 }}>{rotuloSala(cursoActivo)}</span>
           </div>
         </div>
 
-        {/* Abas de curso */}
+        {/* Abas: cursos e disciplinas subscritas */}
         <div className="flex gap-1 overflow-x-auto pb-0" style={{ scrollbarWidth: "none" }}>
-          {nomesCursos.map(curso => {
+          {[...nomesCursos.map(c => ({ sala: c, nome: c, tipo: 'curso' })), ...disciplinas.map(d => ({ sala: d.sala, nome: d.nome, tipo: 'disciplina' }))].map(({ sala: curso, nome, tipo }) => {
             const active = cursoActivo === curso;
             return (
               <button
                 key={curso}
                 onClick={() => setCursoActivo(curso)}
+                title={tipo === 'disciplina' ? `Sala da disciplina ${nome}` : `Sala do curso ${nome}`}
                 className="shrink-0 px-4 py-2.5 rounded-t-xl text-xs font-bold transition-all duration-200"
                 style={active
                   ? {
@@ -299,13 +319,21 @@ const Chat = ({ usuarioLogado }) => {
                     }
                 }
               >
-                {curso}
+                <span className="inline-flex items-center gap-1.5">
+                  {tipo === 'disciplina' ? <BookOpen size={11} /> : <GraduationCap size={11} />}
+                  {nome}
+                </span>
                 {curso === usuarioLogado?.curso && (
                   <span style={{ marginLeft: 6, color: "var(--color-gold)", fontSize: 9 }}>●</span>
                 )}
               </button>
             );
           })}
+          {disciplinas.length === 0 && (
+            <button onClick={() => navigate('/perfil')} className="shrink-0 px-4 py-2.5 text-xs font-bold" style={{ color: "rgba(255,255,255,0.40)", borderBottom: "3px solid transparent" }} title="Subscreva disciplinas no perfil para ter salas por disciplina">
+              + salas por disciplina
+            </button>
+          )}
         </div>
       </header>
 
@@ -341,8 +369,8 @@ const Chat = ({ usuarioLogado }) => {
             >
               <Users size={26} style={{ color: "var(--text-faint)" }} />
             </div>
-            <p style={{ fontWeight: 800, color: "var(--text-body)", fontSize: 16 }}>Sala {cursoActivo} vazia</p>
-            <p style={{ fontSize: 14, color: "var(--text-faint)" }}>Seja o primeiro a iniciar a conversa neste curso!</p>
+            <p style={{ fontWeight: 800, color: "var(--text-body)", fontSize: 16 }}>Sala {rotuloSala(cursoActivo)} vazia</p>
+            <p style={{ fontSize: 14, color: "var(--text-faint)" }}>Seja o primeiro a iniciar a conversa nesta sala!</p>
           </div>
         ) : (
           messages.map((msg, index) => {
@@ -417,6 +445,23 @@ const Chat = ({ usuarioLogado }) => {
                     {msg.userName}
                   </div>
                   <div style={{ lineHeight: 1.55 }}>{msg.message}</div>
+                  {msg.material_id && msg.material_titulo && (
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/video/${msg.material_id}`)}
+                      className="mt-2.5 w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-left transition-all"
+                      style={isOwn
+                        ? { background: "rgba(var(--color-navy-deep-rgb),0.12)", border: "1px solid rgba(var(--color-navy-deep-rgb),0.20)", color: "var(--color-navy-deep)" }
+                        : { background: "var(--surface-hover)", border: "1px solid var(--border-subtle-strong)", color: "var(--text-heading)" }}
+                      title="Abrir material"
+                    >
+                      {msg.material_tipo === 'Vídeo' ? <Film size={16} style={{ flexShrink: 0 }} /> : <FileText size={16} style={{ flexShrink: 0 }} />}
+                      <span className="min-w-0">
+                        <span className="block truncate" style={{ fontSize: 12.5, fontWeight: 800 }}>{msg.material_titulo}</span>
+                        <span className="block" style={{ fontSize: 10.5, opacity: 0.7 }}>Material do repositório · abrir</span>
+                      </span>
+                    </button>
+                  )}
                   <div
                     style={{
                       fontSize: 10, marginTop: 6,
@@ -483,13 +528,15 @@ const Chat = ({ usuarioLogado }) => {
           background: "var(--surface-card)",
         }}
       >
-        <form onSubmit={sendMessage} className="flex flex-col gap-3 sm:flex-row">
-          <div className="flex-1 relative">
+        <form onSubmit={sendMessage} className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+          <PartilharMaterial seleccionado={materialAnexo} onEscolher={setMaterialAnexo} onLimpar={() => setMaterialAnexo(null)} />
+          <div className="flex-1 relative min-w-0">
             <input
               type="text"
               value={newMessage}
               onChange={e => setNewMessage(e.target.value.slice(0, 500))}
-              placeholder={`Mensagem em ${cursoActivo}...`}
+              placeholder={materialAnexo ? 'Diga algo sobre o material…' : `Mensagem em ${rotuloSala(cursoActivo)}...`}
               className="w-full rounded-2xl px-5 py-4 text-sm outline-none transition-all duration-200"
               style={{
                 background: "var(--surface-input)",
@@ -507,6 +554,7 @@ const Chat = ({ usuarioLogado }) => {
                 {500 - newMessage.length}
               </span>
             )}
+          </div>
           </div>
           <button
             type="submit"

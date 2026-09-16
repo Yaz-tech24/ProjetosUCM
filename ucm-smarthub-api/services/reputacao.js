@@ -4,6 +4,7 @@ const PONTOS_POR_MATERIAL_APROVADO = 10;
 const PONTOS_POR_ESTRELA_MEDIA = 5;
 const PONTOS_POR_QUIZ_PASSADO = 2;   // ≥ 70% num quiz, contado uma vez por quiz
 const PONTOS_POR_RESPOSTA_ACEITE = 5;
+const PONTOS_POR_PEDIDO_ATENDIDO = 3;  // ligou um material a um pedido de outro estudante
 
 function calcularEmblema({ aprovados, media }) {
   if (aprovados >= 5 && media >= 4.0) return "Confiável";
@@ -33,8 +34,9 @@ async function atualizarReputacao(usuarioId) {
     const [[extras]] = await db.query(
       `SELECT
          (SELECT COUNT(DISTINCT quiz_id) FROM quiz_resultados WHERE usuario_id = ? AND pontuacao * 100 >= total * 70) AS quizzes,
-         (SELECT COUNT(*) FROM perguntas p JOIN respostas r ON r.id = p.resposta_aceite_id WHERE r.usuario_id = ?) AS respostas_aceites`,
-      [usuarioId, usuarioId]
+         (SELECT COUNT(*) FROM perguntas p JOIN respostas r ON r.id = p.resposta_aceite_id WHERE r.usuario_id = ?) AS respostas_aceites,
+         (SELECT COUNT(*) FROM pedidos_materiais WHERE atendido_por = ? AND estado = 'atendido' AND usuario_id <> ?) AS pedidos_atendidos`,
+      [usuarioId, usuarioId, usuarioId, usuarioId]
     );
 
     const aprovados = Number(stats.aprovados) || 0;
@@ -42,7 +44,8 @@ async function atualizarReputacao(usuarioId) {
     const pontos = aprovados * PONTOS_POR_MATERIAL_APROVADO
       + Math.round(media * PONTOS_POR_ESTRELA_MEDIA)
       + (Number(extras?.quizzes) || 0) * PONTOS_POR_QUIZ_PASSADO
-      + (Number(extras?.respostas_aceites) || 0) * PONTOS_POR_RESPOSTA_ACEITE;
+      + (Number(extras?.respostas_aceites) || 0) * PONTOS_POR_RESPOSTA_ACEITE
+      + (Number(extras?.pedidos_atendidos) || 0) * PONTOS_POR_PEDIDO_ATENDIDO;
     const emblema = calcularEmblema({ aprovados, media });
 
     await db.query(
@@ -59,6 +62,11 @@ async function atualizarReputacao(usuarioId) {
   } catch (erro) {
     console.error("[Reputação] Erro ao actualizar:", erro.message);
   }
+  // Os mesmos eventos que mudam a reputação (material aprovado, resposta
+  // aceite, quiz passado) podem desbloquear conquistas — verificadas aqui
+  // para não repetir a chamada em cada rota. Lazy: conquistas.js importa
+  // notificacoes, que não depende deste módulo, mas evita-se o ciclo à mesma.
+  await require("./conquistas").verificarConquistas(usuarioId);
 }
 
 // Quem avaliou um material afecta a reputação do AUTOR desse material.

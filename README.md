@@ -61,12 +61,28 @@ Definir `DOMAIN=localhost` no `.env` e aceder a `https://localhost/` — o Caddy
 
 ### Backups
 
-O serviço `backup` do `docker-compose.yml` corre um cron dentro da própria stack e cria automaticamente, todos os dias às 03:00, uma cópia comprimida da base de dados em `backups/` (mantém as últimas 14) — não é preciso nenhum crontab manual no servidor, basta que a stack esteja de pé (`docker compose up -d`).
+O serviço `backup` do `docker-compose.yml` corre um cron dentro da própria stack — não é preciso nenhum crontab manual no servidor, basta que a stack esteja de pé (`docker compose up -d`):
 
-`./backup-db.sh` continua disponível para criar um backup manual/pontual a qualquer momento, na mesma pasta `backups/` e com a mesma política de retenção.
+- **Todos os dias às 03:00**: dump comprimido da base de dados em `backups/` (mantém os últimos 14; um `mysqldump` falhado aborta em vez de deixar um ficheiro vazio) e **espelho dos uploads** (PDFs, vídeos, avatares) em `backups/uploads/` — incremental, nunca apaga.
+- **Ao domingo**: snapshot completo `backups/uploads_AAAAMMDD.tar.gz` (mantém 4).
+- **À segunda às 04:00**: **prova de restauro** — repõe o dump mais recente numa base de dados temporária, conta tabelas/linhas e apaga-a. O resultado fica em `backups/cron.log`; para correr à mão: `docker compose exec backup verificar-backup.sh`.
+- O painel **Admin → Sistema** mostra a idade do último backup e os administradores recebem um alerta (notificação + email) se passar de `BACKUP_MAX_HORAS` (48 h).
 
-Para restaurar um backup:
+`./backup-db.sh` continua disponível para um backup manual da base de dados a qualquer momento, na mesma pasta e com a mesma retenção.
+
+Para **restaurar tudo** (base de dados + uploads em falta), na raiz do projecto:
+
+```bash
+./restaurar-backup.sh                                     # dump mais recente
+./restaurar-backup.sh ucm_smarthub_20260101_030000.sql.gz # um dump específico
+```
+
+O script pára a API, delega ao serviço `backup` (`backup/restaurar.sh`) e volta a arrancar a API. Só a base de dados, à mão:
 
 ```bash
 gunzip -c backups/ucm_smarthub_20260101_030000.sql.gz | docker compose exec -T db mysql -uroot -p"$DB_PASSWORD" ucm_smarthub
 ```
+
+### Integração contínua
+
+O workflow `.github/workflows/ci.yml` (Node 22, a mesma versão do Dockerfile) corre em cada push: testes unitários da API e do frontend, lint e build, a conversão DOCX→PDF com um LibreOffice real, um smoke ponta-a-ponta contra um MySQL 8 de serviço (`npm run smoke`, que também confirma que as migrações são idempotentes) e os fluxos de UI em Chromium headless sobre o build de produção (`npm run fluxos`, com screenshots guardados como artefacto). Localmente, os dois últimos precisam da API a correr em `:5055` com `DESATIVAR_RATE_LIMIT=1` e, para os fluxos, de `npx vite preview` em `:4173` e de um Chromium (`npx playwright-core install chromium`).

@@ -7,8 +7,15 @@ import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
   globalIgnores(['dist']),
+  // Scripts Node (fluxos de UI em Chromium headless) — CommonJS com globais de Node
+  {
+    files: ['scripts/**/*.{js,cjs}'],
+    extends: [js.configs.recommended],
+    languageOptions: { ecmaVersion: 2022, sourceType: 'commonjs', globals: { ...globals.node, FormData: 'readonly', Blob: 'readonly', fetch: 'readonly', caches: 'readonly', window: 'readonly', document: 'readonly', Event: 'readonly', KeyboardEvent: 'readonly' } },
+  },
   {
     files: ['**/*.{js,jsx}'],
+    ignores: ['scripts/**'],
     extends: [
       js.configs.recommended,
       react.configs.flat.recommended,

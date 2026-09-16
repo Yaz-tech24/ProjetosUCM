@@ -167,4 +167,4 @@ async function enviarNovoMaterialSubscrito({ to, nome, titulo, cadeira, tipo, li
   });
 }
 
-module.exports = { enviarEmail, enviarVerificacaoEmail, enviarBoasVindas, enviarRecuperacaoPassword, enviarModeracaoMaterial, enviarNovoMaterialSubscrito, emailConfigurado };
+module.exports = { enviarEmail, layoutEmail: layout, escapeHtml, enviarVerificacaoEmail, enviarBoasVindas, enviarRecuperacaoPassword, enviarModeracaoMaterial, enviarNovoMaterialSubscrito, emailConfigurado };

@@ -495,9 +495,17 @@ const Repositorio = ({ usuarioLogado }) => {
             <div className="col-span-full rounded-[28px] p-14 text-center" style={{ border: "2px dashed var(--border-subtle-strong)", background: "var(--surface-card)" }}>
               <p style={{ fontSize: 16, fontWeight: 900, color: "var(--text-faint)" }}>Nenhum material encontrado.</p>
               {buscaTermo && (
-                <button onClick={() => setBuscaTermo('')} className="mt-3 text-sm font-semibold" style={{ color: "var(--text-accent)" }}>
-                  Limpar pesquisa
-                </button>
+                <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
+                  <button onClick={() => setBuscaTermo('')} className="text-sm font-semibold" style={{ color: "var(--text-accent)" }}>
+                    Limpar pesquisa
+                  </button>
+                  <span style={{ color: "var(--text-faint)" }}>·</span>
+                  {/* Sem resultados → pedir à comunidade (pré-preenche o pedido com a pesquisa) */}
+                  <button onClick={() => navigate(`/pedidos?novo=1&q=${encodeURIComponent(buscaTermo)}`)} className="inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-sm font-bold"
+                    style={{ background: "rgba(var(--color-gold-rgb),0.14)", border: "1px solid rgba(var(--color-gold-rgb),0.40)", color: "var(--color-gold-dark)" }}>
+                    Pedir este material à comunidade
+                  </button>
+                </div>
               )}
             </div>
           ) : (

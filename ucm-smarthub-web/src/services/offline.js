@@ -37,9 +37,21 @@ export async function guardarMaterialOffline(material) {
     id: material.id, titulo: material.titulo, cadeira: material.cadeira, tipo: material.tipo,
     url_arquivo: material.url_arquivo, autor: material.autor, data_upload: material.data_upload,
     versao: material.versao, guardado_em: Date.now(),
+    // O resumo por IA viaja com a cópia — é texto, cabe no localStorage.
+    resumo: material.resumo || null,
   };
   gravarLista(lista);
   return lista[material.id];
+}
+
+// Guarda (ou actualiza) o resumo na cópia offline já existente.
+export function actualizarResumoOffline(id, resumo) {
+  const lista = lerLista();
+  const item = lista[Number(id)];
+  if (!item || !resumo) return false;
+  item.resumo = resumo;
+  gravarLista(lista);
+  return true;
 }
 
 export async function removerMaterialOffline(id) {

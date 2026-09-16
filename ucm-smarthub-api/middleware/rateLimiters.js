@@ -70,6 +70,9 @@ const limitar2FA = criarLimitadorTaxa({ janelaMs: 15 * 60 * 1000, maxTentativas:
 const limitarComentarios = criarLimitadorTaxa({ janelaMs: 10 * 60 * 1000, maxTentativas: 20, chave: porUtilizador, mensagem: "Está a comentar demasiado depressa. Aguarde uns minutos." });
 const limitarAvaliacoes = criarLimitadorTaxa({ janelaMs: 10 * 60 * 1000, maxTentativas: 30, chave: porUtilizador });
 const limitarSubscricoes = criarLimitadorTaxa({ janelaMs: 10 * 60 * 1000, maxTentativas: 30, chave: porUtilizador });
+// Um zip lê e envia centenas de MB — poucos por hora chegam para uso real e
+// impedem que um utilizador ocupe o disco/rede do servidor num loop.
+const limitarZip = criarLimitadorTaxa({ janelaMs: 60 * 60 * 1000, maxTentativas: 10, chave: porUtilizador, mensagem: "Limite de exportações por hora atingido. Tente mais tarde." });
 
 // ─── Bloqueio de conta por tentativas falhadas ────────────────────────────
 // Complementa o limite por IP acima: um atacante que rode várias origens/IPs
@@ -107,6 +110,6 @@ intervaloFalhas.unref?.();
 
 module.exports = {
   limitarLogin, limitarRegisto, limitarChat, limitarEsqueciSenha, limitarReporSenha, limitarVerificarEmail,
-  limitar2FA, limitarComentarios, limitarAvaliacoes, limitarSubscricoes,
+  limitar2FA, limitarComentarios, limitarAvaliacoes, limitarSubscricoes, limitarZip,
   contaBloqueada, registarFalhaLogin, limparFalhasLogin,
 };

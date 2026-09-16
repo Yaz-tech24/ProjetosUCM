@@ -115,6 +115,12 @@ require("./routes/perguntas")(app);
 require("./routes/denuncias")(app);
 require("./routes/calendario")(app);
 require("./routes/tags")(app);
+require("./routes/leitura")(app);
+require("./routes/flashcards")(app);
+require("./routes/pedidos")(app);
+require("./routes/pesquisa")(app);
+require("./routes/estudo")(app);
+require("./routes/sistema")(app);
 
 // ==========================================
 // TRATAMENTO GLOBAL DE ERROS (deve ficar por último)
@@ -147,12 +153,14 @@ async function iniciar() {
   // Migrações correm ANTES de aceitar pedidos — evita respostas a /api/config,
   // /api/register, etc. antes de as tabelas novas existirem.
   await correrMigracoes();
-  // Tarefas de fundo: indexação de PDFs para pesquisa, lembretes do calendário
-  // e limpeza de sessões expiradas. Todas com .unref() — não seguram o processo.
+  // Tarefas de fundo: indexação de PDFs para pesquisa, lembretes do calendário,
+  // digest semanal, limpeza diária (sessões, auditoria, notificações) e o
+  // monitor de saúde. Todas com .unref() — não seguram o processo.
   require("./services/indexacao").agendarIndexacao();
   require("./services/lembretes").agendarLembretes();
-  const { purgarSessoesAntigas } = require("./services/sessoes");
-  setInterval(purgarSessoesAntigas, 24 * 60 * 60 * 1000).unref?.();
+  require("./services/digest").agendarDigest();
+  require("./services/manutencao").agendarManutencao();
+  require("./services/saude").agendarMonitor();
   server.listen(PORT, () => {
     console.log(`[SmartHub] Servidor activo na porta ${PORT} | ${new Date().toISOString()}`);
     if (!genAI) console.warn("[SmartHub] GEMINI_API_KEY não definida — funcionalidades de IA desactivadas.");

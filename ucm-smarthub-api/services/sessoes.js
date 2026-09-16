@@ -89,10 +89,12 @@ async function revogarTodasSessoes(usuarioId) {
 async function purgarSessoesAntigas() {
   try {
     await db.query("DELETE FROM sessoes WHERE expira_em < DATE_SUB(NOW(), INTERVAL 30 DAY)");
-    // Os contadores por material ficam; as linhas individuais de acesso só
-    // servem para análise recente — um ano chega.
-    await db.query("DELETE FROM materiais_acessos WHERE criado_em < DATE_SUB(NOW(), INTERVAL 365 DAY)");
-  } catch { /* best-effort */ }
+    // Os contadores por material ficam; as linhas individuais de acesso
+    // alimentam estatísticas de estudo e conquistas — dois anos cobrem um
+    // curso quase inteiro.
+    const [r] = await db.query("DELETE FROM materiais_acessos WHERE criado_em < DATE_SUB(NOW(), INTERVAL 730 DAY)");
+    return r.affectedRows || 0;
+  } catch { return 0; }
 }
 
 module.exports = {

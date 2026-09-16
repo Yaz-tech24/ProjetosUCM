@@ -16,3 +16,4 @@ backup/crontab text eol=lf
 * text=auto eol=lf
 *.webp binary
 *.mp4 binary
+*.docx binary

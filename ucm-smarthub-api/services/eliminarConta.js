@@ -32,6 +32,13 @@ async function eliminarConta(usuarioId) {
     const [[utilizador]] = await conn.query("SELECT id, email, avatar_url FROM usuarios WHERE id = ? FOR UPDATE", [usuarioId]);
     if (!utilizador) throw Object.assign(new Error("Utilizador não encontrado."), { status: 404 });
 
+    // As avaliações deste utilizador vão cair em cascata — a média (e a
+    // reputação) dos autores que ele avaliou tem de ser recalculada depois.
+    const [avaliados] = await conn.query(
+      "SELECT DISTINCT m.autor_id FROM avaliacoes a JOIN materiais m ON m.id = a.material_id WHERE a.usuario_id = ? AND m.autor_id <> ?",
+      [usuarioId, usuarioId]
+    );
+
     const sentinela = await obterSentinela(conn);
     const reatribuir = [
       ["materiais", "autor_id"],
@@ -41,6 +48,9 @@ async function eliminarConta(usuarioId) {
       ["respostas", "usuario_id"],
       ["versoes_materiais", "autor_id"],
       ["eventos_calendario", "criado_por"],
+      // Pedidos atendidos dão reputação a quem os atendeu — não podem
+      // desaparecer com a conta de quem pediu.
+      ["pedidos_materiais", "usuario_id"],
     ];
     for (const [tabela, coluna] of reatribuir) {
       await conn.query(`UPDATE \`${tabela}\` SET \`${coluna}\` = ? WHERE \`${coluna}\` = ?`, [sentinela, usuarioId]);
@@ -51,7 +61,10 @@ async function eliminarConta(usuarioId) {
     if (utilizador.avatar_url) {
       fs.unlink(path.join(uploadsDir, path.basename(utilizador.avatar_url)), () => {});
     }
-    return { email: utilizador.email };
+    // Fora da transacção (já confirmada): best-effort, como toda a reputação.
+    const { atualizarReputacao } = require("./reputacao");
+    for (const { autor_id } of avaliados) await atualizarReputacao(autor_id);
+    return { email: utilizador.email, autores_recalculados: avaliados.length };
   } catch (erro) {
     await conn.rollback().catch(() => {});
     throw erro;

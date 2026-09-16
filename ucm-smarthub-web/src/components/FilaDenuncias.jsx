@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Flag, ExternalLink, Trash2, Check, EyeOff, Inbox } from "lucide-react";
+import { Flag, ExternalLink, Trash2, Check, EyeOff, Inbox, Sparkles } from "lucide-react";
 import api from "../services/api";
 import ConfirmModal from "./ConfirmModal";
 import { BotaoSecundario, Spinner, Vazio, formatarData } from "./ui";
@@ -7,6 +7,26 @@ import { MOTIVOS } from "./Reportar";
 
 const rotuloMotivo = (v) => MOTIVOS.find(m => m.valor === v)?.label || v;
 const rotuloTipo = { material: "Material", comentario: "Comentário", mensagem: "Mensagem de chat", pergunta: "Pergunta", resposta: "Resposta" };
+
+/* Sugestão da IA (services/moderacaoDenuncias.js): só orienta — a decisão
+   continua a ser do admin, com os mesmos botões. */
+const rotuloClassificacao = { spam: "Spam", ofensivo: "Ofensivo", assedio: "Assédio", direitos_autor: "Direitos de autor", informacao_errada: "Informação errada", fora_do_ambito: "Fora do âmbito", sem_problema: "Sem problema", incerto: "Incerto" };
+const ESTILO_SUGESTAO = {
+  remover: { background: "var(--status-danger-bg)", border: "1px solid var(--status-danger-border)", color: "var(--status-danger-text)", label: "IA sugere remover" },
+  ignorar: { background: "var(--status-success-bg)", border: "1px solid var(--status-success-border)", color: "var(--status-success-text)", label: "IA sugere ignorar" },
+  rever: { background: "var(--status-warning-bg)", border: "1px solid var(--status-warning-border)", color: "var(--status-warning-text)", label: "IA: rever com atenção" },
+};
+const SugestaoIA = ({ d }) => {
+  if (!d.ia_sugestao) return null;
+  const e = ESTILO_SUGESTAO[d.ia_sugestao] || ESTILO_SUGESTAO.rever;
+  return (
+    <p className="mt-2 inline-flex flex-wrap items-center gap-2 rounded-xl px-3 py-1.5" style={{ background: e.background, border: e.border, color: e.color, fontSize: 12 }} title="Classificação automática — a decisão é sua">
+      <Sparkles size={12} /> <strong>{e.label}</strong>
+      {d.ia_classificacao && <span>· {rotuloClassificacao[d.ia_classificacao] || d.ia_classificacao}</span>}
+      {d.ia_motivo && <span style={{ opacity: 0.85 }}>— {d.ia_motivo}</span>}
+    </p>
+  );
+};
 
 // Fila de denúncias do Admin: ver o conteúdo, removê-lo e fechar a denúncia,
 // ou marcá-la como ignorada. Fechar uma fecha todas as pendentes sobre o
@@ -87,6 +107,7 @@ const FilaDenuncias = ({ navigate, onToast, onContagem }) => {
                       {d.recurso.resumo}
                     </p>
                     {d.detalhes && <p className="mt-1" style={{ fontSize: 13, color: "var(--text-body)" }}>“{d.detalhes}”</p>}
+                    <SugestaoIA d={d} />
                     {d.resolvida_por_nome && <p className="mt-1" style={{ fontSize: 11.5, color: "var(--text-faint)" }}>Fechada por {d.resolvida_por_nome} em {formatarData(d.resolvida_em)}</p>}
                   </div>
                   <div className="flex flex-wrap gap-1.5 w-full lg:w-auto lg:shrink-0">

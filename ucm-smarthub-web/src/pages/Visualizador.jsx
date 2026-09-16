@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import api from "../services/api";
 import useFavoritos from "../hooks/useFavoritos";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft, ExternalLink, DownloadCloud, Sparkles, RotateCcw, Heart, Share2, Trash2, Send, MessageCircle, Eye, WifiOff, CloudDownload, CloudOff, Star, BrainCircuit, History } from "lucide-react";
+import { ArrowLeft, ExternalLink, DownloadCloud, Sparkles, RotateCcw, Heart, Share2, Trash2, Send, MessageCircle, Eye, WifiOff, CloudDownload, CloudOff, Star, BrainCircuit, History, Layers, BookMarked, Languages } from "lucide-react";
 import { useConfig } from "../context/ConfigContext";
 import Toast from "../components/Toast";
 import Avaliacoes from "../components/Avaliacoes";
@@ -12,7 +12,9 @@ import Quiz from "../components/Quiz";
 import VersoesMaterial from "../components/VersoesMaterial";
 import GuardarEmColecao from "../components/GuardarEmColecao";
 import BotaoReportar from "../components/Reportar";
-import { guardarMaterialOffline, removerMaterialOffline, estaGuardadoOffline, obterMaterialOffline, obterUrlLocal } from "../services/offline";
+import Flashcards from "../components/Flashcards";
+import LeituraNotas from "../components/LeituraNotas";
+import { guardarMaterialOffline, removerMaterialOffline, estaGuardadoOffline, obterMaterialOffline, obterUrlLocal, actualizarResumoOffline } from "../services/offline";
 
 /* ── Renderiza o resumo estruturado devolvido pela IA ── */
 const SummaryRenderer = ({ text }) => {
@@ -104,6 +106,10 @@ const Visualizador = ({ usuarioLogado }) => {
   const [semRede,        setSemRede]        = useState(() => typeof navigator !== 'undefined' && navigator.onLine === false); // a mostrar a cópia offline
   const [searchParams]   = useSearchParams();
   const [separador,      setSeparador]      = useState(() => searchParams.get('sep') || 'avaliacoes');
+  const [paginaPdf,      setPaginaPdf]      = useState(null);    // #page=N no iframe (retomar leitura / marcador)
+  const [idiomaResumo,   setIdiomaResumo]   = useState('pt');
+  const [resumoTraduzido, setResumoTraduzido] = useState(null);
+  const [aTraduzir,      setATraduzir]      = useState(false);
 
   const summaryAbortRef = useRef(null);
   const chatEndRef      = useRef(null);
@@ -121,6 +127,12 @@ const Visualizador = ({ usuarioLogado }) => {
         setMaterial(res.data);
         // Conta uma abertura (o servidor ignora repetições em 30 min).
         api.post(`/materiais/${id}/acesso`, { tipo: 'abertura' }).catch(() => {});
+        // Retoma na página onde o utilizador ficou (se guardou progresso).
+        if (res.data.tipo === 'PDF') {
+          api.get(`/materiais/${id}/leitura`, { signal: controller.signal })
+            .then(r => { if (r.data.pagina > 1) setPaginaPdf(r.data.pagina); })
+            .catch(() => {});
+        }
       })
       .catch(err => {
         if (err.code === 'ERR_CANCELED' || err.name === 'CanceledError' || err.name === 'AbortError') return;
@@ -169,9 +181,10 @@ const Visualizador = ({ usuarioLogado }) => {
         setOffline(false);
         setToast({ message: "Cópia offline removida.", type: "success" });
       } else {
-        await guardarMaterialOffline(material);
+        await guardarMaterialOffline({ ...material, resumo: summary || material.resumo || null });
         setOffline(true);
-        setToast({ message: "Guardado. Pode abrir este PDF sem ligação à internet.", type: "success" });
+        api.post('/eventos', { tipo: 'offline', referencia: material.id }).catch(() => {});
+        setToast({ message: "Guardado. Pode abrir este PDF (e o resumo) sem ligação à internet.", type: "success" });
       }
     } catch (err) {
       setToast({ message: err.message || "Não foi possível guardar para offline.", type: "error" });
@@ -184,6 +197,15 @@ const Visualizador = ({ usuarioLogado }) => {
 
   const fetchSummary = useCallback(async (forcar = false) => {
     if (!material) return;
+    // Sem rede: o resumo guardado com a cópia offline (se existir).
+    if (semRede) {
+      const copia = obterMaterialOffline(id);
+      const guardado = copia?.resumo || material.resumo || '';
+      setSummary(guardado);
+      setSummaryError(guardado ? null : 'Resumo indisponível sem ligação.');
+      setSummaryLoading(false);
+      return;
+    }
     summaryAbortRef.current?.abort();
     const controller = new AbortController();
     summaryAbortRef.current = controller;
@@ -194,15 +216,34 @@ const Visualizador = ({ usuarioLogado }) => {
       // — só recalcula (e volta a pagar a IA) quando o utilizador pede "Regenerar".
       const res = await api.get(`/materiais/${id}/resumo${forcar ? '?forcar=true' : ''}`, { signal: controller.signal });
       setSummary(res.data.resumo || 'Resumo não disponível.');
+      setResumoTraduzido(null);
+      setIdiomaResumo('pt');
+      // A cópia offline (se existir) fica com o resumo para ler sem rede.
+      if (res.data.resumo && estaGuardadoOffline(id)) actualizarResumoOffline(id, res.data.resumo);
     } catch (err) {
       if (err.code === 'ERR_CANCELED' || err.name === 'CanceledError' || err.name === 'AbortError') return;
       setSummaryError('Não foi possível gerar o resumo no momento.');
     } finally {
       if (!controller.signal.aborted) setSummaryLoading(false);
     }
-  }, [material, id]);
+  }, [material, id, semRede]);
 
   useEffect(() => { if (material) fetchSummary(); }, [material, fetchSummary]);
+
+  const alternarIdiomaResumo = async () => {
+    if (idiomaResumo === 'en') { setIdiomaResumo('pt'); return; }
+    if (resumoTraduzido) { setIdiomaResumo('en'); return; }
+    setATraduzir(true);
+    try {
+      const res = await api.get(`/materiais/${id}/resumo/traducao?idioma=en`, { timeout: 60000 });
+      setResumoTraduzido(res.data.resumo);
+      setIdiomaResumo('en');
+    } catch (err) {
+      setToast({ message: err.response?.data?.erro || 'Não foi possível traduzir o resumo.', type: 'error' });
+    } finally {
+      setATraduzir(false);
+    }
+  };
 
   /* Cancela o pedido de resumo em curso ao desmontar (ex: utilizador navega para outra página). */
   useEffect(() => () => summaryAbortRef.current?.abort(), []);
@@ -223,7 +264,7 @@ const Visualizador = ({ usuarioLogado }) => {
     setChatInput('');
     setChatEnviando(true);
     try {
-      const res = await api.post(`/materiais/${id}/chat`, { mensagem: texto });
+      const res = await api.post(`/materiais/${id}/chat`, { mensagem: texto, historico: chatMessages.slice(-6) });
       setChatMessages(prev => [...prev, { autor: 'ia', texto: res.data.resposta }]);
     } catch (err) {
       const erroTexto = err.response?.data?.erro || 'Não foi possível responder agora. Tente novamente.';
@@ -435,7 +476,7 @@ const Visualizador = ({ usuarioLogado }) => {
         {semRede && (
           <div className="flex items-center gap-3 rounded-2xl px-5 py-3" style={{ background: "var(--status-warning-bg)", border: "1px solid var(--status-warning-border)", color: "var(--status-warning-text)" }}>
             <WifiOff size={18} />
-            <p style={{ fontSize: 13.5, fontWeight: 600 }}>Sem ligação — a mostrar a cópia guardada neste dispositivo. Avaliações, comentários e resumo ficam disponíveis quando a ligação voltar.</p>
+            <p style={{ fontSize: 13.5, fontWeight: 600 }}>Sem ligação — a mostrar a cópia guardada neste dispositivo. Avaliações, comentários, quiz e perguntas à IA ficam disponíveis quando a ligação voltar.</p>
           </div>
         )}
 
@@ -451,7 +492,8 @@ const Visualizador = ({ usuarioLogado }) => {
             </video>
           ) : isPDF ? (
             <iframe
-              src={urlLocal || material.url_arquivo}
+              key={paginaPdf || 0}
+              src={(urlLocal || material.url_arquivo) + (paginaPdf ? `#page=${paginaPdf}` : '')}
               className="w-full"
               style={{ minHeight: "72vh", background: "#fff" }}
               title={`PDF — ${material.titulo}`}
@@ -515,7 +557,8 @@ const Visualizador = ({ usuarioLogado }) => {
           const separadores = [
             { key: 'avaliacoes', label: 'Avaliações', icon: Star },
             { key: 'comentarios', label: 'Comentários', icon: MessageCircle },
-            ...(config.ia_activada && isPDF ? [{ key: 'quiz', label: 'Quiz', icon: BrainCircuit }] : []),
+            ...(isPDF ? [{ key: 'leitura', label: 'Leitura', icon: BookMarked }] : []),
+            ...(config.ia_activada && isPDF ? [{ key: 'quiz', label: 'Quiz', icon: BrainCircuit }, { key: 'flashcards', label: 'Flashcards', icon: Layers }] : []),
             ...(podeRemover || material.versao > 1 ? [{ key: 'versoes', label: material.versao > 1 ? `Versões (v${material.versao})` : 'Versões', icon: History }] : []),
           ];
           const activo = separadores.some(s => s.key === separador) ? separador : 'avaliacoes';
@@ -543,6 +586,11 @@ const Visualizador = ({ usuarioLogado }) => {
                 {activo === 'avaliacoes' && <Avaliacoes embutido materialId={material.id} usuarioId={usuarioLogado?.id} />}
                 {activo === 'comentarios' && <Comentarios embutido materialId={material.id} usuarioId={usuarioLogado?.id} ehAdmin={usuarioLogado?.papel === 'admin'} />}
                 {activo === 'quiz' && <Quiz embutido materialId={material.id} tipo={material.tipo} onToast={mostrarToast} />}
+                {activo === 'flashcards' && <Flashcards embutido materialId={material.id} podeRegenerar={podeRemover} onToast={mostrarToast} />}
+                {activo === 'leitura' && (
+                  <LeituraNotas embutido materialId={material.id} paginaActual={paginaPdf} onToast={mostrarToast}
+                    onIrParaPagina={(p) => { setPaginaPdf(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }} />
+                )}
                 {activo === 'versoes' && (
                   <VersoesMaterial
                     embutido
@@ -586,9 +634,24 @@ const Visualizador = ({ usuarioLogado }) => {
                   <h3 style={{ fontSize: 18, fontWeight: 900, color: "#fff", lineHeight: 1 }}>Resumo IA</h3>
                 </div>
               </div>
+              <div className="flex items-center gap-2">
+              {config.ia_activada && summary && !summaryLoading && !semRede && (
+                <button
+                  onClick={alternarIdiomaResumo}
+                  disabled={aTraduzir}
+                  className="h-10 rounded-xl px-3 inline-flex items-center gap-1.5 text-xs font-black transition-all duration-200 disabled:opacity-40"
+                  style={idiomaResumo === 'en'
+                    ? { background: "var(--color-gold)", color: "var(--color-navy-deep)" }
+                    : { background: "rgba(255,255,255,0.09)", border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.70)" }}
+                  title={idiomaResumo === 'en' ? "Ver em português" : "Traduzir para inglês"}
+                  aria-label={idiomaResumo === 'en' ? "Ver em português" : "Traduzir para inglês"}
+                >
+                  <Languages size={14} className={aTraduzir ? 'animate-pulse' : ''} /> {idiomaResumo === 'en' ? 'PT' : 'EN'}
+                </button>
+              )}
               <button
                 onClick={() => fetchSummary(true)}
-                disabled={summaryLoading}
+                disabled={summaryLoading || semRede}
                 className="w-10 h-10 rounded-xl grid place-items-center transition-all duration-200 disabled:opacity-40"
                 style={{ background: "rgba(255,255,255,0.09)", border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.55)" }}
                 onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.18)", e.currentTarget.style.color = "#fff")}
@@ -598,6 +661,7 @@ const Visualizador = ({ usuarioLogado }) => {
               >
                 <RotateCcw size={15} className={summaryLoading ? 'animate-spin' : ''} />
               </button>
+              </div>
             </div>
 
             <div
@@ -624,7 +688,7 @@ const Visualizador = ({ usuarioLogado }) => {
                   </button>
                 </div>
               ) : summary ? (
-                <SummaryRenderer text={summary} />
+                <SummaryRenderer text={idiomaResumo === 'en' && resumoTraduzido ? resumoTraduzido : summary} />
               ) : (
                 <div className="flex flex-col items-center justify-center py-12 gap-2">
                   <div className="w-9 h-9 rounded-full border-[3px] animate-spin" style={{ borderColor: "rgba(255,255,255,0.12)", borderTopColor: "var(--color-gold)" }} />
@@ -634,7 +698,7 @@ const Visualizador = ({ usuarioLogado }) => {
             </div>
 
             {/* Chat de acompanhamento — perguntas dirigidas à IA sobre este material específico */}
-            {summary && !summaryLoading && !summaryError && (
+            {summary && !summaryLoading && !summaryError && !semRede && (
               <div style={{ marginTop: 20, paddingTop: 18, borderTop: "1px solid rgba(255,255,255,0.10)" }}>
                 <div className="flex items-center gap-2 mb-3">
                   <MessageCircle size={14} style={{ color: "var(--color-gold)" }} />

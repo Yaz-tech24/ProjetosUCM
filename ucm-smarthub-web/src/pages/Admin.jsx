@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import api from "../services/api";
 import {
   ShieldCheck, CheckCircle, XCircle, Clock, AlertTriangle, X, MessageCircle, Trash2,
-  Settings, Upload, Plus, Save, Sparkles, Users, UserPlus, Mail, GraduationCap, Lock, Database, Tag as TagIcon,
+  Settings, Upload, Plus, Save, Sparkles, Users, UserPlus, Mail, GraduationCap, Lock, Database, Tag as TagIcon, Activity,
 } from "lucide-react";
 import { useConfig } from "../context/ConfigContext";
 import { aplicarPaleta } from "../utils/palette";
@@ -10,6 +10,7 @@ import Toast from "../components/Toast";
 import ConfirmModal from "../components/ConfirmModal";
 import { Etiqueta } from "../components/TagsMaterial";
 import FilaDenuncias from "../components/FilaDenuncias";
+import PainelSistema from "../components/PainelSistema";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 const TIPOS_FICHEIRO_OPCOES = [
@@ -28,7 +29,7 @@ const Admin = ({ usuarioLogado }) => {
   const { config, cursos, capacidades, refetchConfig } = useConfig();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [aba, setAba]           = useState(() => (['materiais', 'chat', 'utilizadores', 'config', 'denuncias'].includes(searchParams.get('aba')) ? searchParams.get('aba') : 'materiais'));
+  const [aba, setAba]           = useState(() => (['materiais', 'chat', 'utilizadores', 'config', 'denuncias', 'sistema'].includes(searchParams.get('aba')) ? searchParams.get('aba') : 'materiais'));
   const [denunciasPendentes, setDenunciasPendentes] = useState(0);
   const [pendentes, setPendentes] = useState([]);
   const [loading, setLoading]   = useState(true);
@@ -483,6 +484,7 @@ const Admin = ({ usuarioLogado }) => {
             { key: 'utilizadores', label: 'Utilizadores',      icon: Users, badge: 0 },
             { key: 'denuncias',    label: 'Denúncias',         icon: AlertTriangle, badge: denunciasPendentes },
             { key: 'config',       label: 'Configurações',     icon: Settings, badge: 0 },
+            { key: 'sistema',      label: 'Sistema',           icon: Activity, badge: 0 },
           ].map(({ key, label, icon: Icon, badge }) => (
             <button
               key={key}
@@ -920,6 +922,9 @@ const Admin = ({ usuarioLogado }) => {
         {aba === 'denuncias' && (
           <FilaDenuncias navigate={navigate} onToast={showToast} onContagem={setDenunciasPendentes} />
         )}
+
+        {/* ═══ SISTEMA: saúde, digest, manutenção ═══════════════════ */}
+        {aba === 'sistema' && <PainelSistema onToast={showToast} />}
 
         {aba === 'config' && configForm && (
           <div className="space-y-6">

@@ -75,7 +75,7 @@ CREATE TABLE IF NOT EXISTS auditoria (
   PRIMARY KEY (id),
   KEY usuario_id (usuario_id),
   KEY idx_auditoria_data_acao (data_hora, acao),
-  CONSTRAINT auditoria_ibfk_1 FOREIGN KEY (usuario_id) REFERENCES usuarios (id)
+  CONSTRAINT auditoria_ibfk_1 FOREIGN KEY (usuario_id) REFERENCES usuarios (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Sistema de Avaliações (stars + comentários)

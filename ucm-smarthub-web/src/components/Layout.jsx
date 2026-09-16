@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { BookOpen, Home, Library, ShieldCheck, Search, MessageCircle, LogOut, Bell, X, Sun, Moon, Menu, KeyRound, BarChart3, MessageCircleQuestion, FolderOpen, CalendarDays } from 'lucide-react';
+import { BookOpen, Home, Library, ShieldCheck, Search, MessageCircle, LogOut, X, Sun, Moon, Menu, KeyRound, BarChart3, MessageCircleQuestion, FolderOpen, CalendarDays, HandHelping } from 'lucide-react';
 import NotificacoesDropdown from './NotificacoesDropdown';
+import PaletaComandos from './PaletaComandos';
 import Chatbot from './Chatbot';
 import { useConfig } from '../context/ConfigContext';
 import { useTheme } from '../context/ThemeContext';
@@ -11,6 +12,7 @@ const NAV_ITEMS = [
   { label: 'Repositório',     icon: Library,       path: '/repositorio' },
   { label: 'Chat Estudantes', icon: MessageCircle, path: '/chat'        },
   { label: 'Perguntas',       icon: MessageCircleQuestion, path: '/perguntas' },
+  { label: 'Pedidos',         icon: HandHelping,   path: '/pedidos'     },
   { label: 'Colecções',       icon: FolderOpen,    path: '/colecoes'    },
   { label: 'Calendário',      icon: CalendarDays,  path: '/calendario'  },
   { label: 'Segurança',       icon: KeyRound,      path: '/seguranca'   },
@@ -21,7 +23,7 @@ const Layout = ({ usuarioLogado, onLogout }) => {
   const { tema, alternarTema } = useTheme();
   const navigate  = useNavigate();
   const location  = useLocation();
-  const [searchTerm,   setSearchTerm]   = useState('');
+  const [paletaAberta, setPaletaAberta] = useState(false);
   const [chatOpen,     setChatOpen]     = useState(false);
   const [sidebarOpen,  setSidebarOpen]  = useState(false);
   const searchInputRef = useRef(null);
@@ -40,12 +42,13 @@ const Layout = ({ usuarioLogado, onLogout }) => {
      que possam abrir o assistente de IA flutuante — ex: o atalho no Dashboard. */
   const outletContext = useMemo(() => ({ openChatbot: () => setChatOpen(true) }), []);
 
-  /* Atalho global Ctrl+K / Cmd+K — foca a pesquisa a partir de qualquer página */
+  /* Atalho global Ctrl+K / Cmd+K — abre a paleta de pesquisa a partir de qualquer página */
   useEffect(() => {
     const handler = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        searchInputRef.current?.focus();
+        setPaletaAberta(true);
+        searchInputRef.current?.blur();
       }
     };
     document.addEventListener('keydown', handler);
@@ -54,14 +57,6 @@ const Layout = ({ usuarioLogado, onLogout }) => {
 
 
   const handleLogout = () => { if (onLogout) onLogout(); navigate('/login'); };
-
-  /* Pesquisa global: navega para repositório com ?q= */
-  const handleSearch = (e) => {
-    e.preventDefault();
-    if (!searchTerm.trim()) return;
-    navigate(`/repositorio?q=${encodeURIComponent(searchTerm.trim())}`);
-    setSearchTerm('');
-  };
 
   if (!usuarioLogado) {
     return (
@@ -311,22 +306,20 @@ const Layout = ({ usuarioLogado, onLogout }) => {
             </div>
 
             <div className="flex items-center gap-3">
-              {/* Pesquisa que funciona */}
-              <form onSubmit={handleSearch} className="flex items-center">
-                <div
-                  className="flex items-center gap-3 rounded-2xl px-4 py-3 w-full max-w-sm transition-all duration-200"
+              {/* Pesquisa global — abre a paleta (Ctrl+K) */}
+              <div className="flex items-center">
+                <button
+                  type="button"
+                  ref={searchInputRef}
+                  onClick={() => setPaletaAberta(true)}
+                  className="flex items-center gap-3 rounded-2xl px-4 py-3 w-full max-w-sm transition-all duration-200 text-left"
                   style={{ background: "var(--surface-card-glass)", border: "1.5px solid var(--border-subtle-strong)", boxShadow: "0 2px 12px rgba(var(--color-navy-mid-rgb),0.05)" }}
+                  aria-label="Pesquisar (Ctrl+K)"
                 >
                   <Search size={17} style={{ color: "var(--text-faint)", flexShrink: 0 }} />
-                  <input
-                    ref={searchInputRef}
-                    type="text"
-                    value={searchTerm}
-                    onChange={e => setSearchTerm(e.target.value)}
-                    placeholder="Pesquisar materiais..."
-                    className="bg-transparent outline-none text-sm w-full"
-                    style={{ color: "var(--text-heading)" }}
-                  />
+                  <span className="text-sm w-full truncate" style={{ color: "var(--text-faint)", minWidth: 0 }}>
+                    <span className="hidden sm:inline">Pesquisar materiais, perguntas…</span><span className="sm:hidden">Pesquisar</span>
+                  </span>
                   <kbd
                     className="hidden sm:inline-flex items-center justify-center shrink-0"
                     style={{
@@ -338,8 +331,8 @@ const Layout = ({ usuarioLogado, onLogout }) => {
                   >
                     Ctrl K
                   </kbd>
-                </div>
-              </form>
+                </button>
+              </div>
 
               {/* Alternar modo claro/escuro */}
               <button
@@ -371,6 +364,7 @@ const Layout = ({ usuarioLogado, onLogout }) => {
         </div>
 
         {config.ia_activada && <Chatbot usuarioLogado={usuarioLogado} chatOpen={chatOpen} setChatOpen={setChatOpen} />}
+        <PaletaComandos aberta={paletaAberta} onFechar={() => setPaletaAberta(false)} navigate={navigate} ehAdmin={usuarioLogado?.papel === 'admin'} />
       </main>
     </div>
   );

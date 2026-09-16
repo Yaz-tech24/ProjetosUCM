@@ -7,6 +7,8 @@ const { autenticar } = require("../middleware/auth");
 const { limitarAvaliacoes } = require("../middleware/rateLimiters");
 const { auditar } = require("../middleware/auditoria");
 const { paraUrlAbsoluto } = require("../utils/urls");
+const { prepararEntradas, escreverZip, nomeFicheiroSeguro } = require("../services/exportarZip");
+const { limitarZip } = require("../middleware/rateLimiters");
 
 const schemaColecao = z.object({
   nome: z.string().trim().min(2, "Dê um nome à colecção.").max(100, "Máximo 100 caracteres."),
@@ -227,6 +229,54 @@ module.exports = function registarRotasColecoes(app) {
     } catch (erro) {
       console.error("Erro ao abrir colecção:", erro.message);
       res.status(500).json({ erro: "Erro ao abrir colecção." });
+    }
+  });
+
+  /**
+   * @openapi
+   * /api/colecoes/{slug}/zip:
+   *   get:
+   *     summary: Descarrega os PDFs da colecção num .zip (pública ou do próprio). Vídeos ficam de fora.
+   *     tags: [Colecções]
+   *     responses:
+   *       200: { description: Ficheiro zip em streaming, content: { application/zip: {} } }
+   *       404: { description: Colecção não encontrada, privada ou sem PDFs }
+   *       413: { description: Excede o limite de tamanho para exportação }
+   */
+  app.get("/api/colecoes/:slug/zip", autenticar, limitarZip, async (req, res) => {
+    try {
+      const [[colecao]] = await db.query(
+        "SELECT c.id, c.nome, c.publica, c.usuario_id, u.nome AS dono FROM colecoes c JOIN usuarios u ON u.id = c.usuario_id WHERE c.slug = ?",
+        [String(req.params.slug)]
+      );
+      if (!colecao || (!colecao.publica && colecao.usuario_id !== req.utilizador.id)) {
+        return res.status(404).json({ erro: "Colecção não encontrada ou privada." });
+      }
+      const [materiais] = await db.query(
+        `SELECT m.id, m.titulo, m.cadeira, m.tipo, m.url_arquivo, u.nome AS autor
+         FROM colecoes_materiais cm JOIN materiais m ON m.id = cm.material_id JOIN usuarios u ON u.id = m.autor_id
+         WHERE cm.colecao_id = ? AND m.status = 'aprovado'
+         ORDER BY cm.ordem ASC, cm.adicionado_em ASC`,
+        [colecao.id]
+      );
+      const { entradas, ignorados } = await prepararEntradas(materiais);
+      if (entradas.length === 0) return res.status(404).json({ erro: "Esta colecção não tem PDFs disponíveis para exportar." });
+
+      auditar(req.utilizador.id, "exportar_colecao_zip", "colecao", colecao.id, `${entradas.length} ficheiro(s)`, req.ip);
+      const leiame = [
+        `Colecção: ${colecao.nome}`, `Criada por: ${colecao.dono}`, `Exportada em: ${new Date().toLocaleString("pt-PT")}`, "",
+        ...materiais.filter(m => m.tipo === "PDF").map((m, i) => `${String(i + 1).padStart(2, "0")}. ${m.titulo} — ${m.cadeira} (${m.autor})`),
+        ...(ignorados ? ["", `${ignorados} item(ns) não incluído(s): vídeos ou ficheiros indisponíveis.`] : []),
+      ].join("\n");
+      res.setHeader("Content-Type", "application/zip");
+      res.setHeader("Content-Disposition", `attachment; filename="${nomeFicheiroSeguro(colecao.nome)}.zip"`);
+      res.setHeader("Cache-Control", "no-store");
+      await escreverZip(res, entradas, { leiame });
+    } catch (erro) {
+      if (res.headersSent) { console.error("Erro a meio do zip:", erro.message); return res.end(); }
+      if (erro.status) return res.status(erro.status).json({ erro: erro.message });
+      console.error("Erro ao exportar colecção:", erro.message);
+      res.status(500).json({ erro: "Erro ao exportar a colecção." });
     }
   });
 

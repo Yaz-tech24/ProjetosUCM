@@ -16,10 +16,12 @@ RUN microdnf install -y cronie \
  && microdnf clean all
 
 COPY backup-cron.sh /usr/local/bin/backup-cron.sh
+COPY verificar-backup.sh /usr/local/bin/verificar-backup.sh
+COPY restaurar.sh /usr/local/bin/restaurar.sh
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY crontab /etc/cron.d/backup-cron
 
-RUN chmod +x /usr/local/bin/backup-cron.sh /usr/local/bin/entrypoint.sh \
+RUN chmod +x /usr/local/bin/backup-cron.sh /usr/local/bin/verificar-backup.sh /usr/local/bin/restaurar.sh /usr/local/bin/entrypoint.sh \
  && chmod 0644 /etc/cron.d/backup-cron
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

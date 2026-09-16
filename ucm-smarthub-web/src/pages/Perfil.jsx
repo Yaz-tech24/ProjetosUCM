@@ -1,9 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import api from "../services/api";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   User, Mail, GraduationCap, ShieldCheck, Lock, Upload, Trash2,
-  Save, KeyRound, IdCard, Phone, AlertTriangle, UserX,
+  Save, KeyRound, IdCard, Phone, AlertTriangle, UserX, Newspaper,
 } from "lucide-react";
 import { useConfig } from "../context/ConfigContext";
 import Toast from "../components/Toast";
@@ -11,11 +11,37 @@ import { Cartao, Campo, BotaoPrimario, BotaoSecundario } from "../components/ui"
 import ConfirmModal from "../components/ConfirmModal";
 import Reputacao from "../components/Reputacao";
 import Subscricoes from "../components/Subscricoes";
+import EstatisticasEstudo from "../components/EstatisticasEstudo";
+import Conquistas from "../components/Conquistas";
 
 const Perfil = ({ usuarioLogado, onUpdateUsuario, onLogout }) => {
   const { config } = useConfig();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const [digest, setDigest] = useState(usuarioLogado?.digest_semanal !== false);
+  const [aGuardarDigest, setAGuardarDigest] = useState(false);
   const [eliminarAberto, setEliminarAberto] = useState(false);
+
+  /* Link directo a uma secção (ex: notificação de conquista → /perfil?sep=conquistas) */
+  useEffect(() => {
+    const sep = searchParams.get("sep");
+    if (sep) setTimeout(() => document.getElementById(`perfil-${sep}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 300);
+  }, [searchParams]);
+
+  const alternarDigest = async () => {
+    const novo = !digest;
+    setAGuardarDigest(true);
+    try {
+      await api.put("/perfil/preferencias", { digest_semanal: novo });
+      setDigest(novo);
+      onUpdateUsuario({ digest_semanal: novo });
+      showToast(novo ? "Resumo semanal activado." : "Resumo semanal desligado.");
+    } catch (err) {
+      showToast(err.response?.data?.erro || "Não foi possível guardar.", "error");
+    } finally {
+      setAGuardarDigest(false);
+    }
+  };
   const [senhaEliminar, setSenhaEliminar] = useState("");
   const [codigoEliminar, setCodigoEliminar] = useState("");
   const [confirmarEliminar, setConfirmarEliminar] = useState("");
@@ -212,9 +238,30 @@ const Perfil = ({ usuarioLogado, onUpdateUsuario, onLogout }) => {
           </form>
         </Cartao>
 
+        {/* ═══ ESTUDO ══════════════════════════════════════════ */}
+        <div id="perfil-estudo"><EstatisticasEstudo /></div>
+        <div id="perfil-conquistas"><Conquistas usuarioId={usuarioLogado.id} proprio /></div>
+
         {/* ═══ COMUNIDADE ═════════════════════════════════════ */}
         <Reputacao usuarioId={usuarioLogado.id} />
         <Subscricoes />
+
+        {/* ═══ COMUNICAÇÃO ════════════════════════════════════ */}
+        <Cartao icon={Newspaper} titulo="Resumo semanal" subtitulo="Uma vez por semana: materiais novos, perguntas sem resposta e eventos das suas disciplinas">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <p style={{ fontSize: 13.5, color: "var(--text-body)", maxWidth: 460, lineHeight: 1.6 }}>
+              Chega como notificação na plataforma{config.contacto_email !== undefined ? " e, se o email estiver configurado, também por email" : ""}. Só é enviado quando há novidades nas disciplinas que subscreve.
+            </p>
+            <button type="button" role="switch" aria-checked={digest} onClick={alternarDigest} disabled={aGuardarDigest}
+              className="inline-flex items-center gap-3 rounded-2xl px-4 py-2.5 text-sm font-bold transition-all disabled:opacity-60"
+              style={digest ? { background: "var(--status-success-bg)", border: "1px solid var(--status-success-border)", color: "var(--status-success-text)" } : { background: "var(--surface-hover)", border: "1px solid var(--border-subtle-strong)", color: "var(--text-muted)" }}>
+              <span className="relative inline-block w-10 h-6 rounded-full transition-colors" style={{ background: digest ? "var(--status-success-text)" : "var(--border-subtle-strong)" }}>
+                <span className="absolute top-1 w-4 h-4 rounded-full bg-white transition-all" style={{ left: digest ? 22 : 4 }} />
+              </span>
+              {digest ? "Activado" : "Desligado"}
+            </button>
+          </div>
+        </Cartao>
 
         {/* ═══ SEGURANÇA ══════════════════════════════════════ */}
         <Cartao icon={Lock} titulo="Segurança" subtitulo="Altere a sua palavra-passe periodicamente">

@@ -8,6 +8,7 @@ import {
   Users, Heart, BookOpen, Upload,
 } from "lucide-react";
 import { useConfig } from "../context/ConfigContext";
+import ContinuarEstudo from "../components/ContinuarEstudo";
 
 /* Card de estatística */
 const StatCard = ({ icon: Icon, label, value, iconBg, glow, delay }) => (
@@ -220,6 +221,9 @@ const Dashboard = ({ usuarioLogado }) => {
           </div>
         </div>
       </section>
+
+      {/* ═══ CONTINUAR A ESTUDAR (leituras a meio + flashcards de hoje) ═══ */}
+      <ContinuarEstudo />
 
       {/* ═══ ACESSO RÁPIDO ═════════════════════════════════════════ */}
       <section className="grid gap-4 sm:grid-cols-3">

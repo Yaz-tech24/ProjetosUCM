@@ -15,6 +15,7 @@ const { notificarSubscritores, criarNotificacao } = require("../services/notific
 const { formatoConvertivel, conversaoDisponivel, converterParaPdf } = require("../services/conversao");
 const { indexarMaterial, consultaBooleana } = require("../services/indexacao");
 const { apagarFicheirosMaterial } = require("../services/ficheirosMaterial");
+const traducao = require("../services/traducao");
 const { limitarChat, limitarAvaliacoes } = require("../middleware/rateLimiters");
 const { uploadsDir, upload } = require("../middleware/upload");
 const { schemaMaterial } = require("../schemas");
@@ -217,7 +218,7 @@ module.exports = function registarRotasMateriais(app) {
       const materialId = parseInt(req.params.id, 10);
       const [resultado] = await db.query(
         `SELECT m.id, m.titulo, m.cadeira, m.tipo, m.url_arquivo, m.data_upload, m.status, m.autor_id, u.nome AS autor,
-                m.visualizacoes, m.downloads, m.versao, m.formato_original
+                m.visualizacoes, m.downloads, m.versao, m.formato_original, m.resumo_texto AS resumo
          FROM materiais m
          JOIN usuarios u ON m.autor_id = u.id
          WHERE m.status = 'aprovado' AND m.id = ?`,
@@ -441,6 +442,44 @@ Responde APENAS com as 3 notas numeradas. Sem introdução, sem conclusão.`;
 
   /**
    * @openapi
+   * /api/materiais/{id}/resumo/traducao:
+   *   get:
+   *     summary: Resumo por IA traduzido (pt ou en), com cache invalidada quando o resumo muda
+   *     tags: [Materiais]
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema: { type: integer }
+   *       - in: query
+   *         name: idioma
+   *         required: true
+   *         schema: { type: string, enum: [pt, en] }
+   *     responses:
+   *       200: { description: "{ resumo, idioma, cache }" }
+   *       404: { description: Material sem resumo gerado ainda }
+   */
+  app.get("/api/materiais/:id/resumo/traducao", autenticar, limitarChat, async (req, res) => {
+    try {
+      const config = await getConfiguracoes();
+      if (!config.ia_activada) return res.status(503).json({ erro: "Funcionalidades de IA desactivadas pelo administrador." });
+      const idioma = String(req.query.idioma || "").toLowerCase();
+      if (!traducao.IDIOMAS[idioma]) return res.status(400).json({ erro: "Idioma inválido (pt ou en)." });
+      const materialId = parseInt(req.params.id, 10);
+      const [[material]] = await db.query("SELECT id, resumo_texto FROM materiais WHERE id = ? AND status = 'aprovado'", [materialId]);
+      if (!material) return res.status(404).json({ erro: "Material não encontrado." });
+      if (!material.resumo_texto) return res.status(404).json({ erro: "Este material ainda não tem resumo gerado." });
+      const { texto, cache } = await traducao.traduzirComCache({ materialId, campo: "resumo", idioma, texto: material.resumo_texto });
+      res.json({ resumo: texto, idioma, cache });
+    } catch (erro) {
+      if (erro.status) return res.status(erro.status).json({ erro: erro.message });
+      console.error("Erro ao traduzir resumo:", erro.message);
+      res.status(500).json({ erro: "Não foi possível traduzir o resumo." });
+    }
+  });
+
+  /**
+   * @openapi
    * /api/materiais/{id}/chat:
    *   post:
    *     summary: Pergunta de acompanhamento à IA sobre um material específico (baseada no resumo/conteúdo)
@@ -483,7 +522,7 @@ Responde APENAS com as 3 notas numeradas. Sem introdução, sem conclusão.`;
 
       const materialId = parseInt(req.params.id, 10);
       const [resultado] = await db.query(
-        `SELECT m.id, m.titulo, m.cadeira, m.tipo, m.url_arquivo, u.nome AS autor
+        `SELECT m.id, m.titulo, m.cadeira, m.tipo, m.url_arquivo, m.texto_extraido, m.resumo_texto, u.nome AS autor
          FROM materiais m
          JOIN usuarios u ON m.autor_id = u.id
          WHERE m.status = 'aprovado' AND m.id = ?`,
@@ -494,24 +533,33 @@ Responde APENAS com as 3 notas numeradas. Sem introdução, sem conclusão.`;
       }
       const material = resultado[0];
 
-      // Mesmo texto que alimenta o resumo — assim a conversa mantém-se ancorada
-      // no conteúdo real do documento, não apenas no seu título.
+      // Mesmo texto que alimenta o resumo e a pesquisa — já indexado em
+      // materiais.texto_extraido (services/indexacao.js); só se reextrai o
+      // PDF se a indexação ainda não tiver corrido para este material.
       let trimmedText = "";
       if (material.tipo === "PDF") {
-        const urlParts = material.url_arquivo.split('/').filter(p => p && p !== "..");
-        const fileName = urlParts[urlParts.length - 1];
-        const filePath = path.join(uploadsDir, fileName);
-
-        if (fileName && !fileName.includes("..") && fs.existsSync(filePath)) {
-          try {
-            const pdfText = await extractPdfText(filePath);
-            trimmedText = pdfText.slice(0, 12000);
-          } catch (pdfErro) {
-            console.error("Erro ao extrair texto do PDF para chat:", pdfErro.message);
+        let pdfText = material.texto_extraido || "";
+        if (!pdfText) {
+          const urlParts = material.url_arquivo.split('/').filter(p => p && p !== "..");
+          const fileName = urlParts[urlParts.length - 1];
+          const filePath = path.join(uploadsDir, fileName);
+          if (fileName && !fileName.includes("..") && fs.existsSync(filePath)) {
+            try {
+              pdfText = await extractPdfText(filePath);
+            } catch (pdfErro) {
+              console.error("Erro ao extrair texto do PDF para chat:", pdfErro.message);
+            }
           }
         }
+        trimmedText = pdfText.slice(0, 12000);
       }
       const temTexto = trimmedText.trim().length > 0;
+      // Histórico curto (últimas trocas) enviado pelo cliente — mantém o fio
+      // da conversa sem guardar nada no servidor.
+      const historico = Array.isArray(req.body.historico)
+        ? req.body.historico.slice(-6).filter(h => h && typeof h.texto === "string" && ["utilizador", "ia"].includes(h.autor))
+            .map(h => `${h.autor === "utilizador" ? "Estudante" : "Assistente"}: ${h.texto.slice(0, 1500)}`).join("\n")
+        : "";
 
       const utilizadorNome = req.utilizador?.nome || "estudante";
       const prompt = `És o assistente académico de IA da plataforma "${config.nome_plataforma}", a esclarecer dúvidas de ${utilizadorNome} sobre um material específico do repositório.
@@ -529,7 +577,7 @@ Regras de resposta:
 - Nunca inventes dados, números ou citações que não estejam no documento
 - Português europeu, tom de tutor — directo, sem introduções nem despedidas desnecessárias
 
-Pergunta do estudante: ${mensagem.trim()}`;
+${historico ? `Conversa até agora:\n${historico}\n\n` : ""}Pergunta do estudante: ${mensagem.trim()}`;
 
       const fallback = "Não consegui obter uma resposta neste momento. Tente novamente dentro de instantes.";
       const resposta = await gerarResumoIA(prompt, fallback);

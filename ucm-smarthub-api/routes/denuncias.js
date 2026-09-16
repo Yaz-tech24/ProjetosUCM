@@ -8,6 +8,8 @@ const { auditar } = require("../middleware/auditoria");
 const { criarNotificacao } = require("../services/notificacoes");
 const { atualizarReputacao } = require("../services/reputacao");
 const { apagarFicheirosMaterial } = require("../services/ficheirosMaterial");
+const { classificarDenuncia } = require("../services/moderacaoDenuncias");
+const { getConfiguracoes } = require("../services/plataforma");
 
 const TIPOS = ["material", "comentario", "mensagem", "pergunta", "resposta"];
 const MOTIVOS = ["conteudo_improprio", "direitos_autor", "spam", "informacao_errada", "assedio", "outro"];
@@ -34,7 +36,7 @@ async function descreverRecurso(tipo, id) {
   const [[linha]] = await db.query(`SELECT * FROM \`${def.tabela}\` WHERE id = ?`, [id]);
   if (!linha) return null;
   const extra = tipo === "comentario" ? linha.material_id : tipo === "resposta" ? linha.pergunta_id : null;
-  return { existe: true, resumo: String(linha[def.titulo] || "").slice(0, 160), link: def.link(id, extra) };
+  return { existe: true, resumo: String(linha[def.titulo] || "").slice(0, 160), conteudo: String(linha[def.titulo] || ""), link: def.link(id, extra) };
 }
 
 module.exports = function registarRotasDenuncias(app) {
@@ -78,6 +80,18 @@ module.exports = function registarRotasDenuncias(app) {
       );
       auditar(req.utilizador.id, "denunciar_conteudo", tipo, recurso_id, `Motivo: ${motivo}`, req.ip);
 
+      // Sugestão da IA para o admin (best-effort, nunca bloqueia a denúncia).
+      // Materiais não têm texto curto para classificar — ficam para revisão humana.
+      if (tipo !== "material") {
+        const config = await getConfiguracoes().catch(() => ({}));
+        if (config.moderacao_ia_activada) {
+          const ia = await classificarDenuncia({ tipo, motivo, detalhes, conteudo: recurso.conteudo, proposito: config.descricao_proposito });
+          if (ia) {
+            await db.query("UPDATE denuncias SET ia_classificacao = ?, ia_sugestao = ?, ia_motivo = ? WHERE id = ?", [ia.classificacao, ia.sugestao, ia.motivo, r.insertId]).catch(() => {});
+          }
+        }
+      }
+
       // Avisa os admins em tempo real — a fila só é útil se alguém a vir.
       const [admins] = await db.query("SELECT id FROM usuarios WHERE papel = 'admin'");
       for (const a of admins) {
@@ -111,6 +125,7 @@ module.exports = function registarRotasDenuncias(app) {
       const offset = (page - 1) * limit;
       const [denuncias] = await db.query(
         `SELECT d.id, d.tipo, d.recurso_id, d.motivo, d.detalhes, d.estado, d.criado_em, d.resolvida_em,
+                d.ia_classificacao, d.ia_sugestao, d.ia_motivo,
                 u.nome AS denunciante, a.nome AS resolvida_por_nome
          FROM denuncias d
          LEFT JOIN usuarios u ON u.id = d.usuario_id
@@ -121,7 +136,10 @@ module.exports = function registarRotasDenuncias(app) {
       const enriquecidas = [];
       for (const d of denuncias) {
         const recurso = await descreverRecurso(d.tipo, d.recurso_id);
-        enriquecidas.push({ ...d, recurso: recurso || { existe: false, resumo: "(conteúdo já removido)", link: null } });
+        // `conteudo` completo só serve à IA — a fila mostra o resumo.
+        const publico = { ...(recurso || { existe: false, resumo: "(conteúdo já removido)", link: null }) };
+        delete publico.conteudo;
+        enriquecidas.push({ ...d, recurso: publico });
       }
       const [[{ total }]] = await db.query("SELECT COUNT(*) AS total FROM denuncias WHERE estado = ?", [estado]);
       const [[{ pendentes }]] = await db.query("SELECT COUNT(*) AS pendentes FROM denuncias WHERE estado = 'pendente'");

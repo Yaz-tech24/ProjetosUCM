@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { io } from "socket.io-client";
-import { Bell, X, CheckCheck, MessageCircle, ShieldAlert, FileCheck, CalendarDays, Flag, Award, BellRing, Trash2 } from "lucide-react";
+import { adquirirSocket, libertarSocket } from "../services/socket";
+import { Bell, X, CheckCheck, MessageCircle, ShieldAlert, FileCheck, CalendarDays, Flag, Award, BellRing, Trash2, Trophy, HandHelping, Newspaper, Activity, PackageCheck } from "lucide-react";
 import api from "../services/api";
 
 const ICONES = {
   moderacao: FileCheck, comentario: MessageCircle, resposta: MessageCircle, resposta_aceite: Award,
   novo_material: BellRing, calendario: CalendarDays, lembrete: CalendarDays, denuncia: Flag,
   denuncia_fechada: Flag, seguranca: ShieldAlert,
+  conquista: Trophy, pedido: HandHelping, pedido_atendido: PackageCheck, digest: Newspaper, sistema: Activity,
 };
 
 const tempoRelativo = (valor) => {
@@ -45,16 +46,16 @@ const NotificacoesDropdown = ({ navigate }) => {
   // Contador ao montar + socket para novas notificações
   useEffect(() => {
     carregar(1);
-    const apiBase = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace("/api", "");
-    const sock = io(apiBase, { withCredentials: true, reconnectionDelayMax: 10000 });
-    sock.on("notificacao", (n) => {
+    const sock = adquirirSocket();
+    const aoReceber = (n) => {
       setLista(prev => [n, ...prev].slice(0, 50));
       setNaoLidas(c => c + 1);
       if (typeof Notification !== "undefined" && Notification.permission === "granted" && document.hidden) {
         try { new Notification(n.titulo, { body: n.mensagem || "", icon: "/icons/icon-192.png" }); } catch { /* browser sem suporte */ }
       }
-    });
-    return () => sock.disconnect();
+    };
+    sock.on("notificacao", aoReceber);
+    return () => { sock.off("notificacao", aoReceber); libertarSocket(); };
   }, [carregar]);
 
   useEffect(() => {

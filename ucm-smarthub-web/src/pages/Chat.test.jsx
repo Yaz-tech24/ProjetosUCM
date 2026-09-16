@@ -22,9 +22,15 @@ function criarSocketFalso() {
 }
 
 let socketFalso;
+// A app liga-se através de services/socket.js (import nomeado `io`) — o
+// mock expõe as duas formas para não depender de como é importado.
 vi.mock("socket.io-client", () => ({
   default: vi.fn(() => socketFalso),
+  io: vi.fn(() => socketFalso),
 }));
+
+const mockNavigate = vi.fn();
+vi.mock("react-router-dom", () => ({ useNavigate: () => mockNavigate }));
 
 const configFalso = { chat_activado: true };
 const cursosFalsos = [{ id: 1, nome: "Geral" }, { id: 2, nome: "Informática" }];
@@ -54,12 +60,32 @@ describe("Chat", () => {
 
   it("entra automaticamente na sala do curso do próprio utilizador", async () => {
     render(<Chat usuarioLogado={utilizadorEstudante} />);
-    await waitFor(() => expect(socketFalso.emit).toHaveBeenCalledWith("joinRoom", { curso: "Informática" }));
+    await waitFor(() => expect(socketFalso.emit).toHaveBeenCalledWith("joinRoom", expect.objectContaining({ sala: "Informática" })));
   });
 
   it("cai na primeira sala disponível quando o curso do utilizador não tem sala própria", async () => {
     render(<Chat usuarioLogado={{ ...utilizadorEstudante, curso: "Curso Sem Sala" }} />);
-    await waitFor(() => expect(socketFalso.emit).toHaveBeenCalledWith("joinRoom", { curso: "Geral" }));
+    await waitFor(() => expect(socketFalso.emit).toHaveBeenCalledWith("joinRoom", expect.objectContaining({ sala: "Geral" })));
+  });
+
+  it("mostra as salas das disciplinas subscritas ao lado dos cursos", async () => {
+    api.get.mockImplementation((url) => Promise.resolve({ data: url === "/chat/salas" ? { cursos: [], disciplinas: [{ nome: "Cálculo I", sala: "disc:Cálculo I" }] } : [] }));
+    render(<Chat usuarioLogado={utilizadorEstudante} />);
+    const aba = await screen.findByText("Cálculo I");
+    fireEvent.click(aba);
+    await waitFor(() => expect(socketFalso.emit).toHaveBeenCalledWith("joinRoom", expect.objectContaining({ sala: "disc:Cálculo I" })));
+    expect(screen.getByPlaceholderText("Mensagem em Cálculo I...")).toBeInTheDocument();
+  });
+
+  it("uma mensagem com material partilhado mostra o cartão para o abrir", async () => {
+    api.get.mockImplementation((url) => Promise.resolve({
+      data: url.startsWith("/chat/messages")
+        ? [{ id: 5, message: "Vejam estes slides", userId: 2, userName: "Bruno", timestamp: new Date().toISOString(), curso: "Informática", material_id: 15, material_titulo: "Slides de Redes", material_tipo: "PDF" }]
+        : [],
+    }));
+    render(<Chat usuarioLogado={utilizadorEstudante} />);
+    expect(await screen.findByText("Slides de Redes")).toBeInTheDocument();
+    expect(screen.getByTitle("Abrir material")).toBeInTheDocument();
   });
 
   it("carrega e mostra o histórico de mensagens da sala", async () => {
@@ -76,7 +102,7 @@ describe("Chat", () => {
 
   it("mostra uma mensagem recebida em tempo real via socket", async () => {
     render(<Chat usuarioLogado={utilizadorEstudante} />);
-    await waitFor(() => expect(socketFalso.emit).toHaveBeenCalledWith("joinRoom", { curso: "Informática" }));
+    await waitFor(() => expect(socketFalso.emit).toHaveBeenCalledWith("joinRoom", expect.objectContaining({ sala: "Informática" })));
 
     act(() => {
       socketFalso._trigger("message", {
@@ -89,21 +115,21 @@ describe("Chat", () => {
 
   it("envia uma mensagem válida via socket.emit e limpa o campo", async () => {
     render(<Chat usuarioLogado={utilizadorEstudante} />);
-    await waitFor(() => expect(socketFalso.emit).toHaveBeenCalledWith("joinRoom", { curso: "Informática" }));
+    await waitFor(() => expect(socketFalso.emit).toHaveBeenCalledWith("joinRoom", expect.objectContaining({ sala: "Informática" })));
 
     const campo = screen.getByPlaceholderText(/Mensagem em/i);
     fireEvent.change(campo, { target: { value: "Alguém já fez o exercício 3?" } });
     fireEvent.click(screen.getByRole("button", { name: /Enviar/i }));
 
-    expect(socketFalso.emit).toHaveBeenCalledWith("sendMessage", {
-      message: "Alguém já fez o exercício 3?", curso: "Informática",
-    });
+    expect(socketFalso.emit).toHaveBeenCalledWith("sendMessage", expect.objectContaining({
+      message: "Alguém já fez o exercício 3?", sala: "Informática", material_id: undefined,
+    }));
     expect(campo.value).toBe("");
   });
 
   it("bloqueia uma mensagem reprovada pelo filtro de conteúdo e mostra o aviso, sem a enviar", async () => {
     render(<Chat usuarioLogado={utilizadorEstudante} />);
-    await waitFor(() => expect(socketFalso.emit).toHaveBeenCalledWith("joinRoom", { curso: "Informática" }));
+    await waitFor(() => expect(socketFalso.emit).toHaveBeenCalledWith("joinRoom", expect.objectContaining({ sala: "Informática" })));
     socketFalso.emit.mockClear();
 
     const campo = screen.getByPlaceholderText(/Mensagem em/i);

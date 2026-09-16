@@ -24,6 +24,7 @@ const Seguranca   = lazy(() => import("./pages/Seguranca"));
 const Colecoes    = lazy(() => import("./pages/Colecoes"));
 const Perguntas   = lazy(() => import("./pages/Perguntas"));
 const Calendario  = lazy(() => import("./pages/Calendario"));
+const Pedidos     = lazy(() => import("./pages/Pedidos"));
 
 // ─── Fallback de carregamento entre páginas ───────────────────
 const PageLoader = () => (
@@ -187,6 +188,7 @@ const App = () => {
           <Route path="perguntas"   element={<Perguntas   usuarioLogado={usuarioLogado} />} />
           <Route path="perguntas/:id" element={<Perguntas usuarioLogado={usuarioLogado} />} />
           <Route path="calendario"  element={<Calendario  usuarioLogado={usuarioLogado} />} />
+          <Route path="pedidos"     element={<Pedidos     usuarioLogado={usuarioLogado} />} />
         </Route>
 
         {/* ─── 404 ────────────────────────────────────────── */}
