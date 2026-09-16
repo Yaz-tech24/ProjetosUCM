@@ -3,11 +3,23 @@ const path = require("path");
 const db = require("../config/db");
 const mailer = require("./email");
 const { genAI } = require("./ia");
+const { estatisticasIA } = require("./gemini");
+const { estadoPreGeracao } = require("./preGeracao");
+
 const { conversaoDisponivel } = require("./conversao");
 const { estadoMigracoes } = require("../db/migracoes");
 const { uploadsDir } = require("../middleware/upload");
 const { criarNotificacao } = require("./notificacoes");
 const { getConfiguracoes } = require("./plataforma");
+
+// Resumo curto das estatísticas da IA para o cartão de Admin → Sistema
+// (o detalhe completo está em GET /api/admin/ia).
+function resumoIA() {
+  const s = estatisticasIA();
+  const totais = Object.values(s.porRecurso).reduce((t, r) => ({ chamadas: t.chamadas + r.chamadas, ok: t.ok + r.ok, quota_429: t.quota_429 + r.quota_429, procura_503: t.procura_503 + r.procura_503 }), { chamadas: 0, ok: 0, quota_429: 0, procura_503: 0 });
+  const pre = estadoPreGeracao();
+  return { modelos: s.modelos, chamadas: totais.chamadas, taxa_sucesso: totais.chamadas ? Math.round((totais.ok / totais.chamadas) * 100) : null, quota_429: totais.quota_429, procura_503: totais.procura_503, em_espera: s.em_espera, pre_geracao: { activa: pre.activa, fila: pre.fila, processados: pre.processados, pausa: pre.motivo_pausa } };
+}
 
 // Estado de saúde do sistema (BD, LibreOffice, fila de indexação, disco,
 // backups) e alertas aos administradores quando algo fica mal durante mais
@@ -97,7 +109,7 @@ async function estadoDetalhado() {
   const servicos = {
     bd, indexacao, disco, backups,
     libreoffice: { ...libreoffice, critico: false },
-    ia: { ok: true, configurada: Boolean(genAI) },
+    ia: { ok: true, configurada: Boolean(genAI), ...resumoIA() },
     email: { ok: true, configurado: mailer.emailConfigurado() },
     migracoes,
     digest: { dia_semana: digest.DIA_SEMANA, hora: digest.HORA },

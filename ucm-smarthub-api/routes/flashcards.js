@@ -3,9 +3,9 @@ const { autenticar } = require("../middleware/auth");
 const { limitarChat, limitarAvaliacoes } = require("../middleware/rateLimiters");
 const { auditar } = require("../middleware/auditoria");
 const { getConfiguracoes } = require("../services/plataforma");
-const { indexarMaterial } = require("../services/indexacao");
 const { verificarConquistas } = require("../services/conquistas");
 const flashcards = require("../services/flashcards");
+const { garantirFlashcards } = require("../services/geracaoIA");
 
 async function carregarCartoes(materialId, usuarioId) {
   const [linhas] = await db.query(
@@ -69,24 +69,8 @@ module.exports = function registarRotasFlashcards(app) {
 
       let cartoes = await carregarCartoes(materialId, req.utilizador.id);
       if (cartoes.length === 0) {
-        if (material.tipo !== "PDF") return res.status(400).json({ erro: "Os flashcards só estão disponíveis para documentos PDF." });
-        let texto = material.texto_extraido;
-        if (!texto && !material.texto_indexado_em) {
-          await indexarMaterial(materialId, material.url_arquivo);
-          const [[actualizado]] = await db.query("SELECT texto_extraido FROM materiais WHERE id = ?", [materialId]);
-          texto = actualizado?.texto_extraido;
-        }
-        if (!texto || texto.trim().length < 400) {
-          return res.status(400).json({ erro: "Este PDF não tem texto suficiente para gerar flashcards (pode ser uma digitalização)." });
-        }
-        const { cartoes: gerados, modelo } = await flashcards.gerarFlashcards({ nomePlataforma: config.nome_plataforma, titulo: material.titulo, cadeira: material.cadeira, texto });
-        // Só insere se entretanto ninguém gerou (dois pedidos simultâneos).
-        const [[{ existentes }]] = await db.query("SELECT COUNT(*) AS existentes FROM flashcards WHERE material_id = ?", [materialId]);
-        if (Number(existentes) === 0) {
-          for (const [i, c] of gerados.entries()) {
-            await db.query("INSERT INTO flashcards (material_id, ordem, frente, verso, modelo) VALUES (?, ?, ?, ?, ?)", [materialId, i, c.frente, c.verso, modelo]);
-          }
-        }
+        // Gera e guarda (pedidos simultâneos partilham a mesma geração).
+        await garantirFlashcards(material, config);
         cartoes = await carregarCartoes(materialId, req.utilizador.id);
       }
 
@@ -101,7 +85,7 @@ module.exports = function registarRotasFlashcards(app) {
         })),
       });
     } catch (erro) {
-      if (erro.status) return res.status(erro.status).json({ erro: erro.message });
+      if (erro.status) return res.status(erro.status).json({ erro: erro.codigo === "nao_pdf" ? "Os flashcards só estão disponíveis para documentos PDF." : erro.codigo === "sem_texto" ? "Este PDF não tem texto suficiente para gerar flashcards (pode ser uma digitalização)." : erro.message, codigo: erro.codigo });
       console.error("Erro nos flashcards:", erro.message);
       res.status(500).json({ erro: "Erro ao preparar os flashcards." });
     }

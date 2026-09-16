@@ -1,23 +1,11 @@
 const util = require("util");
 const fs = require("fs");
 const { PDFParse } = require("pdf-parse");
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+// Cliente partilhado: cadeia de modelos, repetições, fila e estatísticas
+// vivem em services/gemini.js — aqui ficam só as funções de negócio.
+const { genAI, GEMINI_MODELS, chamarGemini, extrairJson } = require("./gemini");
 
 const readFile = util.promisify(fs.readFile);
-
-// Instância Gemini criada uma vez ao carregar o módulo
-const genAI = process.env.GEMINI_API_KEY
-  ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
-  : null;
-
-// Modelos a tentar por ordem (testados e confirmados a responder com a chave configurada).
-// "gemini-flash-latest" é um alias que a Google mantém apontado ao modelo "flash" mais
-// recente disponível — funciona como rede de segurança extra se um modelo fixo for descontinuado.
-const GEMINI_MODELS = [
-  "gemini-2.5-flash",
-  "gemini-flash-latest",
-  "gemini-3.5-flash",
-];
 
 async function extractPdfText(filePath) {
   const dataBuffer = await readFile(filePath);
@@ -32,21 +20,18 @@ async function extractPdfText(filePath) {
   }
 }
 
-async function gerarResumoIA(prompt, fallbackText) {
-  if (!genAI) return fallbackText;
-
-  for (const modelName of GEMINI_MODELS) {
-    try {
-      const model = genAI.getGenerativeModel({ model: modelName });
-      const result = await model.generateContent(prompt);
-      const text = result.response.text();
-      if (text && text.trim().length > 0) return text;
-    } catch {
-      // tenta próximo modelo
-    }
+// Texto livre com fallback: nunca lança — quem chama decide o que mostrar
+// quando a IA não responde (o resumo genérico, a mensagem "tente de novo").
+// `recurso` rotula a chamada nas estatísticas de Admin → Sistema.
+async function gerarResumoIA(prompt, fallbackText, { recurso = "texto", cliente = genAI } = {}) {
+  if (!cliente) return fallbackText;
+  try {
+    const { texto } = await chamarGemini({ prompt, recurso, cliente });
+    return texto;
+  } catch (erro) {
+    console.error(`[IA] ${recurso}: ${erro.message}`);
+    return fallbackText;
   }
-
-  return fallbackText;
 }
 
 // Verifica com a IA se um material corresponde ao propósito configurado da plataforma.
@@ -73,21 +58,11 @@ ou, se não corresponder ao propósito:
 {"conforme": false, "motivo": "razão curta e específica em português"}`;
 
   try {
-    // responseMimeType força o Gemini a devolver JSON puro (sem markdown à
-    // volta) — mais fiável do que confiar só na instrução do prompt. A
-    // extracção por regex abaixo mantém-se como rede de segurança, para o
-    // caso (raro, mas visto na prática) de a resposta vir na mesma envolta
-    // em texto extra.
-    const model = cliente.getGenerativeModel({
-      model: GEMINI_MODELS[0],
-      generationConfig: { responseMimeType: "application/json" },
-    });
-    const result = await model.generateContent(prompt);
-    const texto = result.response.text().trim();
-    const jsonMatch = texto.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return { sinalizado: false, motivo: null };
-
-    const parsed = JSON.parse(jsonMatch[0]);
+    // JSON puro pedido ao modelo; a extracção tolerante mantém-se como rede
+    // de segurança para respostas envoltas em texto/cercas. A moderação corre
+    // no upload com o aluno à espera: uma tentativa por modelo, 15 s no total.
+    const { texto } = await chamarGemini({ prompt, recurso: "moderacao_upload", json: true, tentativas: 1, orcamentoMs: 15000, cliente });
+    const parsed = extrairJson(texto);
     if (parsed.conforme === false) {
       return { sinalizado: true, motivo: String(parsed.motivo || "Possível desvio do propósito da plataforma.").slice(0, 500) };
     }

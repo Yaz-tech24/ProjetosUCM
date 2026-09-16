@@ -109,6 +109,7 @@ const Visualizador = ({ usuarioLogado }) => {
   const [paginaPdf,      setPaginaPdf]      = useState(null);    // #page=N no iframe (retomar leitura / marcador)
   const [idiomaResumo,   setIdiomaResumo]   = useState('pt');
   const [resumoTraduzido, setResumoTraduzido] = useState(null);
+  const [resumoProvisorio, setResumoProvisorio] = useState(null); // mensagem da IA quando devolveu um texto genérico
   const [aTraduzir,      setATraduzir]      = useState(false);
 
   const summaryAbortRef = useRef(null);
@@ -214,15 +215,20 @@ const Visualizador = ({ usuarioLogado }) => {
     try {
       // Sem forcar: o backend devolve o resumo já gerado antes (cache), se existir
       // — só recalcula (e volta a pagar a IA) quando o utilizador pede "Regenerar".
-      const res = await api.get(`/materiais/${id}/resumo${forcar ? '?forcar=true' : ''}`, { signal: controller.signal });
+      // A IA pode levar mais de 20 s (repetições em 429/503 no servidor) — o
+      // timeout por defeito da API cortava a espera a meio.
+      const res = await api.get(`/materiais/${id}/resumo${forcar ? '?forcar=true' : ''}`, { signal: controller.signal, timeout: 120000 });
       setSummary(res.data.resumo || 'Resumo não disponível.');
+      // Provisório = a IA não respondeu e o servidor devolveu um texto genérico
+      // (não fica em cache): mostra-se o aviso e o botão para tentar de novo.
+      setResumoProvisorio(res.data.provisorio ? (res.data.erro_ia || 'A IA não respondeu; este resumo é genérico.') : null);
       setResumoTraduzido(null);
       setIdiomaResumo('pt');
-      // A cópia offline (se existir) fica com o resumo para ler sem rede.
-      if (res.data.resumo && estaGuardadoOffline(id)) actualizarResumoOffline(id, res.data.resumo);
+      // A cópia offline (se existir) fica com o resumo real para ler sem rede.
+      if (res.data.resumo && !res.data.provisorio && estaGuardadoOffline(id)) actualizarResumoOffline(id, res.data.resumo);
     } catch (err) {
       if (err.code === 'ERR_CANCELED' || err.name === 'CanceledError' || err.name === 'AbortError') return;
-      setSummaryError('Não foi possível gerar o resumo no momento.');
+      setSummaryError(err.response?.data?.erro || (err.code === 'ECONNABORTED' ? 'A IA demorou demasiado a responder. Tente novamente.' : 'Não foi possível gerar o resumo no momento.'));
     } finally {
       if (!controller.signal.aborted) setSummaryLoading(false);
     }
@@ -264,7 +270,7 @@ const Visualizador = ({ usuarioLogado }) => {
     setChatInput('');
     setChatEnviando(true);
     try {
-      const res = await api.post(`/materiais/${id}/chat`, { mensagem: texto, historico: chatMessages.slice(-6) });
+      const res = await api.post(`/materiais/${id}/chat`, { mensagem: texto, historico: chatMessages.slice(-6) }, { timeout: 90000 });
       setChatMessages(prev => [...prev, { autor: 'ia', texto: res.data.resposta }]);
     } catch (err) {
       const erroTexto = err.response?.data?.erro || 'Não foi possível responder agora. Tente novamente.';
@@ -688,7 +694,15 @@ const Visualizador = ({ usuarioLogado }) => {
                   </button>
                 </div>
               ) : summary ? (
-                <SummaryRenderer text={idiomaResumo === 'en' && resumoTraduzido ? resumoTraduzido : summary} />
+                <>
+                  {resumoProvisorio && (
+                    <div className="flex flex-wrap items-center gap-2 rounded-xl px-3.5 py-2.5 mb-3" style={{ background: "rgba(245,158,11,0.14)", border: "1px solid rgba(245,158,11,0.40)", color: "#fde68a", fontSize: 12.5, lineHeight: 1.5 }}>
+                      <span className="flex-1 min-w-[10rem]"><strong>Resumo provisório.</strong> {resumoProvisorio}</span>
+                      <button onClick={() => fetchSummary(true)} className="rounded-lg px-3 py-1.5 text-xs font-black" style={{ background: "var(--color-gold)", color: "var(--color-navy-deep)" }}>Tentar de novo</button>
+                    </div>
+                  )}
+                  <SummaryRenderer text={idiomaResumo === 'en' && resumoTraduzido ? resumoTraduzido : summary} />
+                </>
               ) : (
                 <div className="flex flex-col items-center justify-center py-12 gap-2">
                   <div className="w-9 h-9 rounded-full border-[3px] animate-spin" style={{ borderColor: "rgba(255,255,255,0.12)", borderTopColor: "var(--color-gold)" }} />

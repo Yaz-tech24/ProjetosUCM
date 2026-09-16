@@ -1,4 +1,11 @@
-const { genAI, GEMINI_MODELS } = require("./ia");
+const { SchemaType } = require("@google/generative-ai");
+const { genAI, chamarGemini, extrairJson } = require("./gemini");
+
+const SCHEMA = {
+  type: SchemaType.OBJECT,
+  properties: { classificacao: { type: SchemaType.STRING }, sugestao: { type: SchemaType.STRING }, motivo: { type: SchemaType.STRING } },
+  required: ["classificacao", "sugestao", "motivo"],
+};
 
 // Classificação assistida de denúncias: a IA lê o conteúdo reportado e o
 // motivo, e SUGERE uma acção ao administrador. Nunca decide sozinha — a fila
@@ -39,12 +46,6 @@ RESPONDE APENAS com JSON válido, sem cercas de código:
 {"classificacao":"...","sugestao":"...","motivo":"..."}`;
 }
 
-function extrairJson(texto) {
-  const m = String(texto).replace(/```(?:json)?/gi, "").match(/\{[\s\S]*\}/);
-  if (!m) throw new Error("Resposta sem JSON.");
-  return JSON.parse(m[0]);
-}
-
 function normalizar(parsed) {
   const classificacao = CLASSIFICACOES.includes(parsed?.classificacao) ? parsed.classificacao : "incerto";
   const sugestao = SUGESTOES.includes(parsed?.sugestao) ? parsed.sugestao : "rever";
@@ -55,23 +56,15 @@ function normalizar(parsed) {
 async function classificarDenuncia({ tipo, motivo, detalhes, conteudo, proposito }, cliente = genAI) {
   if (!cliente || !conteudo) return null;
   const prompt = construirPrompt({ tipo, motivo, detalhes, conteudo, proposito });
-  // Mesma cadeia de modelos dos outros serviços de IA: um modelo em quota ou
-  // descontinuado não deixa a fila sem sugestões.
-  let ultimoErro = null;
-  for (const modelo of GEMINI_MODELS) {
-    try {
-      const model = cliente.getGenerativeModel({ model: modelo, generationConfig: { responseMimeType: "application/json", temperature: 0.1 } });
-      const resultado = await Promise.race([
-        model.generateContent(prompt),
-        new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), TIMEOUT_MS).unref?.()),
-      ]);
-      return normalizar(extrairJson(resultado.response.text()));
-    } catch (erro) {
-      ultimoErro = erro;
-    }
+  try {
+    // Corre dentro do pedido de denúncia — 2 tentativas e timeout curto para
+    // não prender quem reporta; sem sugestão a fila continua a funcionar.
+    const { texto } = await chamarGemini({ prompt, recurso: "moderacao_denuncias", json: true, schema: SCHEMA, temperature: 0.1, tentativas: 1, orcamentoMs: 15000, timeoutMs: TIMEOUT_MS, cliente });
+    return normalizar(extrairJson(texto));
+  } catch (erro) {
+    console.error("[Moderação IA] Classificação da denúncia falhou (a ignorar):", erro.message);
+    return null;
   }
-  console.error("[Moderação IA] Classificação da denúncia falhou (a ignorar):", ultimoErro?.message);
-  return null;
 }
 
 module.exports = { classificarDenuncia, normalizar, CLASSIFICACOES, SUGESTOES };

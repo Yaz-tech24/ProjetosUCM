@@ -1,4 +1,27 @@
-const { genAI, GEMINI_MODELS } = require("./ia");
+const { SchemaType } = require("@google/generative-ai");
+const { genAI, chamarGemini, extrairJson } = require("./gemini");
+
+// Saída estruturada: o modelo é obrigado a devolver exactamente esta forma —
+// acaba com as respostas "quase JSON" que a validação abaixo rejeitava.
+const SCHEMA = {
+  type: SchemaType.OBJECT,
+  properties: {
+    perguntas: {
+      type: SchemaType.ARRAY,
+      items: {
+        type: SchemaType.OBJECT,
+        properties: {
+          pergunta: { type: SchemaType.STRING },
+          opcoes: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
+          correcta: { type: SchemaType.INTEGER },
+          explicacao: { type: SchemaType.STRING },
+        },
+        required: ["pergunta", "opcoes", "correcta", "explicacao"],
+      },
+    },
+  },
+  required: ["perguntas"],
+};
 
 const TOTAL_PERGUNTAS = 10;
 const OPCOES_POR_PERGUNTA = 4;
@@ -23,15 +46,6 @@ DOCUMENTO:
 ${texto}`;
 }
 
-// Aceita a resposta com ou sem cercas ```json e ignora lixo antes/depois.
-function extrairJson(texto) {
-  const semCercas = String(texto).replace(/```(?:json)?/gi, "").trim();
-  const inicio = semCercas.indexOf("{");
-  const fim = semCercas.lastIndexOf("}");
-  if (inicio < 0 || fim <= inicio) throw new Error("Resposta sem JSON.");
-  return JSON.parse(semCercas.slice(inicio, fim + 1));
-}
-
 function validarPerguntas(dados) {
   const lista = Array.isArray(dados?.perguntas) ? dados.perguntas : [];
   const validas = lista
@@ -48,22 +62,16 @@ function validarPerguntas(dados) {
   return validas;
 }
 
-async function gerarQuiz({ nomePlataforma, titulo, cadeira, texto }) {
-  if (!genAI) throw Object.assign(new Error("IA não configurada neste servidor."), { status: 503 });
+async function gerarQuiz({ nomePlataforma, titulo, cadeira, texto }, cliente = genAI) {
   const prompt = construirPrompt({ nomePlataforma, titulo, cadeira, texto: String(texto).slice(0, LIMITE_TEXTO) });
-
-  let ultimoErro = null;
-  for (const modelo of GEMINI_MODELS) {
-    try {
-      const model = genAI.getGenerativeModel({ model: modelo, generationConfig: { responseMimeType: "application/json", temperature: 0.4 } });
-      const resultado = await model.generateContent(prompt);
-      const perguntas = validarPerguntas(extrairJson(resultado.response.text()));
-      return { perguntas, modelo };
-    } catch (erro) {
-      ultimoErro = erro;
-    }
+  // Erros de rede/quota chegam já classificados (ErroIA, com status 429/503/502);
+  // uma resposta bem recebida mas inválida é falha de conteúdo → 502.
+  const { texto: resposta, modelo } = await chamarGemini({ prompt, recurso: "quiz", json: true, schema: SCHEMA, temperature: 0.4, cliente });
+  try {
+    return { perguntas: validarPerguntas(extrairJson(resposta)), modelo };
+  } catch (erro) {
+    throw Object.assign(new Error(`Não foi possível gerar o quiz: ${erro.message}`), { status: 502 });
   }
-  throw Object.assign(new Error(`Não foi possível gerar o quiz: ${ultimoErro?.message || "sem resposta da IA"}`), { status: 502 });
 }
 
 // Sem a resposta certa nem a explicação — só depois de responder.

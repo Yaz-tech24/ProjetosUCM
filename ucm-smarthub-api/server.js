@@ -161,6 +161,7 @@ async function iniciar() {
   require("./services/digest").agendarDigest();
   require("./services/manutencao").agendarManutencao();
   require("./services/saude").agendarMonitor();
+  require("./services/preGeracao").agendarPreGeracao();
   server.listen(PORT, () => {
     console.log(`[SmartHub] Servidor activo na porta ${PORT} | ${new Date().toISOString()}`);
     if (!genAI) console.warn("[SmartHub] GEMINI_API_KEY não definida — funcionalidades de IA desactivadas.");

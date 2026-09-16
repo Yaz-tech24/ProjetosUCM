@@ -3,16 +3,9 @@ const { autenticar } = require("../middleware/auth");
 const { limitarChat, limitarAvaliacoes } = require("../middleware/rateLimiters");
 const { auditar } = require("../middleware/auditoria");
 const { getConfiguracoes } = require("../services/plataforma");
-const { indexarMaterial } = require("../services/indexacao");
 const { atualizarReputacao } = require("../services/reputacao");
 const quiz = require("../services/quiz");
-
-async function carregarQuiz(materialId) {
-  const [[linha]] = await db.query("SELECT id, perguntas, modelo, gerado_em FROM quizzes WHERE material_id = ?", [materialId]);
-  if (!linha) return null;
-  const perguntas = typeof linha.perguntas === "string" ? JSON.parse(linha.perguntas) : linha.perguntas;
-  return { ...linha, perguntas };
-}
+const { garantirQuiz, carregarQuiz } = require("../services/geracaoIA");
 
 module.exports = function registarRotasQuiz(app) {
   /**
@@ -43,25 +36,9 @@ module.exports = function registarRotasQuiz(app) {
       );
       if (!material) return res.status(404).json({ erro: "Material não encontrado." });
 
-      let existente = await carregarQuiz(materialId);
-      if (!existente) {
-        if (material.tipo !== "PDF") return res.status(400).json({ erro: "Os quizzes só estão disponíveis para documentos PDF." });
-        let texto = material.texto_extraido;
-        if (!texto && !material.texto_indexado_em) {
-          await indexarMaterial(materialId, material.url_arquivo);
-          const [[actualizado]] = await db.query("SELECT texto_extraido FROM materiais WHERE id = ?", [materialId]);
-          texto = actualizado?.texto_extraido;
-        }
-        if (!texto || texto.trim().length < 400) {
-          return res.status(400).json({ erro: "Este PDF não tem texto suficiente para gerar perguntas (pode ser uma digitalização)." });
-        }
-        const { perguntas, modelo } = await quiz.gerarQuiz({ nomePlataforma: config.nome_plataforma, titulo: material.titulo, cadeira: material.cadeira, texto });
-        await db.query(
-          "INSERT INTO quizzes (material_id, perguntas, modelo) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE perguntas = VALUES(perguntas), modelo = VALUES(modelo), gerado_em = NOW()",
-          [materialId, JSON.stringify(perguntas), modelo]
-        );
-        existente = await carregarQuiz(materialId);
-      }
+      // Carrega ou gera (pedidos simultâneos partilham a mesma geração); os
+      // erros da IA chegam com status 429/503/502 e mensagem para o aluno.
+      const existente = await garantirQuiz(material, config);
 
       const [[melhor]] = await db.query(
         "SELECT MAX(pontuacao) AS pontuacao, MAX(total) AS total, COUNT(*) AS tentativas FROM quiz_resultados WHERE quiz_id = ? AND usuario_id = ?",
@@ -75,7 +52,7 @@ module.exports = function registarRotasQuiz(app) {
         melhor: melhor?.tentativas > 0 ? { pontuacao: melhor.pontuacao, total: melhor.total, tentativas: melhor.tentativas } : null,
       });
     } catch (erro) {
-      if (erro.status) return res.status(erro.status).json({ erro: erro.message });
+      if (erro.status) return res.status(erro.status).json({ erro: erro.codigo === "nao_pdf" ? "Os quizzes só estão disponíveis para documentos PDF." : erro.codigo === "sem_texto" ? "Este PDF não tem texto suficiente para gerar perguntas (pode ser uma digitalização)." : erro.message, codigo: erro.codigo });
       console.error("Erro no quiz:", erro.message);
       res.status(500).json({ erro: "Erro ao preparar o quiz." });
     }

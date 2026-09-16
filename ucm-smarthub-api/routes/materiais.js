@@ -15,6 +15,8 @@ const { notificarSubscritores, criarNotificacao } = require("../services/notific
 const { formatoConvertivel, conversaoDisponivel, converterParaPdf } = require("../services/conversao");
 const { indexarMaterial, consultaBooleana } = require("../services/indexacao");
 const { apagarFicheirosMaterial } = require("../services/ficheirosMaterial");
+const { gerarResumoMaterial } = require("../services/resumo");
+const preGeracao = require("../services/preGeracao");
 const traducao = require("../services/traducao");
 const { limitarChat, limitarAvaliacoes } = require("../middleware/rateLimiters");
 const { uploadsDir, upload } = require("../middleware/upload");
@@ -288,152 +290,10 @@ module.exports = function registarRotasMateriais(app) {
         return res.status(200).json({ resumo: material.resumo_texto });
       }
 
-      let resumoTexto = "";
-
-      if (material.tipo === "PDF") {
-        // url_arquivo é armazenado como "/uploads/uuid.pdf" — extrair APENAS o filename
-        // Usando split('/') para ser seguro contra path traversal (ex: "/uploads/../../../etc/passwd")
-        const urlParts = material.url_arquivo.split('/').filter(p => p && p !== "..");
-        const fileName = urlParts[urlParts.length - 1];
-
-        if (!fileName || fileName.includes("..")) {
-          console.error("Tentativa de acesso com path traversal:", material.url_arquivo);
-          return res.status(400).json({ erro: "Caminho de ficheiro inválido." });
-        }
-
-        const filePath = path.join(uploadsDir, fileName);
-
-        if (!fs.existsSync(filePath)) {
-          console.error("PDF não encontrado no disco:", filePath);
-          return res.status(404).json({ erro: "Ficheiro PDF não encontrado no servidor." });
-        }
-
-        // Texto já indexado (services/indexacao.js) evita reextrair o PDF.
-        let pdfText = material.texto_extraido || "";
-        if (!pdfText) {
-          try {
-            pdfText = await extractPdfText(filePath);
-          } catch (pdfErro) {
-            console.error("Erro ao extrair texto do PDF:", pdfErro.message);
-            // Continua sem texto — Gemini usará título e disciplina
-          }
-        }
-
-        const trimmedText = pdfText.slice(0, 12000);
-        const temTexto = trimmedText.trim().length > 0;
-
-        const promptResumo = temTexto
-          ? `És o assistente académico de IA da plataforma "${config.nome_plataforma}".
-
-Analisa o documento académico abaixo e produz um resumo de estudo completo em português europeu.
-
-USA EXACTAMENTE este formato de secções (os títulos em maiúsculas são obrigatórios):
-
-VISÃO GERAL
-[2 a 3 frases que expliquem o tema central do documento, o seu propósito e a sua importância para a disciplina]
-
-CONCEITOS FUNDAMENTAIS
-• [Nome do conceito]: [Definição clara e precisa em 1-2 frases]
-• [Repete para cada conceito relevante — mínimo 3, máximo 7]
-
-MÉTODOS E PROCEDIMENTOS
-• [Descreve cada método, fórmula, processo ou técnica que o estudante deve saber aplicar]
-• [Inclui passos ou condições de aplicação quando relevante]
-• [Omite esta secção se o material for puramente teórico]
-
-PONTOS-CHAVE PARA O EXAME
-• [Tema ou questão com alta probabilidade de aparecer na avaliação]
-• [Mínimo 3, máximo 5 pontos — específicos e accionáveis]
-
-DICA DE ESTUDO
-[1 a 2 frases com uma estratégia concreta e eficaz para estudar este material específico]
-
-REGRAS ABSOLUTAS:
-- Usa EXACTAMENTE os títulos de secção em maiúsculas como indicado
-- Cada bullet começa obrigatoriamente com "• " (bullet + espaço)
-- Baseia-te APENAS no conteúdo do documento — nunca inventes factos
-- Português europeu, linguagem académica mas acessível ao estudante universitário
-- Não uses markdown (**negrito**, _itálico_) — texto simples apenas
-
-Documento:
-Título: ${material.titulo}
-Disciplina: ${material.cadeira}
-
-Conteúdo:
-${trimmedText}`
-          : `És o assistente académico de IA da plataforma "${config.nome_plataforma}".
-
-Com base no título e disciplina abaixo, cria um resumo de estudo estruturado em português europeu.
-
-USA EXACTAMENTE este formato:
-
-VISÃO GERAL
-[2-3 frases sobre o que esta matéria aborda e a sua importância na disciplina]
-
-CONCEITOS FUNDAMENTAIS
-• [Conceito essencial 1 desta disciplina/tema]: [Definição]
-• [Conceito essencial 2]: [Definição]
-• [Conceito essencial 3]: [Definição]
-
-PONTOS-CHAVE PARA O EXAME
-• [Ponto 1 que normalmente sai nos exames desta matéria]
-• [Ponto 2]
-• [Ponto 3]
-
-DICA DE ESTUDO
-[Estratégia concreta para estudar este tema]
-
-Título: ${material.titulo}
-Disciplina: ${material.cadeira}`;
-
-        const fallback = `VISÃO GERAL
-Este documento aborda os conceitos fundamentais de ${material.cadeira} apresentados em "${material.titulo}". Compreender esta matéria é essencial para o aproveitamento académico na disciplina.
-
-CONCEITOS FUNDAMENTAIS
-• Definições base: Identifique e memorize os termos técnicos e definições centrais apresentados pelo autor.
-• Princípios teóricos: Compreenda os fundamentos que sustentam a disciplina e as suas aplicações práticas.
-• Relações entre conceitos: Analise como os diferentes tópicos se relacionam entre si.
-
-PONTOS-CHAVE PARA O EXAME
-• Questões de definição e identificação de conceitos teóricos.
-• Aplicação prática dos métodos e procedimentos estudados.
-• Análise e interpretação de casos práticos da disciplina.
-
-DICA DE ESTUDO
-Leia o material duas vezes: primeiro para compreensão geral, depois sublinhando os conceitos-chave. Crie um mapa mental ligando os tópicos principais antes de resolver exercícios práticos.`;
-
-        resumoTexto = await gerarResumoIA(promptResumo, fallback);
-      } else {
-        // Vídeo ou outro tipo
-        const promptResumo = `És o assistente académico de IA da plataforma "${config.nome_plataforma}".
-
-Com base nos metadados do material abaixo, gera 3 notas de estudo em português europeu, numeradas de 1 a 3, úteis para quem vai ver ou rever este conteúdo:
-
-1. O que aprender — o tema ou competência central que este material ensina
-2. Como estudar — a abordagem prática recomendada para tirar o máximo partido do conteúdo
-3. Para o exame — o conceito ou questão mais provável em avaliação desta matéria
-
-Título: ${material.titulo}
-Disciplina: ${material.cadeira}
-Tipo de material: ${material.tipo}
-
-Responde APENAS com as 3 notas numeradas. Sem introdução, sem conclusão.`;
-
-        const fallback = `1. Este material aborda os conceitos essenciais de ${material.cadeira} — foque-se nas definições e princípios apresentados.
-2. Tome notas durante a visualização e relacione cada conceito com exemplos da vida real ou de exercícios do manual.
-3. Reveja os temas que normalmente aparecem nos exames de ${material.cadeira} e verifique se o material os cobre.`;
-
-        resumoTexto = await gerarResumoIA(promptResumo, fallback);
-      }
-
-      // Best-effort: uma falha a guardar o cache não deve impedir a resposta
-      // de chegar ao estudante, só significa que a próxima visita gera de novo.
-      db.query(
-        "UPDATE materiais SET resumo_texto = ?, resumo_gerado_em = NOW() WHERE id = ?",
-        [resumoTexto, materialId]
-      ).catch(erroCache => console.error("Erro ao guardar cache do resumo:", erroCache.message));
-
-      res.status(200).json({ resumo: resumoTexto });
+      // Geração (e cache) no serviço — partilhado com a pré-geração em background.
+      // Um resumo provisório (IA indisponível) vem marcado e não fica em cache.
+      const r = await gerarResumoMaterial(material, config);
+      res.status(200).json({ resumo: r.resumo, provisorio: r.provisorio, ...(r.provisorio ? { erro_ia: r.erro } : {}) });
     } catch (erro) {
       console.error("Erro ao gerar resumo:", erro.message);
       res.status(500).json({ erro: "Falha ao gerar resumo do material." });
@@ -655,7 +515,10 @@ ${historico ? `Conversa até agora:\n${historico}\n\n` : ""}Pergunta do estudant
 
       atualizarReputacao(autor_id);
       if (tipo === "PDF") indexarMaterial(resultado.insertId, url_arquivo);
-      if (statusInicial === "aprovado") notificarSubscritores({ id: resultado.insertId, titulo, cadeira, tipo, autor_id });
+      if (statusInicial === "aprovado") {
+        notificarSubscritores({ id: resultado.insertId, titulo, cadeira, tipo, autor_id });
+        preGeracao.agendar(resultado.insertId, "aprovacao automatica");
+      }
     } catch (erro) {
       limparFicheiroOrfao();
       console.error("Erro ao gravar material:", erro.message);
@@ -810,6 +673,8 @@ ${historico ? `Conversa até agora:\n${historico}\n\n` : ""}Pergunta do estudant
       );
       // Quiz e resumo eram sobre o conteúdo antigo.
       await db.query("DELETE FROM quizzes WHERE material_id = ?", [materialId]).catch(() => {});
+      await db.query("DELETE FROM flashcards WHERE material_id = ?", [materialId]).catch(() => {});
+      preGeracao.agendar(materialId, "nova versao");
 
       // Só as últimas N versões ficam em disco.
       const [antigas] = await db.query(
@@ -982,6 +847,7 @@ ${historico ? `Conversa até agora:\n${historico}\n\n` : ""}Pergunta do estudant
         // Só avisa os subscritores na primeira aprovação — reaprovar um
         // material já aprovado não deve repetir o email a toda a gente.
         if (material.status !== "aprovado") notificarSubscritores(material);
+        preGeracao.agendar(material.id, "aprovacao");
       } else {
         await apagarFicheirosMaterial(id);
         await db.query("DELETE FROM materiais WHERE id = ?", [id]);

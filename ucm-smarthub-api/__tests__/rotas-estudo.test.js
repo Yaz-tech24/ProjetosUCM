@@ -418,6 +418,16 @@ describe("Sistema: health, digest e manutenção", () => {
     expect(chamadas.some(c => /DELETE FROM notificacoes WHERE lida = 1/.test(c.sql))).toBe(true);
   });
 
+  it("GET /api/admin/ia expõe modelos, estatísticas e fila de pré-geração (só admin)", async () => {
+    mockSql([]);
+    expect((await request(app).get("/api/admin/ia").set(auth(3))).status).toBe(403);
+    const res = await request(app).get("/api/admin/ia").set(auth(1, "admin"));
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.modelos)).toBe(true);
+    expect(res.body.pre_geracao).toHaveProperty("fila");
+    expect(res.body).toHaveProperty("porRecurso");
+  });
+
   it("PUT /api/perfil/preferencias guarda o opt-out do digest", async () => {
     const chamadas = mockSql([[/UPDATE usuarios SET digest_semanal/, [{ affectedRows: 1 }]]]);
     const res = await request(app).put("/api/perfil/preferencias").set(auth(3)).send({ digest_semanal: false });

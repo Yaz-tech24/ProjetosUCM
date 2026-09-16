@@ -5,6 +5,8 @@ const saude = require("../services/saude");
 const digest = require("../services/digest");
 const manutencao = require("../services/manutencao");
 const { getConfiguracoes } = require("../services/plataforma");
+const gemini = require("../services/gemini");
+const preGeracao = require("../services/preGeracao");
 
 module.exports = function registarRotasSistema(app) {
   /**
@@ -92,6 +94,55 @@ module.exports = function registarRotasSistema(app) {
     } catch (erro) {
       console.error("Erro ao enviar digest:", erro.message);
       res.status(500).json({ erro: "Erro ao enviar o digest." });
+    }
+  });
+
+  /**
+   * @openapi
+   * /api/admin/ia:
+   *   get:
+   *     summary: Estado da IA — modelos, estatísticas por funcionalidade, últimos erros e fila de pré-geração (admin)
+   *     tags: [Admin]
+   *     responses:
+   *       200: { description: Estado }
+   * /api/admin/ia/testar:
+   *   post:
+   *     summary: Faz um pedido mínimo a cada modelo da cadeia e reporta qual responde (admin)
+   *     tags: [Admin]
+   *     responses:
+   *       200: { description: Resultado por modelo }
+   * /api/admin/ia/pregerar:
+   *   post:
+   *     summary: Agenda a pré-geração de resumo/quiz/flashcards para um material ou para o backlog (admin)
+   *     tags: [Admin]
+   *     requestBody:
+   *       content:
+   *         application/json:
+   *           schema: { type: object, properties: { material_id: { type: integer } } }
+   *     responses:
+   *       200: { description: Agendado }
+   */
+  app.get("/api/admin/ia", autenticar, apenasAdmin, async (req, res) => {
+    res.json({ ...gemini.estatisticasIA(), pre_geracao: preGeracao.estadoPreGeracao() });
+  });
+
+  app.post("/api/admin/ia/testar", autenticar, apenasAdmin, async (req, res) => {
+    try {
+      const resultado = await gemini.testarModelos();
+      auditar(req.utilizador.id, "testar_modelos_ia", "sistema", null, JSON.stringify(resultado.modelos?.map(m => ({ m: m.modelo, ok: m.ok }))), req.ip);
+      res.json(resultado);
+    } catch (erro) {
+      res.status(500).json({ erro: erro.message });
+    }
+  });
+
+  app.post("/api/admin/ia/pregerar", autenticar, apenasAdmin, async (req, res) => {
+    try {
+      const materialId = Number.isInteger(req.body?.material_id) ? req.body.material_id : null;
+      const agendados = materialId ? (preGeracao.agendar(materialId, "admin") ? 1 : 0) : await preGeracao.agendarBacklog();
+      res.json({ agendados, estado: preGeracao.estadoPreGeracao() });
+    } catch (erro) {
+      res.status(500).json({ erro: erro.message });
     }
   });
 

@@ -1,4 +1,16 @@
-const { genAI, GEMINI_MODELS } = require("./ia");
+const { SchemaType } = require("@google/generative-ai");
+const { genAI, chamarGemini, extrairJson } = require("./gemini");
+
+const SCHEMA = {
+  type: SchemaType.OBJECT,
+  properties: {
+    cartoes: {
+      type: SchemaType.ARRAY,
+      items: { type: SchemaType.OBJECT, properties: { frente: { type: SchemaType.STRING }, verso: { type: SchemaType.STRING } }, required: ["frente", "verso"] },
+    },
+  },
+  required: ["cartoes"],
+};
 
 // Flashcards gerados por IA a partir do texto do PDF, revistos com uma
 // versão simplificada do algoritmo SM-2 (o do Anki): cada resposta do
@@ -27,14 +39,6 @@ DOCUMENTO:
 ${texto}`;
 }
 
-function extrairJson(texto) {
-  const semCercas = String(texto).replace(/```(?:json)?/gi, "").trim();
-  const inicio = semCercas.indexOf("{");
-  const fim = semCercas.lastIndexOf("}");
-  if (inicio < 0 || fim <= inicio) throw new Error("Resposta sem JSON.");
-  return JSON.parse(semCercas.slice(inicio, fim + 1));
-}
-
 function validarCartoes(dados) {
   const lista = Array.isArray(dados?.cartoes) ? dados.cartoes : [];
   const vistos = new Set();
@@ -52,21 +56,14 @@ function validarCartoes(dados) {
   return validos;
 }
 
-async function gerarFlashcards({ nomePlataforma, titulo, cadeira, texto }) {
-  if (!genAI) throw Object.assign(new Error("IA não configurada neste servidor."), { status: 503 });
+async function gerarFlashcards({ nomePlataforma, titulo, cadeira, texto }, cliente = genAI) {
   const prompt = construirPrompt({ nomePlataforma, titulo, cadeira, texto: String(texto).slice(0, LIMITE_TEXTO) });
-
-  let ultimoErro = null;
-  for (const modelo of GEMINI_MODELS) {
-    try {
-      const model = genAI.getGenerativeModel({ model: modelo, generationConfig: { responseMimeType: "application/json", temperature: 0.4 } });
-      const resultado = await model.generateContent(prompt);
-      return { cartoes: validarCartoes(extrairJson(resultado.response.text())), modelo };
-    } catch (erro) {
-      ultimoErro = erro;
-    }
+  const { texto: resposta, modelo } = await chamarGemini({ prompt, recurso: "flashcards", json: true, schema: SCHEMA, temperature: 0.4, cliente });
+  try {
+    return { cartoes: validarCartoes(extrairJson(resposta)), modelo };
+  } catch (erro) {
+    throw Object.assign(new Error(`Não foi possível gerar os flashcards: ${erro.message}`), { status: 502 });
   }
-  throw Object.assign(new Error(`Não foi possível gerar os flashcards: ${ultimoErro?.message || "sem resposta da IA"}`), { status: 502 });
 }
 
 // SM-2 simplificado. `estado` é a linha actual de flashcards_revisoes (ou

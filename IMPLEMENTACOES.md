@@ -25,7 +25,7 @@ Descreve o que existe, como funciona e o que precisa de configuração.
 | **Leitura: progresso, marcadores e notas** | Separador "Leitura" na página do PDF: página onde ficou (`PUT /api/materiais/:id/leitura`), marcadores e notas por página (`/api/materiais/:id/anotacoes`), tudo privado. Ao reabrir, o PDF abre em `#page=N`. "Continuar a ler" no painel inicial (`GET /api/leituras`). O visualizador é o do browser, por isso a página é indicada pelo aluno. | — |
 | **Versões** | `POST /api/materiais/:id/versoes` (autor ou admin). Mantém avaliações, comentários e tags; guarda as últimas 5 versões descarregáveis (ficheiros apagados com o material); volta a passar pela moderação por IA. | — |
 | **Word/PowerPoint → PDF** | DOCX/PPTX/DOC/PPT convertidos com LibreOffice headless no upload e em versões novas. Activar os tipos em Admin → Configurações. Testado de verdade no CI (job `conversao`) e na imagem Docker. | LibreOffice no servidor (incluído no Dockerfile; `SOFFICE_PATH` opcional). Sem ele, o upload é recusado com aviso e o Admin mostra o estado. |
-| **Resumo por IA** | Gerado uma vez e guardado em `materiais.resumo_texto`; viaja com a cópia offline. Botão **EN/PT** traduz o resumo (`GET /api/materiais/:id/resumo/traducao?idioma=en`, cache em `traducoes` invalidada quando o resumo muda). | `GEMINI_API_KEY` |
+| **Resumo por IA** | Gerado uma vez e guardado em `materiais.resumo_texto`; viaja com a cópia offline. Se a IA não responder, o texto genérico vem marcado como **provisório** e não fica em cache (antes era guardado como se fosse o resumo). Botão **EN/PT** traduz o resumo (`GET /api/materiais/:id/resumo/traducao?idioma=en`, cache em `traducoes` invalidada quando o resumo muda). | `GEMINI_API_KEY` |
 | **Perguntar ao documento** | `POST /api/materiais/:id/chat` usa o texto indexado (sem reextrair o PDF) e recebe as últimas 6 trocas como contexto. | `GEMINI_API_KEY` |
 | **Quizzes por IA** | `GET /api/materiais/:id/quiz` gera (uma vez) 10 perguntas de escolha múltipla; `POST …/quiz/respostas` corrige. Passar (≥70%) vale 2 pontos de reputação por quiz. | `GEMINI_API_KEY` |
 | **Flashcards (repetição espaçada)** | `GET /api/materiais/:id/flashcards` gera (uma vez) 20 cartões a partir do PDF; `POST /api/flashcards/:id/revisao` com `errei/dificil/facil` aplica SM-2 simplificado (facilidade e intervalo por utilizador). "Revisões de hoje" no painel inicial (`GET /api/flashcards/pendentes`). Autor/admin podem regenerar. | `GEMINI_API_KEY` |
@@ -57,6 +57,8 @@ Descreve o que existe, como funciona e o que precisa de configuração.
 
 | Funcionalidade | Como funciona | Requisitos |
 |---|---|---|
+| **Cliente de IA robusto** | Todas as chamadas ao Gemini passam por `services/gemini.js`: cadeia de modelos (`GEMINI_MODELOS`; por defeito 2.5-flash → 3.5-flash → flash-latest), repetição com espera exponencial em 429/503/500/timeout, salto imediato em 404 (modelo inexistente), paragem em 400/403 (chave), orçamento de tempo por chamada, fila com `GEMINI_CONCORRENCIA` (2) chamadas em simultâneo, saída estruturada (`responseSchema`) para quiz/flashcards/moderação, erros com mensagem em português (429 "limite de pedidos", 503 "muita procura") e estatísticas por funcionalidade em Admin → Sistema → IA (com botão **Testar modelos**). | `GEMINI_API_KEY` |
+| **Pré-geração em background** | Ao aprovar um PDF (ou nova versão), resumo, quiz e flashcards são gerados de seguida por um worker (um material de cada vez, 20 s entre materiais, pausa 10 min em 429 / 2 min em 503) — o aluno encontra tudo já feito. Backlog dos mais vistos: 3 por hora. Pedidos simultâneos para o mesmo material partilham uma única geração. `IA_PREGERAR=0` desliga. | `GEMINI_API_KEY` |
 | **Saúde e alertas** | `GET /api/health` (público, 503 se a BD estiver em baixo) e `GET /api/admin/sistema` (Admin → Sistema): BD e latência, LibreOffice, fila de indexação, disco livre, idade do último backup, migrações, IA, SMTP. O monitor corre a cada 5 min e, à 2.ª falha seguida, avisa os admins (notificação + email), no máximo uma vez por 6 h por problema, e avisa quando resolve. | `BACKUPS_DIR` para vigiar backups (o docker-compose já o define); `DISCO_MIN_MB`, `BACKUP_MAX_HORAS`. |
 | **Limpeza diária** | Sessões expiradas (30 d), registos de acesso (2 anos), auditoria e denúncias fechadas (`RETENCAO_AUDITORIA_DIAS`), notificações lidas (`RETENCAO_NOTIFICACOES_DIAS`), eventos passados (`RETENCAO_EVENTOS_DIAS`). Accionável em Admin → Sistema. | — |
 | **Backups** | Serviço `backup` do docker-compose: dump diário às 03:00 (`--single-transaction`; um `mysqldump` falhado **aborta** em vez de deixar um ficheiro vazio), espelho diário dos uploads em `backups/uploads`, snapshot `uploads_AAAAMMDD.tar.gz` ao domingo (mantém 4), e **prova de restauro** à segunda (`verificar-backup.sh`: repõe o último dump numa BD temporária e conta tabelas). Restauro completo com `./restaurar-backup.sh`. Testado ponta-a-ponta em Docker (backup → verificação → drop → restauro → 36 tabelas, uploads repostos). | Docker Compose |
@@ -71,7 +73,7 @@ pedidos: `SET NULL`).
 
 ## Testes e CI
 
-- `npm test` na API: 184 testes com `db.query` mockado (+2 de conversão real, saltados sem LibreOffice); no frontend, 44 (Vitest).
+- `npm test` na API: 196 testes com `db.query` mockado (+2 de conversão real, saltados sem LibreOffice); no frontend, 44 (Vitest).
 - `npm run smoke` na API: 70–72 verificações ponta-a-ponta contra uma API a correr e a BD real (contas descartáveis, limpas no fim).
 - `npm run fluxos` no frontend: 21 verificações de UI em Chromium headless sobre o build de produção (login 2FA, paleta, pedidos, leitura, offline).
 - CI (GitHub Actions, Node 22 = Dockerfile): testes unitários API/Web, lint e build, conversão DOCX→PDF com LibreOffice real, smoke contra MySQL 8 de serviço (com verificação de idempotência das migrações) e fluxos de UI com screenshots como artefacto.
@@ -81,5 +83,7 @@ pedidos: `SET NULL`).
 `FRONTEND_URL`, `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`,
 `GEMINI_API_KEY`, `JWT_SECRET` (obrigatória em produção), `SOFFICE_PATH`,
 `DB_PORT`, `BACKUPS_DIR`, `BACKUP_MAX_HORAS`, `DISCO_MIN_MB`, `DIGEST_DIA_SEMANA`,
-`DIGEST_HORA`, `RETENCAO_*_DIAS`, `ZIP_LIMITE_MB`, `DESATIVAR_RATE_LIMIT` (só dev).
+`DIGEST_HORA`, `RETENCAO_*_DIAS`, `ZIP_LIMITE_MB`, `GEMINI_MODELOS`, `GEMINI_CONCORRENCIA`,
+`GEMINI_TIMEOUT_MS`, `IA_PREGERAR`, `IA_PREGERAR_INTERVALO_MS`, `IA_PREGERAR_BACKLOG_HORA`,
+`DESATIVAR_RATE_LIMIT` (só dev).
 Ver `.env.example`.

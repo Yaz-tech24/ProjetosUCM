@@ -85,7 +85,7 @@ const Chatbot = ({ usuarioLogado, chatOpen: chatOpenProp, setChatOpen: setChatOp
     setChatInput("");
     setIsTyping(true);
     try {
-      const res = await api.post("/chat", { mensagem: msg });
+      const res = await api.post("/chat", { mensagem: msg }, { timeout: 90000 });
       const botText = res.data.resposta;
       setChatMessages(prev => [...prev, { sender: "bot", text: botText }]);
       speakText(botText);

@@ -1,6 +1,6 @@
 const crypto = require("crypto");
 const db = require("../config/db");
-const { genAI, GEMINI_MODELS } = require("./ia");
+const { genAI, chamarGemini } = require("./gemini");
 
 // Tradução do resumo por IA (PT ↔ EN) com cache em `traducoes`. O hash do
 // texto de origem invalida a tradução quando o resumo é regenerado.
@@ -22,22 +22,12 @@ TEXTO:
 ${texto}`;
 }
 
-async function traduzir(texto, idioma) {
-  if (!genAI) throw Object.assign(new Error("IA não configurada neste servidor."), { status: 503 });
+async function traduzir(texto, idioma, cliente = genAI) {
   if (!IDIOMAS[idioma]) throw Object.assign(new Error("Idioma não suportado."), { status: 400 });
   const prompt = construirPrompt(String(texto).slice(0, LIMITE_TEXTO), idioma);
-  let ultimoErro = null;
-  for (const modelo of GEMINI_MODELS) {
-    try {
-      const model = genAI.getGenerativeModel({ model: modelo, generationConfig: { temperature: 0.2 } });
-      const resultado = await model.generateContent(prompt);
-      const saida = resultado.response.text().trim();
-      if (saida.length > 20) return saida;
-    } catch (erro) {
-      ultimoErro = erro;
-    }
-  }
-  throw Object.assign(new Error(`Não foi possível traduzir: ${ultimoErro?.message || "sem resposta da IA"}`), { status: 502 });
+  const { texto: saida } = await chamarGemini({ prompt, recurso: "traducao", temperature: 0.2, cliente });
+  if (saida.trim().length <= 20) throw Object.assign(new Error("Não foi possível traduzir: resposta demasiado curta."), { status: 502 });
+  return saida.trim();
 }
 
 // Devolve a tradução (da cache se o texto de origem não mudou). `traduzirFn`

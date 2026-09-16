@@ -3,6 +3,7 @@ import { Activity, Database, HardDrive, FileText, Cpu, Mail, Sparkles, RefreshCw
 import api from "../services/api";
 import ConfirmModal from "./ConfirmModal";
 import { BotaoPrimario, BotaoSecundario, Spinner } from "./ui";
+import PainelIA from "./PainelIA";
 
 /* Admin → Sistema: estado detalhado (BD, LibreOffice, indexação, disco,
    backups, migrações), envio do digest semanal e limpeza manual. */
@@ -91,12 +92,17 @@ const PainelSistema = ({ onToast }) => {
               <Linha icon={HardDrive} titulo="Disco (pasta de uploads)" ok={s.disco.ok} neutro={s.disco.indisponivel} detalhe={s.disco.indisponivel ? "Sem leitura do espaço livre neste sistema" : `${mb(s.disco.livre_mb)} livres de ${mb(s.disco.total_mb)}${s.uploads ? ` · uploads: ${s.uploads.ficheiros} ficheiro(s), ${mb(s.uploads.mb)}` : ""}`} />
               <Linha icon={Archive} titulo="Backups da base de dados" ok={s.backups.ok} neutro={!s.backups.configurado} detalhe={!s.backups.configurado ? "BACKUPS_DIR não definido — a API não consegue ver a pasta de backups (defina-a para monitorizar)" : s.backups.erro || `Último: ${s.backups.ultimo} há ${s.backups.ha_horas} h (${s.backups.mb} MB) · ${s.backups.total} guardado(s)`} />
               <Linha icon={ServerCog} titulo="Migrações do esquema" ok={!s.migracoes.erro && s.migracoes.pendentes?.length === 0} detalhe={s.migracoes.erro || `${s.migracoes.aplicadas}/${s.migracoes.total} aplicadas${s.migracoes.ultima ? ` · última: ${s.migracoes.ultima.nome}` : ""}`} />
-              <Linha icon={Sparkles} titulo="IA (Gemini)" ok={s.ia.configurada} neutro={!s.ia.configurada} detalhe={s.ia.configurada ? "Chave configurada — resumos, quizzes, flashcards, traduções e moderação assistida" : "GEMINI_API_KEY não definida"} />
+              <Linha icon={Sparkles} titulo="IA (Gemini)" ok={s.ia.configurada && (s.ia.taxa_sucesso === null || s.ia.taxa_sucesso >= 60)} neutro={!s.ia.configurada}
+                detalhe={s.ia.configurada
+                  ? (s.ia.chamadas ? `${s.ia.chamadas} chamada(s) desde o arranque · ${s.ia.taxa_sucesso}% com sucesso · ${s.ia.quota_429} × 429 · ${s.ia.procura_503} × 503${s.ia.pre_geracao?.fila ? ` · ${s.ia.pre_geracao.fila} na fila de pré-geração` : ""}${s.ia.pre_geracao?.pausa ? ` · pré-geração em pausa (${s.ia.pre_geracao.pausa})` : ""}` : "Chave configurada — resumos, quizzes, flashcards, traduções e moderação assistida (detalhe abaixo)")
+                  : "GEMINI_API_KEY não definida"} />
               <Linha icon={Mail} titulo="Email (SMTP)" ok={s.email.configurado} neutro={!s.email.configurado} detalhe={s.email.configurado ? `Configurado · digest semanal ${["dom", "seg", "ter", "qua", "qui", "sex", "sáb"][s.digest.dia_semana]} às ${String(s.digest.hora).padStart(2, "0")}:00` : "Não configurado — emails não são enviados; o digest chega só como notificação"} />
             </ul>
           )}
         </div>
       </section>
+
+      <PainelIA onToast={onToast} />
 
       <section className="grid gap-6 md:grid-cols-2">
         <div className="rounded-[28px] p-7" style={{ background: "var(--surface-card)", border: "1px solid var(--border-subtle)", boxShadow: "0 4px 32px rgba(var(--color-navy-mid-rgb),0.07)" }}>
