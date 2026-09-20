@@ -1,10 +1,12 @@
 # Nota sobre "deploy.resources.limits": confirmado empiricamente (Docker
 # Compose v2, CLI "docker compose", fora do modo swarm) que estes limites
 # SÃO aplicados directamente ao container por "docker compose up" — não é
-# preciso "docker stack deploy" nem swarm activo. Os valores abaixo estão
-# dimensionados para aguentar ~100 utilizadores activos em simultâneo (uso
-# normal da plataforma — não só IA); ajuste-os para cima se o hardware real
-# do servidor tiver mais folga, ou para baixo numa VPS mais pequena.
+# preciso "docker stack deploy" nem swarm activo. "cpus" não pode exceder o
+# número de CPUs físicas da máquina onde isto corre (o Docker recusa-se a
+# arrancar o container se exceder) — por isso os tectos vêm de variáveis de
+# ambiente com defaults que cabem numa VPS de 2 vCPU típica; se o servidor
+# real tiver mais núcleos/RAM, defina DB_CPUS, API_CPUS, etc. no .env em vez
+# de editar este ficheiro.
 x-logging: &default-logging
   driver: json-file
   options:
@@ -38,8 +40,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "4.0"
-          memory: 4G
+          cpus: "${DB_CPUS:-1.0}"
+          memory: ${DB_MEMORY:-1536M}
     logging: *default-logging
 
   api:
@@ -72,13 +74,13 @@ services:
       BACKUPS_DIR: /backups
       BACKUP_MAX_HORAS: ${BACKUP_MAX_HORAS:-48}
       # Tecto de ligações simultâneas ao MySQL (ver config/db.js), dimensionado
-      # para ~100 utilizadores activos em simultâneo.
-      DB_CONNECTION_LIMIT: ${DB_CONNECTION_LIMIT:-50}
+      # para ~100 utilizadores activos em simultâneo numa VPS de 2 vCPU.
+      DB_CONNECTION_LIMIT: ${DB_CONNECTION_LIMIT:-20}
       # O Node só executa JS numa única thread, mas bcrypt (login/registo),
       # leitura de ficheiros e a compressão gzip das respostas correm na
       # threadpool do libuv — o tecto por omissão (4) tornava-se um gargalo
       # visível com dezenas de logins/pedidos comprimidos ao mesmo tempo.
-      UV_THREADPOOL_SIZE: 8
+      UV_THREADPOOL_SIZE: ${UV_THREADPOOL_SIZE:-6}
     volumes:
       - api_uploads:/app/uploads
       - ./backups:/backups:ro
@@ -89,8 +91,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "4.0"
-          memory: 2G
+          cpus: "${API_CPUS:-1.0}"
+          memory: ${API_MEMORY:-768M}
     logging: *default-logging
 
   web:
@@ -116,8 +118,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.5"
-          memory: 256M
+          cpus: "${WEB_CPUS:-0.3}"
+          memory: ${WEB_MEMORY:-256M}
     logging: *default-logging
 
   caddy:
@@ -155,8 +157,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.5"
-          memory: 256M
+          cpus: "${CADDY_CPUS:-0.3}"
+          memory: ${CADDY_MEMORY:-256M}
     logging: *default-logging
 
   backup:
