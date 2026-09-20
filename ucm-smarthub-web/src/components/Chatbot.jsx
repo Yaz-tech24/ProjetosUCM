@@ -33,10 +33,92 @@ const Chatbot = ({ usuarioLogado, chatOpen: chatOpenProp, setChatOpen: setChatOp
 
   const recognitionRef  = useRef(null);
   const messagesEndRef  = useRef(null);
+  const chatWindowRef   = useRef(null);
   // Mantém sempre a versão mais recente — o recognition é criado uma única vez
   // ao montar, por isso o seu onresult não pode fechar sobre estado desactualizado
   // (ex.: voiceEnabled), ou a resposta por voz nunca reflectiria o botão de voz.
   const sendMessageWithTextRef = useRef(null);
+
+  // Arrastar a janela pelo cabeçalho: muda a posição via "position: fixed" +
+  // left/top em pixels definidos directamente no DOM (fora do React, para não
+  // re-renderizar a cada pixel de movimento). Antes do primeiro arrasto a
+  // janela fica ancorada ao canto (bottom-4 right-4 do wrapper), como sempre;
+  // só passa a "flutuar" livremente depois de o utilizador a arrastar.
+  const iniciarArrasto = (e) => {
+    if (e.target.closest("button")) return; // não arrasta ao clicar nos botões do cabeçalho
+    const el = chatWindowRef.current;
+    if (!el) return;
+    e.preventDefault();
+    const toque = e.touches?.[0];
+    const rect = el.getBoundingClientRect();
+    const offsetX = (toque?.clientX ?? e.clientX) - rect.left;
+    const offsetY = (toque?.clientY ?? e.clientY) - rect.top;
+    document.body.style.userSelect = "none";
+
+    const mover = (ev) => {
+      const t = ev.touches?.[0];
+      const clientX = t?.clientX ?? ev.clientX;
+      const clientY = t?.clientY ?? ev.clientY;
+      if (clientX == null || clientY == null) return;
+      const largura = el.offsetWidth;
+      const altura = el.offsetHeight;
+      const novoLeft = Math.min(Math.max(clientX - offsetX, 8), window.innerWidth - largura - 8);
+      const novoTop = Math.min(Math.max(clientY - offsetY, 8), window.innerHeight - altura - 8);
+      el.style.position = "fixed";
+      el.style.left = `${novoLeft}px`;
+      el.style.top = `${novoTop}px`;
+      el.style.right = "auto";
+      el.style.bottom = "auto";
+      el.style.margin = "0";
+    };
+    const soltar = () => {
+      document.body.style.userSelect = "";
+      window.removeEventListener("mousemove", mover);
+      window.removeEventListener("mouseup", soltar);
+      window.removeEventListener("touchmove", mover);
+      window.removeEventListener("touchend", soltar);
+    };
+    window.addEventListener("mousemove", mover);
+    window.addEventListener("mouseup", soltar);
+    window.addEventListener("touchmove", mover, { passive: false });
+    window.addEventListener("touchend", soltar);
+  };
+
+  // Redimensionar pela borda esquerda: o "resize: both" nativo (ver estilo da
+  // janela abaixo) só dá uma pega no canto inferior direito — a esquerda fica
+  // sem forma de alargar a janela para a esquerda a não ser por aqui.
+  const iniciarRedimensionamentoEsquerda = (e) => {
+    const el = chatWindowRef.current;
+    if (!el) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const toque = e.touches?.[0];
+    const startX = toque?.clientX ?? e.clientX;
+    const startWidth = el.getBoundingClientRect().width;
+    const startLeft = el.getBoundingClientRect().left;
+    document.body.style.userSelect = "none";
+
+    const mover = (ev) => {
+      const t = ev.touches?.[0];
+      const clientX = t?.clientX ?? ev.clientX;
+      if (clientX == null) return;
+      const delta = startX - clientX; // arrastar para a esquerda aumenta a largura
+      const maxLargura = startLeft + startWidth - 8; // não deixa sair do ecrã à esquerda
+      const novaLargura = Math.min(Math.max(startWidth + delta, 320), maxLargura, window.innerWidth - 16);
+      el.style.width = `${novaLargura}px`;
+    };
+    const soltar = () => {
+      document.body.style.userSelect = "";
+      window.removeEventListener("mousemove", mover);
+      window.removeEventListener("mouseup", soltar);
+      window.removeEventListener("touchmove", mover);
+      window.removeEventListener("touchend", soltar);
+    };
+    window.addEventListener("mousemove", mover);
+    window.addEventListener("mouseup", soltar);
+    window.addEventListener("touchmove", mover, { passive: false });
+    window.addEventListener("touchend", soltar);
+  };
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -133,8 +215,10 @@ const Chatbot = ({ usuarioLogado, chatOpen: chatOpenProp, setChatOpen: setChatOp
       {/* ─── Janela de chat ─── */}
       {chatOpen && (
         <div
+          ref={chatWindowRef}
           className="mb-5 flex flex-col"
           style={{
+            position: "relative",
             width: "min(385px, calc(100vw - 2rem))",
             height: "min(550px, 75vh)",
             minWidth: 320,
@@ -145,7 +229,9 @@ const Chatbot = ({ usuarioLogado, chatOpen: chatOpenProp, setChatOpen: setChatOp
             // chat — "overflow: auto" (em vez de "hidden") é o que faz o browser
             // desenhar a pega de redimensionamento; nada dentro transborda na
             // prática porque o cabeçalho/rodapé são de altura fixa e só a lista
-            // de mensagens tem o seu próprio scroll interno.
+            // de mensagens tem o seu próprio scroll interno. A borda esquerda
+            // (abaixo) cobre o lado que o "resize" nativo não dá — só tem pega
+            // no canto inferior direito.
             resize: "both",
             overflow: "auto",
             borderRadius: 28,
@@ -155,6 +241,20 @@ const Chatbot = ({ usuarioLogado, chatOpen: chatOpenProp, setChatOpen: setChatOp
             animation: "chat-slide-up 0.35s cubic-bezier(0.22,1,0.36,1) both",
           }}
         >
+          {/* Pega de redimensionamento pela esquerda */}
+          <div
+            onMouseDown={iniciarRedimensionamentoEsquerda}
+            onTouchStart={iniciarRedimensionamentoEsquerda}
+            title="Arraste para redimensionar"
+            style={{
+              position: "absolute",
+              left: 0, top: 0, bottom: 0, width: 8,
+              cursor: "ew-resize",
+              zIndex: 2,
+              touchAction: "none",
+            }}
+          />
+
           {/* Barra dourada topo */}
           <div style={{
             height: 3, flexShrink: 0,
@@ -162,13 +262,17 @@ const Chatbot = ({ usuarioLogado, chatOpen: chatOpenProp, setChatOpen: setChatOp
             opacity: 0.90,
           }} />
 
-          {/* Header do chat */}
+          {/* Header do chat — arrastável para mover a janela pelo ecrã */}
           <div
+            onMouseDown={iniciarArrasto}
+            onTouchStart={iniciarArrasto}
             className="px-5 py-4 flex items-center justify-between shrink-0"
             style={{
               background: "linear-gradient(-45deg, var(--color-navy-abyss), var(--color-navy-deep), var(--color-navy))",
               backgroundSize: "300% 300%",
               animation: "aurora-chat-w 8s ease infinite",
+              cursor: "grab",
+              touchAction: "none",
             }}
           >
             <div className="flex items-center gap-3">
