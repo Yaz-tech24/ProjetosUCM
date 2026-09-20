@@ -78,14 +78,23 @@ const Chatbot = ({ usuarioLogado, chatOpen: chatOpenProp, setChatOpen: setChatOp
     window.speechSynthesis.speak(utterance);
   };
 
+  // Histórico enviado à API a cada pergunta — a API não guarda sessão de
+  // chat nenhuma, por isso é o frontend que lembra a conversa e reenvia-a
+  // (últimas 12 mensagens; ver HISTORICO_MAX_MENSAGENS em routes/chat.js).
+  // Sem isto, cada pergunta chegava à IA isolada, como se fosse a primeira.
+  const HISTORICO_MAX_MENSAGENS = 12;
+
   const sendMessageWithText = async (text) => {
     const msg = text.trim();
     if (!msg) return;
+    const historico = chatMessages
+      .slice(-HISTORICO_MAX_MENSAGENS)
+      .map(m => ({ remetente: m.sender === "user" ? "user" : "bot", texto: m.text }));
     setChatMessages(prev => [...prev, { sender: "user", text: msg }]);
     setChatInput("");
     setIsTyping(true);
     try {
-      const res = await api.post("/chat", { mensagem: msg }, { timeout: 90000 });
+      const res = await api.post("/chat", { mensagem: msg, historico }, { timeout: 90000 });
       const botText = res.data.resposta;
       setChatMessages(prev => [...prev, { sender: "bot", text: botText }]);
       speakText(botText);
@@ -124,8 +133,21 @@ const Chatbot = ({ usuarioLogado, chatOpen: chatOpenProp, setChatOpen: setChatOp
       {/* ─── Janela de chat ─── */}
       {chatOpen && (
         <div
-          className="w-[min(385px,calc(100vw-2rem))] h-[min(550px,75vh)] mb-5 flex flex-col overflow-hidden"
+          className="mb-5 flex flex-col"
           style={{
+            width: "min(385px, calc(100vw - 2rem))",
+            height: "min(550px, 75vh)",
+            minWidth: 320,
+            minHeight: 380,
+            maxWidth: "calc(100vw - 2rem)",
+            maxHeight: "85vh",
+            // Arraste pelo canto inferior direito para redimensionar a janela do
+            // chat — "overflow: auto" (em vez de "hidden") é o que faz o browser
+            // desenhar a pega de redimensionamento; nada dentro transborda na
+            // prática porque o cabeçalho/rodapé são de altura fixa e só a lista
+            // de mensagens tem o seu próprio scroll interno.
+            resize: "both",
+            overflow: "auto",
             borderRadius: 28,
             background: "#fff",
             border: "1px solid rgba(var(--color-navy-mid-rgb),0.08)",

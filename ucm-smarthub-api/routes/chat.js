@@ -16,6 +16,25 @@ const normalizarSala = (valor) => {
   return sala || "Geral";
 };
 
+// Histórico da conversa corrente do assistente flutuante (Chatbot.jsx): o
+// frontend guarda as mensagens no estado da página e reenvia-as a cada
+// pedido (a API não tem sessão de chat própria) — sem isto, cada pergunta
+// chegava à IA como se fosse a primeira, e "e depois disso?" ou "explica
+// melhor o segundo ponto" não faziam sentido nenhum para o modelo. Tectos
+// aqui por defesa em profundidade: o frontend já limita a 12 mensagens,
+// mas o corpo do pedido é controlado pelo cliente.
+const HISTORICO_MAX_MENSAGENS = 12;
+const HISTORICO_MENSAGEM_MAX = 1500;
+
+function formatarHistorico(historico) {
+  if (!Array.isArray(historico) || historico.length === 0) return "(início da conversa — sem mensagens anteriores)";
+  const linhas = historico
+    .slice(-HISTORICO_MAX_MENSAGENS)
+    .filter(h => h && typeof h.texto === "string" && h.texto.trim() && (h.remetente === "user" || h.remetente === "bot"))
+    .map(h => `${h.remetente === "user" ? "Estudante" : "Assistente"}: ${h.texto.trim().slice(0, HISTORICO_MENSAGEM_MAX)}`);
+  return linhas.length > 0 ? linhas.join("\n") : "(início da conversa — sem mensagens anteriores)";
+}
+
 module.exports = function registarRotasChat(app, io) {
   /**
    * @openapi
@@ -61,13 +80,14 @@ module.exports = function registarRotasChat(app, io) {
    */
   app.post("/api/chat", autenticar, limitarChat, async (req, res) => {
     try {
-      const { mensagem } = req.body;
+      const { mensagem, historico } = req.body;
       if (!mensagem || !mensagem.trim()) {
         return res.status(400).json({ erro: "Mensagem em falta." });
       }
       if (mensagem.length > MENSAGEM_IA_MAX) {
         return res.status(400).json({ erro: `Mensagem demasiado longa (máximo ${MENSAGEM_IA_MAX} caracteres).` });
       }
+      const historicoFormatado = formatarHistorico(historico);
 
       const config = await getConfiguracoes();
       if (!config.ia_activada) {
@@ -137,6 +157,11 @@ Regras de resposta:
 - Se não souberes algo com certeza, diz claramente e indica onde pesquisar
 - Nunca inventes factos, datas, autores ou resultados
 - Evita emojis — usa linguagem para transmitir energia e precisão
+- Não uses markdown (negrito com **, itálico com _, código entre crases, # para títulos, ou * / - no início da linha para listas) — texto simples apenas, porque a app mostra a tua resposta tal e qual, sem interpretar símbolos. Para listas usa "• " no início da linha; para realçar um termo, usa maiúsculas ou aspas em vez de negrito
+- Usa o histórico da conversa abaixo para manteres o fio à meada: responde tendo em conta o que já foi perguntado e respondido, sem repetires informação já dada nem pedires ao estudante para repetir o que ele já disse
+
+Histórico desta conversa (mais antiga primeiro):
+${historicoFormatado}
 
 Contexto da sessão:
 - Estudante: ${utilizadorNome}${utilizadorCurso ? ` | Curso: ${utilizadorCurso}` : ""}
