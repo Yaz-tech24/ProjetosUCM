@@ -17,7 +17,7 @@ const SCHEMA = {
 // estudante ("errei", "difícil", "fácil") ajusta a facilidade do cartão e o
 // intervalo até à próxima revisão.
 const TOTAL_CARTOES = 20;
-const LIMITE_TEXTO = 14000;
+const LIMITE_TEXTO = 60000;
 const FACILIDADE_MIN = 1.3;
 const FACILIDADE_INICIAL = 2.5;
 

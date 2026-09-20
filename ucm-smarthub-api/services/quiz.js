@@ -25,7 +25,7 @@ const SCHEMA = {
 
 const TOTAL_PERGUNTAS = 10;
 const OPCOES_POR_PERGUNTA = 4;
-const LIMITE_TEXTO = 14000;
+const LIMITE_TEXTO = 60000;
 
 function construirPrompt({ nomePlataforma, titulo, cadeira, texto }) {
   return `És o assistente académico de IA da plataforma "${nomePlataforma}".

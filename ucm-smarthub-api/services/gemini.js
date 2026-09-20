@@ -5,25 +5,30 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 // chamarGemini(), que trata do que cada chamada avulsa não tratava:
 //
 //  - cadeia de modelos (GEMINI_MODELOS ou a lista por defeito), passando ao
-//    seguinte quando um não existe ou está indisponível;
+//    seguinte quando um não existe ou está indisponível — com facturação
+//    activa, o "gemini-2.5-pro" (mais capaz, melhor em raciocínio e em
+//    documentos longos) vai primeiro; o "flash" fica como rede de segurança
+//    de velocidade/disponibilidade;
 //  - repetição com espera exponencial em erros transitórios (429 quota/
 //    ritmo, 503 "high demand", 500, rede, timeout) — a maioria destes erros
 //    resolve-se em segundos, e antes cada modelo era tentado UMA vez;
-//  - limite de chamadas em simultâneo: o plano gratuito tem poucos pedidos
-//    por minuto; uma turma a abrir o mesmo material ao mesmo tempo gerava
-//    uma rajada de 429. Os pedidos a mais esperam em fila em vez de falhar;
+//  - limite de chamadas em simultâneo: com plano pago o tecto de pedidos por
+//    minuto é muito mais alto, por isso a fila deixa passar mais pedidos ao
+//    mesmo tempo em vez de os empilhar sem necessidade;
 //  - erros com código e mensagem em português para o utilizador;
 //  - estatísticas em memória (por funcionalidade) para Admin → Sistema.
 const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
 
-// Ordem de preferência; "gemini-flash-latest" é um alias que a Google mantém
+// Ordem de preferência: qualidade primeiro (plano pago aguenta o custo/ritmo
+// do "pro"), com os alias de "flash" como rede de segurança de velocidade e
+// disponibilidade. "gemini-flash-latest" é um alias que a Google mantém
 // apontado ao flash mais recente — rede de segurança se um nome fixo for
 // descontinuado. Substituível por GEMINI_MODELOS="a,b,c" sem tocar no código.
-const MODELOS_POR_DEFEITO = ["gemini-2.5-flash", "gemini-3.5-flash", "gemini-flash-latest"];
+const MODELOS_POR_DEFEITO = ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-flash-latest"];
 const GEMINI_MODELS = (process.env.GEMINI_MODELOS || "").split(",").map(m => m.trim()).filter(Boolean);
 if (GEMINI_MODELS.length === 0) GEMINI_MODELS.push(...MODELOS_POR_DEFEITO);
 
-const CONCORRENCIA_MAX = Math.max(1, Number(process.env.GEMINI_CONCORRENCIA) || 2);
+const CONCORRENCIA_MAX = Math.max(1, Number(process.env.GEMINI_CONCORRENCIA) || 6);
 const TIMEOUT_MS = Number(process.env.GEMINI_TIMEOUT_MS) || 45000;
 const ESPERA_BASE_MS = 1500;
 
@@ -52,7 +57,7 @@ class ErroIA extends Error {
 
 function descreverFalha(erro) {
   const s = statusDoErro(erro);
-  if (s === 429) return new ErroIA("A IA atingiu o limite de pedidos deste minuto (plano gratuito). Tente de novo dentro de um minuto.", { status: 429, codigo: "quota", causa: erro });
+  if (s === 429) return new ErroIA("A IA atingiu o limite de pedidos deste minuto. Tente de novo dentro de instantes.", { status: 429, codigo: "quota", causa: erro });
   if (s === 503) return new ErroIA("O modelo de IA está com muita procura neste momento. Tente de novo dentro de instantes.", { status: 503, codigo: "alta_procura", causa: erro });
   if (ehTimeout(erro)) return new ErroIA("A IA demorou demasiado a responder. Tente de novo.", { status: 504, codigo: "timeout", causa: erro });
   if (ehFatal(erro)) return new ErroIA("A IA recusou o pedido (chave inválida ou pedido rejeitado). Um administrador deve verificar a configuração.", { status: 502, codigo: "configuracao", causa: erro });

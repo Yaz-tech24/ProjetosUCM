@@ -5,7 +5,7 @@ const { genAI, chamarGemini } = require("./gemini");
 // Tradução do resumo por IA (PT ↔ EN) com cache em `traducoes`. O hash do
 // texto de origem invalida a tradução quando o resumo é regenerado.
 const IDIOMAS = { pt: "português europeu", en: "inglês" };
-const LIMITE_TEXTO = 20000;
+const LIMITE_TEXTO = 80000;
 
 const hashDe = (texto) => crypto.createHash("sha256").update(String(texto)).digest("hex");
 

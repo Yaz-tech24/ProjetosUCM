@@ -12,7 +12,7 @@ const { uploadsDir } = require("../middleware/upload");
 // Quando a IA não responde devolve-se um texto GENÉRICO marcado como
 // provisório — e esse texto NÃO é guardado: antes ficava em cache como se
 // fosse o resumo do documento e era servido para sempre.
-const LIMITE_TEXTO = 12000;
+const LIMITE_TEXTO = 60000;
 
 function caminhoDoMaterial(urlArquivo) {
   const nome = path.basename(String(urlArquivo || ""));

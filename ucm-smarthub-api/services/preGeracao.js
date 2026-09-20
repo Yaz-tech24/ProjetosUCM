@@ -11,15 +11,16 @@ const { garantirQuiz, garantirFlashcards } = require("./geracaoIA");
 // reduz erros vistos pelos alunos: o caminho interactivo passa a ser leitura
 // de cache.
 //
-// Ritmo deliberadamente lento (um material de cada vez, pausa entre
-// chamadas) para caber no plano gratuito do Gemini; em 429 pausa 10 min, em
-// 503 pausa 2 min, e o material volta ao fim da fila.
+// Um material de cada vez, com uma pequena pausa entre chamadas — mesmo com
+// plano pago (tecto de pedidos por minuto bem mais alto) não vale a pena
+// disparar tudo em rajada: em 429 pausa 3 min, em 503 pausa 1 min, e o
+// material volta ao fim da fila.
 const ACTIVA = process.env.IA_PREGERAR !== "0";
-const INTERVALO_ENTRE_MATERIAIS_MS = Number(process.env.IA_PREGERAR_INTERVALO_MS) || 20000;
-const INTERVALO_ENTRE_CHAMADAS_MS = 3000;
-const PAUSA_QUOTA_MS = 10 * 60 * 1000;
-const PAUSA_PROCURA_MS = 2 * 60 * 1000;
-const BACKLOG_POR_HORA = Number(process.env.IA_PREGERAR_BACKLOG_HORA ?? 3);
+const INTERVALO_ENTRE_MATERIAIS_MS = Number(process.env.IA_PREGERAR_INTERVALO_MS) || 6000;
+const INTERVALO_ENTRE_CHAMADAS_MS = 1000;
+const PAUSA_QUOTA_MS = 3 * 60 * 1000;
+const PAUSA_PROCURA_MS = 60 * 1000;
+const BACKLOG_POR_HORA = Number(process.env.IA_PREGERAR_BACKLOG_HORA ?? 15);
 
 const fila = [];               // ids por ordem de chegada
 const naFila = new Set();

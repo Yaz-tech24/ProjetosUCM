@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 
 // Cliente partilhado do Gemini: cadeia de modelos, repetições com espera,
 // classificação de erros e fila de concorrência — tudo com um cliente falso.
-const { chamarGemini, ErroIA, estatisticasIA, testarModelos } = require("../services/gemini");
+const { chamarGemini, ErroIA, estatisticasIA, testarModelos, CONCORRENCIA_MAX } = require("../services/gemini");
 
 const erroHttp = (status, msg = "erro") => Object.assign(new Error(`[GoogleGenerativeAI Error]: Error fetching: [${status} ${msg}] detalhe`), {});
 const resposta = (texto) => ({ response: { text: () => texto } });
@@ -86,9 +86,10 @@ describe("chamarGemini", () => {
     let emCurso = 0, pico = 0;
     const lento = () => new Promise(res => { emCurso++; pico = Math.max(pico, emCurso); setTimeout(() => { emCurso--; res(resposta("ok")); }, 80); });
     const c = clienteFalso({ "*": [lento] });
-    await Promise.all(Array.from({ length: 6 }, (_, i) => chamarGemini({ prompt: String(i), recurso: "t8", cliente: c, modelos: ["m"] })));
-    expect(pico).toBeLessThanOrEqual(2); // GEMINI_CONCORRENCIA por defeito
-    expect(c.chamadas).toHaveLength(6);
+    const total = CONCORRENCIA_MAX + 4;
+    await Promise.all(Array.from({ length: total }, (_, i) => chamarGemini({ prompt: String(i), recurso: "t8", cliente: c, modelos: ["m"] })));
+    expect(pico).toBeLessThanOrEqual(CONCORRENCIA_MAX); // GEMINI_CONCORRENCIA
+    expect(c.chamadas).toHaveLength(total);
   });
 
   it("regista estatísticas por recurso", async () => {

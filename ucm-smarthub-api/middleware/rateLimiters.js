@@ -43,19 +43,28 @@ function criarLimitadorTaxa({ janelaMs, maxTentativas, chave = (req) => req.ip, 
   };
 }
 
-const limitarLogin = criarLimitadorTaxa({ janelaMs: 15 * 60 * 1000, maxTentativas: 10 });
+// Chave por IP: mesma partilha de NAT de campus/rede móvel do limitarRegisto
+// abaixo — um valor baixo aqui bloqueia turmas inteiras a tentar entrar ao
+// mesmo tempo (ex.: início de aula, ~100 estudantes atrás do mesmo IP). A
+// protecção real contra força bruta por conta é o bloqueio por email
+// (FALHAS_LOGIN_MAX abaixo), que não depende do IP; este limitador é só a
+// segunda camada, defesa em profundidade contra automatismos em massa.
+const limitarLogin = criarLimitadorTaxa({ janelaMs: 15 * 60 * 1000, maxTentativas: 150 });
 // Chave por IP: em campus/redes móveis com NAT partilhado, muitos estudantes reais
 // podem aparecer com o mesmo IP — um limite baixo aqui bloqueia turmas inteiras a
 // meio do registo (visto em produção: registos param de ser aceites depois de ~8-10
 // pedidos vindos da mesma rede, muito antes de ser um ataque real). 200/hora continua
 // a impedir scripts de spam em massa sem penalizar picos legítimos de utilizadores.
 const limitarRegisto = criarLimitadorTaxa({ janelaMs: 60 * 60 * 1000, maxTentativas: 200 });
-// Chat de IA — cada pedido custa dinheiro (API do Gemini); sem limite, um utilizador
-// autenticado podia esgotar a quota sozinho. Partilhado por /api/chat, o chat por
-// material e o resumo por IA — e, tal como o registo, chave por IP sofre o mesmo
-// problema de NAT partilhado (campus/rede móvel), por isso o valor é generoso
-// o suficiente para vários estudantes activos na mesma rede em simultâneo.
-const limitarChat = criarLimitadorTaxa({ janelaMs: 60 * 1000, maxTentativas: 30 });
+// Chat de IA — cada pedido custa dinheiro (API do Gemini), mas com plano pago
+// o tecto pode ser bem mais alto do que no gratuito. Partilhado por
+// /api/chat, o chat por material, resumo/tradução, quiz e flashcards — e,
+// tal como o registo, chave por IP sofre o mesmo problema de NAT partilhado
+// (campus/rede móvel): a plataforma foi dimensionada para ~100 utilizadores
+// activos em simultâneo, potencialmente atrás do mesmo IP de campus, por
+// isso o valor tem de chegar para todos eles a usar IA ao mesmo tempo sem
+// se bloquearem uns aos outros.
+const limitarChat = criarLimitadorTaxa({ janelaMs: 60 * 1000, maxTentativas: 150 });
 const limitarEsqueciSenha = criarLimitadorTaxa({ janelaMs: 60 * 60 * 1000, maxTentativas: 5 });
 // O token em si tem 256 bits de entropia (impraticável de adivinhar), mas um
 // limite generoso aqui é defesa em profundidade barata contra automatismos.

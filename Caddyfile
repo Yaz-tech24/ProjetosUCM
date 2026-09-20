@@ -21,13 +21,19 @@
 		# Travão básico por IP, à frente do rate limiting já existente ao
 		# nível do Express — não o substitui, é só uma rede de segurança
 		# contra uma inundação de pedidos antes de chegarem ao Node.
-		# 100 pedidos/min é bastante acima do uso normal (a app já limita
-		# com mais precisão dentro do Express) — só corta picos grosseiros.
+		# "key {remote_host}" agrupa por IP — num campus/rede móvel, uma
+		# turma inteira (dimensionado para ~100 utilizadores activos em
+		# simultâneo) pode aparecer atrás do mesmo IP de NAT, e cada
+		# utilizador já gera vários pedidos/min normais (dashboard, chat,
+		# materiais). 2000/min por IP continua a cortar picos grosseiros de
+		# inundação sem bloquear uso legítimo de uma turma inteira — a
+		# precisão fica com os limitadores do Express (por utilizador/IP,
+		# ver middleware/rateLimiters.js).
 		# Requer o módulo mholt/caddy-ratelimit — ver ./caddy/Dockerfile.
 		rate_limit {
 			zone api_zone {
 				key {remote_host}
-				events 100
+				events 2000
 				window 1m
 			}
 		}
